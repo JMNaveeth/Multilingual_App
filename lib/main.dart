@@ -41,7 +41,7 @@ class MultilingualChatApp extends ConsumerWidget {
         ),
       ),
       routes: {
-        '/login': (context) => const LoginScreen(),
+       // '/login': (context) => const LoginScreen(),
         '/home': (context) => const HomeScreen(),
       },
     );
