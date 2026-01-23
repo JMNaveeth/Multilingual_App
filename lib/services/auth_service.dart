@@ -1,10 +1,20 @@
 import 'dart:convert';
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:multilingual_chat_app/models/user.dart';
 
 class AuthService {
-  static const String baseUrl = 'http://localhost:3000/api'; // Update with your backend URL
+  // Use emulator loopback for Android emulators; keep localhost elsewhere
+  static String get baseUrl {
+    if (kIsWeb) return 'http://localhost:3000/api';
+    try {
+      if (Platform.isAndroid) return 'http://10.0.2.2:3000/api';
+    } catch (_) {}
+    return 'http://localhost:3000/api';
+  }
+
   static const String tokenKey = 'auth_token';
 
   Future<String?> getToken() async {
@@ -45,7 +55,8 @@ class AuthService {
     }
   }
 
-  Future<Map<String, dynamic>> register(String name, String email, String password, String preferredLanguage) async {
+  Future<Map<String, dynamic>> register(String name, String email,
+      String password, String preferredLanguage) async {
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/auth/register'),
