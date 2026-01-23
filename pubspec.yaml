@@ -28,7 +28,7 @@ dependencies:
   jwt_decoder: ^2.0.1
 
   # Media & Audio Processing
-  record: ^5.0.4
+  record: ^6.1.2
   just_audio: ^0.9.34
 
   # UI Components
@@ -57,4 +57,4 @@ flutter:
           weight: 700
 
 dependency_overrides:
-  record_platform_interface: ^3.0.0
+  record_platform_interface: ^1.4.0
