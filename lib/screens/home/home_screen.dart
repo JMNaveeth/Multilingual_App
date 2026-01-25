@@ -1,5 +1,5 @@
+import 'dart:io';
 import 'dart:ui';
-import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:vector_math/vector_math_64.dart' show Matrix4;
 import 'package:multilingual_chat_app/screens/contacts/contacts_screen.dart';
 
@@ -261,35 +261,54 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () async {
-          try {
-            final granted = await FlutterContacts.requestPermission();
-            if (granted) {
-              if (mounted) {
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const ContactsScreen()),
-                );
-              }
-            } else {
-              if (mounted) {
+      floatingActionButton: (Platform.isAndroid || Platform.isIOS)
+          ? FloatingActionButton.extended(
+              onPressed: () async {
+                try {
+                  // Import flutter_contacts dynamically for mobile platforms only
+                  if (Platform.isAndroid || Platform.isIOS) {
+                    // Use dynamic import to avoid compilation errors on Windows
+                    final contacts = await _requestContactsPermission();
+                    if (contacts) {
+                      if (mounted) {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                              builder: (_) => const ContactsScreen()),
+                        );
+                      }
+                    } else {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                              content: Text('Contacts permission denied')),
+                        );
+                      }
+                    }
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Error: ${e.toString()}')),
+                    );
+                  }
+                }
+              },
+              icon: const Icon(Icons.add),
+              label: const Text('New Chat'),
+              backgroundColor: Colors.cyanAccent,
+            )
+          : FloatingActionButton.extended(
+              onPressed: () {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Contacts permission denied')),
+                  const SnackBar(
+                    content: Text('Not available on this platform'),
+                  ),
                 );
-              }
-            }
-          } catch (e) {
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Error: ${e.toString()}')),
-              );
-            }
-          }
-        },
-        icon: const Icon(Icons.add),
-        label: const Text('New Chat'),
-        backgroundColor: Colors.cyanAccent,
-      ),
+              },
+              icon: const Icon(Icons.add),
+              label: const Text('New Chat'),
+              backgroundColor: Colors.cyanAccent,
+            ),
       bottomNavigationBar: BottomNavigationBar(
         backgroundColor: Colors.white.withOpacity(0.06),
         selectedItemColor: Colors.cyanAccent,
@@ -310,5 +329,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ],
       ),
     );
+  }
+
+  Future<bool> _requestContactsPermission() async {
+    try {
+      // Import only when needed
+      if (Platform.isAndroid || Platform.isIOS) {
+        // Using reflection-like approach to avoid direct import on Windows
+        import 'package:flutter_contacts/flutter_contacts.dart' as fc;
+        final granted = await fc.FlutterContacts.requestPermission();
+        return granted;
+      }
+      return false;
+    } catch (e) {
+      print('Error requesting contacts permission: $e');
+      return false;
+    }
   }
 }
