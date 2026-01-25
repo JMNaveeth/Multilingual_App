@@ -1,5 +1,7 @@
 import 'dart:ui';
+import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:vector_math/vector_math_64.dart' show Matrix4;
+import 'package:multilingual_chat_app/screens/contacts/contacts_screen.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -260,9 +262,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          ScaffoldMessenger.of(context)
-              .showSnackBar(const SnackBar(content: Text('Create new chat')));
+        onPressed: () async {
+          // Request contacts permission and open contacts screen
+          final granted = await FlutterContacts.requestPermission();
+          if (!granted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Contacts permission denied')));
+            return;
+          }
+          Navigator.of(context)
+              .push(MaterialPageRoute(builder: (_) => const ContactsScreen()));
         },
         icon: const Icon(Icons.add),
         label: const Text('New Chat'),
