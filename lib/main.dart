@@ -27,19 +27,7 @@ class MultilingualChatApp extends ConsumerWidget {
         useMaterial3: true,
         fontFamily: 'Roboto',
       ),
-      home: authState.when(
-        data: (user) => user != null ? const HomeScreen() : const LoginScreen(),
-        loading: () => const Scaffold(
-          body: Center(
-            child: CircularProgressIndicator(),
-          ),
-        ),
-        error: (error, stack) => Scaffold(
-          body: Center(
-            child: Text('Error: $error'),
-          ),
-        ),
-      ),
+      home: const HomeScreen(),
       routes: {
        // '/login': (context) => const LoginScreen(),
         '/home': (context) => const HomeScreen(),
