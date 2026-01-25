@@ -15,11 +15,30 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   int _selectedIndex = 0;
+  late PageController _pageController;
+  double _currentPage = 0.0;
 
   final List<Widget> _screens = [
     const ChatListScreen(),
     const ProfileScreen(),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController(viewportFraction: 0.78);
+    _pageController.addListener(() {
+      setState(() {
+        _currentPage = _pageController.page ?? 0.0;
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -52,25 +71,34 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           child: Column(
             children: [
               const SizedBox(height: 8),
-              // 3D-looking header cards
+              // Animated PageView header with 3D-ish cards
               SizedBox(
-                height: 160,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  child: ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: 5,
-                    itemBuilder: (context, index) {
-                      final tilt = (index - 2) * 0.06; // small tilt
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 16.0),
+                height: 180,
+                child: PageView.builder(
+                  controller: _pageController,
+                  itemCount: 5,
+                  itemBuilder: (context, index) {
+                    final double diff = index - _currentPage;
+                    final double scale =
+                        (1 - (diff.abs() * 0.12)).clamp(0.88, 1.0);
+                    final double tilt = diff * 0.35;
+                    return Padding(
+                      padding: const EdgeInsets.only(left: 16.0, right: 8.0),
+                      child: GestureDetector(
+                        onTap: () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                                content:
+                                    Text('Open Conversation ${index + 1}')),
+                          );
+                        },
                         child: Transform(
                           alignment: Alignment.center,
                           transform: Matrix4.identity()
                             ..setEntry(3, 2, 0.001)
-                            ..rotateY(tilt),
+                            ..rotateY(tilt)
+                            ..scale(scale, scale),
                           child: Container(
-                            width: 260,
                             decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(20),
                               gradient: LinearGradient(
@@ -156,9 +184,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             ),
                           ),
                         ),
-                      );
-                    },
-                  ),
+                      ),
+                    );
+                  },
                 ),
               ),
               const SizedBox(height: 12),
@@ -178,6 +206,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ],
           ),
         ),
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          ScaffoldMessenger.of(context)
+              .showSnackBar(const SnackBar(content: Text('Create new chat')));
+        },
+        icon: const Icon(Icons.add),
+        label: const Text('New Chat'),
+        backgroundColor: Colors.cyanAccent,
       ),
       bottomNavigationBar: BottomNavigationBar(
         backgroundColor: Colors.white.withOpacity(0.06),
