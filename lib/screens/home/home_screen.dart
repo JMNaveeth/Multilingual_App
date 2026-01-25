@@ -263,15 +263,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
-          // Request contacts permission and open contacts screen
-          final granted = await FlutterContacts.requestPermission();
-          if (!granted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Contacts permission denied')));
-            return;
+          try {
+            final granted = await FlutterContacts.requestPermission();
+            if (granted) {
+              if (mounted) {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const ContactsScreen()),
+                );
+              }
+            } else {
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Contacts permission denied')),
+                );
+              }
+            }
+          } catch (e) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Error: ${e.toString()}')),
+              );
+            }
           }
-          Navigator.of(context)
-              .push(MaterialPageRoute(builder: (_) => const ContactsScreen()));
         },
         icon: const Icon(Icons.add),
         label: const Text('New Chat'),
