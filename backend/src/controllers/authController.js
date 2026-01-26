@@ -208,3 +208,4 @@ module.exports = {
   updateProfile,
   logout
 };
+

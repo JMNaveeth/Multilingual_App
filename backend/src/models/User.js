@@ -107,3 +107,4 @@ userSchema.statics.findByLanguage = function(language) {
 };
 
 module.exports = mongoose.model('User', userSchema);
+

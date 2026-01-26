@@ -81,3 +81,4 @@ class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
     }
   }
 }
+

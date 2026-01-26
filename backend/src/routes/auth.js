@@ -20,3 +20,4 @@ router.put('/profile', authenticate, updateProfile);
 router.post('/logout', authenticate, logout);
 
 module.exports = router;
+

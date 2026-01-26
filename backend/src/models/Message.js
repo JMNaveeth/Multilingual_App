@@ -107,3 +107,4 @@ messageSchema.methods.isFrom = function(userId) {
 };
 
 module.exports = mongoose.model('Message', messageSchema);
+

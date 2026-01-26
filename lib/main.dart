@@ -35,3 +35,4 @@ class MultilingualChatApp extends ConsumerWidget {
     );
   }
 }
+

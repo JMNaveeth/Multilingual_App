@@ -739,3 +739,4 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     return (parts[0][0] + parts[1][0]).toUpperCase();
   }
 }
+

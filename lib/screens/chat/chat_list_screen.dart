@@ -78,3 +78,4 @@ class ChatListScreen extends ConsumerWidget {
     );
   }
 }
+
