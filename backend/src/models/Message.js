@@ -6,10 +6,18 @@ const messageSchema = new mongoose.Schema({
     ref: 'User',
     required: [true, 'Sender is required']
   },
+  senderId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
   receiver: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: [true, 'Receiver is required']
+  },
+  receiverId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
   },
   content: {
     type: String,
@@ -32,6 +40,10 @@ const messageSchema = new mongoose.Schema({
       message: 'Please select a valid message status'
     },
     default: 'sent'
+  },
+  isRead: {
+    type: Boolean,
+    default: false
   },
   mediaUrl: {
     type: String,
@@ -61,8 +73,25 @@ const messageSchema = new mongoose.Schema({
 // Indexes for better query performance
 messageSchema.index({ sender: 1, receiver: 1 });
 messageSchema.index({ receiver: 1, sender: 1 });
+messageSchema.index({ senderId: 1, receiverId: 1 });
+messageSchema.index({ receiverId: 1, senderId: 1 });
 messageSchema.index({ createdAt: -1 });
 messageSchema.index({ conversationId: 1 });
+messageSchema.index({ isRead: 1 });
+
+// Pre-save middleware to sync sender/receiver with senderId/receiverId
+messageSchema.pre('save', function(next) {
+  if (this.sender && !this.senderId) {
+    this.senderId = this.sender;
+  }
+  if (this.receiver && !this.receiverId) {
+    this.receiverId = this.receiver;
+  }
+  if (this.status === 'read') {
+    this.isRead = true;
+  }
+  next();
+});
 
 // Virtual for conversation key (to group messages between two users)
 messageSchema.virtual('conversationKey').get(function() {

@@ -48,6 +48,10 @@ const userSchema = new mongoose.Schema({
     type: Date,
     default: null
   },
+  lastActive: {
+    type: Date,
+    default: Date.now
+  },
   socketId: {
     type: String,
     default: null

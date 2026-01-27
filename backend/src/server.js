@@ -12,6 +12,7 @@ const connectDB = require('./config/database');
 const authRoutes = require('./routes/auth');
 const chatRoutes = require('./routes/chat');
 const userRoutes = require('./routes/user');
+const statsRoutes = require('./routes/stats');
 const { initializeSocket } = require('./services/socketService');
 const { errorHandler } = require('./middleware/errorHandler');
 
@@ -79,6 +80,7 @@ app.get('/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api', statsRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {

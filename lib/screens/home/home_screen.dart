@@ -8,6 +8,8 @@ import 'package:flutter_contacts/flutter_contacts.dart' as fc;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:multilingual_chat_app/providers/auth_provider.dart';
+import 'package:multilingual_chat_app/providers/stats_provider.dart';
+import 'package:multilingual_chat_app/models/stats.dart';
 import 'package:multilingual_chat_app/screens/chat/chat_list_screen.dart';
 import 'package:multilingual_chat_app/screens/profile/profile_screen.dart';
 
@@ -537,82 +539,232 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   // Build 3D stats row
   Widget _build3DStatsRow(BuildContext context) {
-    final stats = [
-      {'value': '24', 'label': 'Active', 'color': Color(0xFF00D9FF)},
-      {'value': '156', 'label': 'Messages', 'color': Color(0xFF7F00FF)},
-      {'value': '12', 'label': 'Groups', 'color': Color(0xFFFF6B6B)},
-    ];
+    // Watch the real-time stats stream
+    final statsAsync = ref.watch(statsStreamProvider);
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: stats.map((stat) {
-          return Expanded(
-            child: AnimatedBuilder(
-              animation: _pulseController,
-              builder: (context, child) {
-                return Transform.scale(
-                  scale: 1.0 + (_pulseController.value * 0.05),
-                  child: Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 6),
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(20),
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          (stat['color'] as Color).withOpacity(0.3),
-                          (stat['color'] as Color).withOpacity(0.1),
-                        ],
-                      ),
-                      border: Border.all(
-                        color: Colors.white.withOpacity(0.2),
-                        width: 1.5,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: (stat['color'] as Color).withOpacity(0.3),
-                          blurRadius: 15,
-                          offset: const Offset(0, 8),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      children: [
-                        Text(
-                          stat['value'] as String,
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 28,
-                            fontWeight: FontWeight.bold,
-                            shadows: [
-                              Shadow(
-                                color: (stat['color'] as Color),
-                                blurRadius: 10,
-                              ),
+    return statsAsync.when(
+      data: (stats) {
+        final statsList = [
+          {
+            'value': stats.activeUsers.toString(),
+            'label': 'Active',
+            'color': const Color(0xFF00D9FF),
+            'icon': Icons.people
+          },
+          {
+            'value': stats.totalMessages.toString(),
+            'label': 'Messages',
+            'color': const Color(0xFF7F00FF),
+            'icon': Icons.message
+          },
+          {
+            'value': stats.totalGroups.toString(),
+            'label': 'Groups',
+            'color': const Color(0xFFFF6B6B),
+            'icon': Icons.group
+          },
+        ];
+
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: statsList.map((stat) {
+              return Expanded(
+                child: AnimatedBuilder(
+                  animation: _pulseController,
+                  builder: (context, child) {
+                    return Transform.scale(
+                      scale: 1.0 + (_pulseController.value * 0.05),
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 6),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(20),
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              (stat['color'] as Color).withOpacity(0.3),
+                              (stat['color'] as Color).withOpacity(0.1),
                             ],
                           ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          stat['label'] as String,
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.7),
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.2),
+                            width: 1.5,
                           ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: (stat['color'] as Color).withOpacity(0.3),
+                              blurRadius: 15,
+                              offset: const Offset(0, 8),
+                            ),
+                          ],
                         ),
+                        child: Column(
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  stat['icon'] as IconData,
+                                  color: stat['color'] as Color,
+                                  size: 16,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  stat['value'] as String,
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 28,
+                                    fontWeight: FontWeight.bold,
+                                    shadows: [
+                                      Shadow(
+                                        color: (stat['color'] as Color),
+                                        blurRadius: 10,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              stat['label'] as String,
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.7),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            // Live indicator
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.greenAccent.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    width: 6,
+                                    height: 6,
+                                    decoration: const BoxDecoration(
+                                      color: Colors.greenAccent,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  const Text(
+                                    'Live',
+                                    style: TextStyle(
+                                      color: Colors.greenAccent,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              );
+            }).toList(),
+          ),
+        );
+      },
+      loading: () {
+        // Show shimmer loading effect
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: List.generate(3, (index) {
+              return Expanded(
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 6),
+                  height: 100,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(20),
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Colors.white.withOpacity(0.1),
+                        Colors.white.withOpacity(0.05),
                       ],
                     ),
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.2),
+                      width: 1.5,
+                    ),
                   ),
-                );
-              },
+                  child: const Center(
+                    child: CircularProgressIndicator(
+                      color: Colors.cyanAccent,
+                      strokeWidth: 2,
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ),
+        );
+      },
+      error: (error, stack) {
+        // Show error state with retry option
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Colors.red.withOpacity(0.2),
+                  Colors.red.withOpacity(0.1),
+                ],
+              ),
+              border: Border.all(
+                color: Colors.red.withOpacity(0.3),
+                width: 1.5,
+              ),
             ),
-          );
-        }).toList(),
-      ),
+            child: Row(
+              children: [
+                const Icon(Icons.error_outline, color: Colors.redAccent),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Unable to fetch live stats',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.9),
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.refresh, color: Colors.cyanAccent),
+                  onPressed: () {
+                    ref.invalidate(statsStreamProvider);
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -644,4 +796,3 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     );
   }
 }
-
