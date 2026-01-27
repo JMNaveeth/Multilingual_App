@@ -52,10 +52,10 @@ class AppStats {
   }
 
   static AppStats get empty => AppStats(
-    activeUsers: 0,
-    totalMessages: 0,
-    totalGroups: 0,
-    unreadMessages: 0,
-    lastUpdated: DateTime.now(),
-  );
+        activeUsers: 0,
+        totalMessages: 0,
+        totalGroups: 0,
+        unreadMessages: 0,
+        lastUpdated: DateTime.now(),
+      );
 }
