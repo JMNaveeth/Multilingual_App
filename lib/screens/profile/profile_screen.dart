@@ -1,5 +1,3 @@
-import 'dart:ui';
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:multilingual_chat_app/providers/auth_provider.dart';
@@ -11,16 +9,14 @@ class ProfileScreen extends ConsumerStatefulWidget {
   ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends ConsumerState<ProfileScreen>
-    with TickerProviderStateMixin {
+class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _nameController;
+  late TextEditingController _statusController;
   String _selectedLanguage = 'en';
   bool _isLoading = false;
-  late AnimationController _floatingController;
-  late AnimationController _rotationController;
-  late AnimationController _pulseController;
-  late AnimationController _shimmerController;
+  bool _isEditingName = false;
+  bool _isEditingStatus = false;
 
   final List<Map<String, String>> _languages = [
     {'code': 'en', 'name': 'English'},
@@ -41,695 +37,56 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     {'code': 'ml', 'name': 'Malayalam'},
   ];
 
+  static const _waGreen = Color(0xFF25D366);
+  static const _waDark = Color(0xFF075E54);
+  static const _waTeal = Color(0xFF128C7E);
+  static const _waBg = Color(0xFFF0F2F5);
+  static const _waCardBg = Colors.white;
+  static const _waSubtitle = Color(0xFF8696A0);
+  static const _waDivider = Color(0xFFE9EDEF);
+  static const _waText = Color(0xFF111B21);
+
   @override
   void initState() {
     super.initState();
     final user = ref.read(authProvider).value;
     _nameController = TextEditingController(text: user?.name ?? '');
+    _statusController = TextEditingController(text: 'Available');
     _selectedLanguage = user?.preferredLanguage ?? 'en';
-
-    // Initialize animation controllers
-    _floatingController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 4),
-    )..repeat(reverse: true);
-
-    _rotationController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 25),
-    )..repeat();
-
-    _pulseController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 2000),
-    )..repeat(reverse: true);
-
-    _shimmerController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 3),
-    )..repeat();
   }
 
   @override
   void dispose() {
     _nameController.dispose();
-    _floatingController.dispose();
-    _rotationController.dispose();
-    _pulseController.dispose();
-    _shimmerController.dispose();
+    _statusController.dispose();
     super.dispose();
   }
 
   Future<void> _updateProfile() async {
     if (!_formKey.currentState!.validate()) return;
-
     setState(() => _isLoading = true);
-
     try {
       await ref.read(authProvider.notifier).updateProfile(
             name: _nameController.text.trim(),
             preferredLanguage: _selectedLanguage,
           );
-
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Profile updated successfully')),
+          const SnackBar(
+            content: Text('Profile updated successfully'),
+            backgroundColor: _waTeal,
+          ),
         );
       }
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to update profile: $error')),
+          SnackBar(content: Text('Failed to update: $error')),
         );
       }
     } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final user = ref.watch(authProvider).value;
-
-    if (user == null) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
-    }
-
-    return Scaffold(
-      extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        title: const Text('Profile',
-            style: TextStyle(fontWeight: FontWeight.bold)),
-        centerTitle: true,
-      ),
-      body: Stack(
-        children: [
-          // Animated gradient background
-          AnimatedBuilder(
-            animation: _rotationController,
-            builder: (context, child) {
-              return Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      Color(0xFF1A2980),
-                      Color(0xFF26D0CE),
-                      Color.lerp(Color(0xFF26D0CE), Color(0xFF1A2980),
-                          _rotationController.value * 0.3)!,
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
-
-          // Floating particles
-          ...List.generate(12, (index) {
-            return AnimatedBuilder(
-              animation: _floatingController,
-              builder: (context, child) {
-                final offset = math.sin(
-                        (_floatingController.value * 2 * math.pi) +
-                            index * 0.5) *
-                    40;
-                return Positioned(
-                  left: (index * 80.0) % MediaQuery.of(context).size.width,
-                  top: (index * 100.0) % MediaQuery.of(context).size.height +
-                      offset,
-                  child: Container(
-                    width: 80,
-                    height: 80,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: RadialGradient(
-                        colors: [
-                          Colors.white.withOpacity(0.05),
-                          Colors.transparent,
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              },
-            );
-          }),
-
-          // Main content
-          SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24.0),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    const SizedBox(height: 20),
-
-                    // 3D Profile Picture with floating effect
-                    _build3DProfileAvatar(user),
-
-                    const SizedBox(height: 16),
-
-                    // Change Profile Picture Button with 3D effect
-                    AnimatedBuilder(
-                      animation: _pulseController,
-                      builder: (context, child) {
-                        return Transform.scale(
-                          scale: 1.0 + (_pulseController.value * 0.05),
-                          child: TextButton.icon(
-                            onPressed: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                    content: Text(
-                                        'Profile picture upload coming soon!')),
-                              );
-                            },
-                            icon: const Icon(Icons.camera_alt,
-                                color: Colors.white),
-                            label: const Text(
-                              'Change Profile Picture',
-                              style:
-                                  TextStyle(color: Colors.white, fontSize: 16),
-                            ),
-                            style: TextButton.styleFrom(
-                              backgroundColor: Colors.white.withOpacity(0.2),
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 20, vertical: 12),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(30),
-                              ),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-
-                    const SizedBox(height: 32),
-
-                    // 3D Name field
-                    _build3DTextField(
-                      controller: _nameController,
-                      label: 'Full Name',
-                      icon: Icons.person,
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter your name';
-                        }
-                        if (value.length < 2) {
-                          return 'Name must be at least 2 characters';
-                        }
-                        return null;
-                      },
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    // 3D Email field (disabled)
-                    _build3DTextField(
-                      initialValue: user.email,
-                      label: 'Email',
-                      icon: Icons.email,
-                      enabled: false,
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    // 3D Language Dropdown
-                    _build3DLanguageDropdown(),
-
-                    const SizedBox(height: 24),
-
-                    // 3D Account Information Card
-                    _build3DAccountInfoCard(user),
-
-                    const SizedBox(height: 32),
-
-                    // 3D Update Button
-                    _build3DButton(
-                      onPressed: _isLoading ? null : _updateProfile,
-                      label: _isLoading ? 'Updating...' : 'Update Profile',
-                      icon: Icons.check_circle,
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF00D9FF), Color(0xFF0099CC)],
-                      ),
-                      isLoading: _isLoading,
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    // 3D Logout Button
-                    _build3DButton(
-                      onPressed: () async {
-                        final confirmed = await showDialog<bool>(
-                          context: context,
-                          builder: (context) => _build3DDialog(context),
-                        );
-
-                        if (confirmed == true) {
-                          await ref.read(authProvider.notifier).logout();
-                        }
-                      },
-                      label: 'Logout',
-                      icon: Icons.logout,
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFFFF6B6B), Color(0xFFEE5A6F)],
-                      ),
-                    ),
-
-                    const SizedBox(height: 32),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInfoRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: TextStyle(color: Colors.grey[600]),
-          ),
-          Text(
-            value,
-            style: const TextStyle(fontWeight: FontWeight.w500),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _formatDate(DateTime date) {
-    return '${date.day}/${date.month}/${date.year}';
-  }
-
-  // 3D profile avatar with glow, floating, and shimmer
-  Widget _build3DProfileAvatar(dynamic user) {
-    return AnimatedBuilder(
-      animation: Listenable.merge([_floatingController, _pulseController]),
-      builder: (context, child) {
-        final floatY = math.sin(_floatingController.value * 2 * math.pi) * 10;
-        final scale = 1.0 + (_pulseController.value * 0.04);
-        return Transform.translate(
-          offset: Offset(0, floatY),
-          child: Transform.scale(
-            scale: scale,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                Container(
-                  width: 150,
-                  height: 150,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF00D9FF), Color(0xFF7F00FF)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.35),
-                        blurRadius: 25,
-                        offset: const Offset(0, 14),
-                      ),
-                      BoxShadow(
-                        color: const Color(0xFF00D9FF).withOpacity(0.35),
-                        blurRadius: 30,
-                        spreadRadius: 2,
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  width: 132,
-                  height: 132,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: LinearGradient(
-                      colors: [
-                        Colors.white.withOpacity(0.18),
-                        Colors.white.withOpacity(0.08),
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    border: Border.all(
-                      color: Colors.white.withOpacity(0.25),
-                      width: 2,
-                    ),
-                  ),
-                  child: ClipOval(
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        // Placeholder initials or future image
-                        Container(
-                          alignment: Alignment.center,
-                          color: Colors.white.withOpacity(0.04),
-                          child: Text(
-                            _initialsFromName(user.name),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 42,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                        // Shimmer highlight
-                        AnimatedBuilder(
-                          animation: _shimmerController,
-                          builder: (context, _) {
-                            return Transform.translate(
-                              offset: Offset(
-                                -150 + (_shimmerController.value * 300),
-                                0,
-                              ),
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    colors: [
-                                      Colors.transparent,
-                                      Colors.white.withOpacity(0.25),
-                                      Colors.transparent,
-                                    ],
-                                    stops: const [0.0, 0.5, 1.0],
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  // 3D text field wrapper
-  Widget _build3DTextField({
-    TextEditingController? controller,
-    String? initialValue,
-    required String label,
-    required IconData icon,
-    bool enabled = true,
-    String? Function(String?)? validator,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(18),
-        gradient: LinearGradient(
-          colors: [
-            Colors.white.withOpacity(0.12),
-            Colors.white.withOpacity(0.05),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.25),
-            blurRadius: 18,
-            offset: const Offset(0, 10),
-          ),
-          BoxShadow(
-            color: Colors.white.withOpacity(0.08),
-            blurRadius: 8,
-            offset: const Offset(-3, -3),
-          ),
-        ],
-        border: Border.all(color: Colors.white.withOpacity(0.18), width: 1.4),
-      ),
-      child: TextFormField(
-        controller: controller,
-        initialValue: controller == null ? initialValue : null,
-        enabled: enabled,
-        validator: validator,
-        style: const TextStyle(color: Colors.white),
-        decoration: InputDecoration(
-          labelText: label,
-          labelStyle: TextStyle(color: Colors.white.withOpacity(0.82)),
-          prefixIcon: Icon(icon, color: Colors.white),
-          border: InputBorder.none,
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
-        ),
-      ),
-    );
-  }
-
-  // 3D language dropdown
-  Widget _build3DLanguageDropdown() {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(18),
-        gradient: LinearGradient(
-          colors: [
-            Colors.white.withOpacity(0.12),
-            Colors.white.withOpacity(0.05),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.25),
-            blurRadius: 18,
-            offset: const Offset(0, 10),
-          ),
-          BoxShadow(
-            color: Colors.white.withOpacity(0.08),
-            blurRadius: 8,
-            offset: const Offset(-3, -3),
-          ),
-        ],
-        border: Border.all(color: Colors.white.withOpacity(0.18), width: 1.4),
-      ),
-      child: DropdownButtonFormField<String>(
-        value: _selectedLanguage,
-        dropdownColor: const Color(0xFF0F172A),
-        iconEnabledColor: Colors.white,
-        style: const TextStyle(color: Colors.white),
-        decoration: InputDecoration(
-          labelText: 'Preferred Language',
-          labelStyle: TextStyle(color: Colors.white.withOpacity(0.82)),
-          prefixIcon: const Icon(Icons.language, color: Colors.white),
-          border: InputBorder.none,
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-        ),
-        items: _languages.map((lang) {
-          return DropdownMenuItem(
-            value: lang['code'],
-            child: Text(lang['name'] ?? ''),
-          );
-        }).toList(),
-        onChanged: (value) {
-          if (value != null) setState(() => _selectedLanguage = value);
-        },
-        validator: (value) {
-          if (value == null || value.isEmpty) {
-            return 'Please select a language';
-          }
-          return null;
-        },
-      ),
-    );
-  }
-
-  // 3D account info card
-  Widget _build3DAccountInfoCard(dynamic user) {
-    final rows = <Map<String, String>>[
-      {'label': 'Member since', 'value': _formatDate(user.createdAt)},
-      {'label': 'Status', 'value': user.isOnline ? 'Online' : 'Offline'},
-      if (!user.isOnline && user.lastSeen != null)
-        {'label': 'Last seen', 'value': _formatDate(user.lastSeen!)},
-    ];
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(22),
-        gradient: LinearGradient(
-          colors: [
-            Colors.white.withOpacity(0.10),
-            Colors.white.withOpacity(0.04),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.28),
-            blurRadius: 20,
-            offset: const Offset(0, 12),
-          ),
-        ],
-        border: Border.all(color: Colors.white.withOpacity(0.18), width: 1.4),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: const [
-              Icon(Icons.verified_user, color: Colors.white),
-              SizedBox(width: 8),
-              Text(
-                'Account Information',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          ...rows.map((row) => _buildInfoRow(row['label']!, row['value']!)),
-        ],
-      ),
-    );
-  }
-
-  // 3D primary button
-  Widget _build3DButton({
-    required VoidCallback? onPressed,
-    required String label,
-    required IconData icon,
-    Gradient? gradient,
-    bool isLoading = false,
-  }) {
-    return AnimatedBuilder(
-      animation: _pulseController,
-      builder: (context, child) {
-        final scale = 1.0 + (_pulseController.value * 0.03);
-        return Transform.scale(
-          scale: scale,
-          child: Container(
-            width: double.infinity,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(18),
-              gradient: gradient ??
-                  const LinearGradient(
-                      colors: [Colors.white24, Colors.white12]),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.25),
-                  blurRadius: 16,
-                  offset: const Offset(0, 10),
-                ),
-                BoxShadow(
-                  color: Colors.white.withOpacity(0.08),
-                  blurRadius: 8,
-                  offset: const Offset(-3, -3),
-                ),
-              ],
-            ),
-            child: ElevatedButton(
-              onPressed: onPressed,
-              style: ElevatedButton.styleFrom(
-                elevation: 0,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                backgroundColor: Colors.transparent,
-                shadowColor: Colors.transparent,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(18)),
-              ),
-              child: isLoading
-                  ? const SizedBox(
-                      height: 22,
-                      width: 22,
-                      child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.white),
-                    )
-                  : Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(icon, color: Colors.white),
-                        const SizedBox(width: 10),
-                        Text(
-                          label,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                      ],
-                    ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  // 3D confirmation dialog
-  Widget _build3DDialog(BuildContext context) {
-    return AlertDialog(
-      backgroundColor: Colors.white.withOpacity(0.08),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      contentPadding: const EdgeInsets.all(20),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: const [
-          Icon(Icons.logout, color: Colors.white, size: 36),
-          SizedBox(height: 12),
-          Text(
-            'Logout',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          SizedBox(height: 8),
-          Text(
-            'Are you sure you want to logout?',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.white70),
-          ),
-        ],
-      ),
-      actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(false),
-          child: const Text('Cancel', style: TextStyle(color: Colors.white70)),
-        ),
-        ElevatedButton(
-          onPressed: () => Navigator.of(context).pop(true),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.redAccent,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-          child: const Text('Logout'),
-        ),
-      ],
-    );
   }
 
   String _initialsFromName(String name) {
@@ -738,5 +95,537 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     if (parts.length == 1) return parts.first[0].toUpperCase();
     return (parts[0][0] + parts[1][0]).toUpperCase();
   }
-}
 
+  String _formatDate(DateTime date) =>
+      '${date.day}/${date.month}/${date.year}';
+
+  String get _selectedLanguageName =>
+      _languages.firstWhere(
+        (l) => l['code'] == _selectedLanguage,
+        orElse: () => {'name': 'English'},
+      )['name'] ??
+      'English';
+
+  @override
+  Widget build(BuildContext context) {
+    final user = ref.watch(authProvider).value;
+
+    if (user == null) {
+      return const Scaffold(
+        backgroundColor: _waBg,
+        body: Center(child: CircularProgressIndicator(color: _waTeal)),
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: _waBg,
+      body: Form(
+        key: _formKey,
+        child: CustomScrollView(
+          slivers: [
+            // WhatsApp-style collapsible AppBar
+            SliverAppBar(
+              expandedHeight: 260,
+              pinned: true,
+              backgroundColor: _waDark,
+              automaticallyImplyLeading: false,
+              iconTheme: const IconThemeData(color: Colors.white),
+              title: const Text(
+                'Profile',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 20,
+                ),
+              ),
+              actions: [
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_vert, color: Colors.white),
+                  onSelected: (v) {
+                    if (v == 'logout') _showLogoutDialog();
+                  },
+                  itemBuilder: (_) => [
+                    const PopupMenuItem(
+                      value: 'logout',
+                      child: Text('Log out'),
+                    ),
+                  ],
+                ),
+              ],
+              flexibleSpace: FlexibleSpaceBar(
+                background: Container(
+                  color: _waDark,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const SizedBox(height: 60),
+                      // Avatar with camera button
+                      Stack(
+                        children: [
+                          CircleAvatar(
+                            radius: 58,
+                            backgroundColor: _waTeal,
+                            child: Text(
+                              _initialsFromName(user.name),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 38,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          Positioned(
+                            bottom: 0,
+                            right: 0,
+                            child: GestureDetector(
+                              onTap: () {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Photo upload coming soon!'),
+                                    backgroundColor: _waTeal,
+                                  ),
+                                );
+                              },
+                              child: Container(
+                                width: 36,
+                                height: 36,
+                                decoration: const BoxDecoration(
+                                  color: _waGreen,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.camera_alt,
+                                  color: Colors.white,
+                                  size: 20,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        user.name.isEmpty ? 'Your Name' : user.name,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        user.email,
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.75),
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+            SliverToBoxAdapter(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 16),
+
+                  // ── Your Name ──
+                  _buildSectionLabel('Your name'),
+                  _buildEditableCard(
+                    icon: Icons.person_outline,
+                    controller: _nameController,
+                    isEditing: _isEditingName,
+                    hint: 'Enter your name',
+                    onEditToggle: () =>
+                        setState(() => _isEditingName = !_isEditingName),
+                    onSave: _updateProfile,
+                    validator: (v) {
+                      if (v == null || v.isEmpty) return 'Please enter your name';
+                      if (v.length < 2) return 'At least 2 characters';
+                      return null;
+                    },
+                  ),
+                  _buildSectionNote(
+                    'This is not your username or pin. This name will be visible to your contacts.',
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  // ── About ──
+                  _buildSectionLabel('About'),
+                  _buildEditableCard(
+                    icon: Icons.info_outline,
+                    controller: _statusController,
+                    isEditing: _isEditingStatus,
+                    hint: 'Available',
+                    onEditToggle: () =>
+                        setState(() => _isEditingStatus = !_isEditingStatus),
+                    onSave: () {},
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  // ── Email ──
+                  _buildSectionLabel('Email'),
+                  _buildReadonlyCard(
+                    icon: Icons.email_outlined,
+                    value: user.email,
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  // ── Preferred Language ──
+                  _buildSectionLabel('Preferred Language'),
+                  _buildLanguageCard(),
+
+                  const SizedBox(height: 8),
+
+                  // ── Account Info ──
+                  _buildSectionLabel('Account'),
+                  _buildInfoCard(user),
+
+                  const SizedBox(height: 24),
+
+                  // ── Save Button ──
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: ElevatedButton(
+                        onPressed: _isLoading ? null : _updateProfile,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _waGreen,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: _isLoading
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text(
+                                'Save Changes',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 16,
+                                ),
+                              ),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  // ── Log Out Button ──
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: OutlinedButton.icon(
+                        onPressed: _showLogoutDialog,
+                        icon: const Icon(Icons.logout, color: Colors.red),
+                        label: const Text(
+                          'Log out',
+                          style: TextStyle(
+                            color: Colors.red,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 16,
+                          ),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Colors.red),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 40),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSectionLabel(String label) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: _waTeal,
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSectionNote(String note) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+      child: Text(
+        note,
+        style: const TextStyle(color: _waSubtitle, fontSize: 12),
+      ),
+    );
+  }
+
+  Widget _buildEditableCard({
+    required IconData icon,
+    required TextEditingController controller,
+    required bool isEditing,
+    required String hint,
+    required VoidCallback onEditToggle,
+    required VoidCallback onSave,
+    String? Function(String?)? validator,
+  }) {
+    return Container(
+      color: _waCardBg,
+      child: ListTile(
+        leading: Icon(icon, color: _waSubtitle),
+        title: isEditing
+            ? TextFormField(
+                controller: controller,
+                autofocus: true,
+                validator: validator,
+                style: const TextStyle(color: _waText, fontSize: 16),
+                decoration: InputDecoration(
+                  hintText: hint,
+                  hintStyle: const TextStyle(color: _waSubtitle),
+                  isDense: true,
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.zero,
+                ),
+                onFieldSubmitted: (_) {
+                  onSave();
+                  onEditToggle();
+                },
+              )
+            : Text(
+                controller.text.isEmpty ? hint : controller.text,
+                style: TextStyle(
+                  color: controller.text.isEmpty ? _waSubtitle : _waText,
+                  fontSize: 16,
+                ),
+              ),
+        trailing: IconButton(
+          icon: Icon(
+            isEditing ? Icons.check : Icons.edit,
+            color: isEditing ? _waGreen : _waSubtitle,
+            size: 20,
+          ),
+          onPressed: () {
+            if (isEditing) onSave();
+            onEditToggle();
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReadonlyCard({
+    required IconData icon,
+    required String value,
+    Widget? trailing,
+  }) {
+    return Container(
+      color: _waCardBg,
+      child: ListTile(
+        leading: Icon(icon, color: _waSubtitle),
+        title: Text(
+          value,
+          style: const TextStyle(color: _waText, fontSize: 16),
+        ),
+        trailing: trailing,
+      ),
+    );
+  }
+
+  Widget _buildLanguageCard() {
+    return Container(
+      color: _waCardBg,
+      child: ListTile(
+        leading: const Icon(Icons.language, color: _waSubtitle),
+        title: Text(
+          _selectedLanguageName,
+          style: const TextStyle(color: _waText, fontSize: 16),
+        ),
+        trailing: const Icon(Icons.chevron_right, color: _waSubtitle),
+        onTap: _showLanguagePicker,
+      ),
+    );
+  }
+
+  void _showLanguagePicker() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => Column(
+        children: [
+          Container(
+            width: 40,
+            height: 4,
+            margin: const EdgeInsets.only(top: 12, bottom: 8),
+            decoration: BoxDecoration(
+              color: _waSubtitle.withOpacity(0.4),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: Text(
+              'Select Language',
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w600,
+                color: _waText,
+              ),
+            ),
+          ),
+          const Divider(height: 1, color: _waDivider),
+          Expanded(
+            child: ListView.separated(
+              itemCount: _languages.length,
+              separatorBuilder: (_, __) =>
+                  const Divider(height: 1, color: _waDivider, indent: 16),
+              itemBuilder: (_, i) {
+                final lang = _languages[i];
+                final selected = lang['code'] == _selectedLanguage;
+                return ListTile(
+                  title: Text(
+                    lang['name'] ?? '',
+                    style: TextStyle(
+                      color: selected ? _waTeal : _waText,
+                      fontWeight:
+                          selected ? FontWeight.w600 : FontWeight.normal,
+                    ),
+                  ),
+                  trailing: selected
+                      ? const Icon(Icons.check, color: _waGreen)
+                      : null,
+                  onTap: () {
+                    setState(() => _selectedLanguage = lang['code']!);
+                    Navigator.pop(ctx);
+                  },
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoCard(dynamic user) {
+    return Container(
+      color: _waCardBg,
+      child: Column(
+        children: [
+          ListTile(
+            leading: const Icon(Icons.calendar_today_outlined,
+                color: _waSubtitle),
+            title: const Text(
+              'Member since',
+              style: TextStyle(color: _waSubtitle, fontSize: 13),
+            ),
+            subtitle: Text(
+              _formatDate(user.createdAt),
+              style: const TextStyle(color: _waText, fontSize: 15),
+            ),
+          ),
+          const Divider(height: 1, indent: 56, color: _waDivider),
+          ListTile(
+            leading: Icon(
+              Icons.circle,
+              color: user.isOnline ? _waGreen : _waSubtitle,
+              size: 14,
+            ),
+            title: const Text(
+              'Status',
+              style: TextStyle(color: _waSubtitle, fontSize: 13),
+            ),
+            subtitle: Text(
+              user.isOnline ? 'Online' : 'Offline',
+              style: const TextStyle(color: _waText, fontSize: 15),
+            ),
+          ),
+          if (!user.isOnline && user.lastSeen != null) ...[
+            const Divider(height: 1, indent: 56, color: _waDivider),
+            ListTile(
+              leading: const Icon(Icons.access_time,
+                  color: _waSubtitle, size: 20),
+              title: const Text(
+                'Last seen',
+                style: TextStyle(color: _waSubtitle, fontSize: 13),
+              ),
+              subtitle: Text(
+                _formatDate(user.lastSeen!),
+                style: const TextStyle(color: _waText, fontSize: 15),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  void _showLogoutDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        title: const Text(
+          'Log out?',
+          style: TextStyle(color: _waText, fontWeight: FontWeight.w600),
+        ),
+        content: const Text(
+          'Are you sure you want to log out?',
+          style: TextStyle(color: _waSubtitle),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel',
+                style: TextStyle(color: _waSubtitle)),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await ref.read(authProvider.notifier).logout();
+            },
+            child: const Text(
+              'Log out',
+              style: TextStyle(
+                color: Colors.red,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
