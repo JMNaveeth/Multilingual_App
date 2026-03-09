@@ -11,12 +11,13 @@ class ProfileScreen extends ConsumerStatefulWidget {
 
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   final _formKey = GlobalKey<FormState>();
-  late TextEditingController _nameController;
-  late TextEditingController _statusController;
+  TextEditingController? _nameController;
+  TextEditingController? _statusController;
   String _selectedLanguage = 'en';
   bool _isLoading = false;
   bool _isEditingName = false;
   bool _isEditingStatus = false;
+  bool _controllersInitialized = false;
 
   final List<Map<String, String>> _languages = [
     {'code': 'en', 'name': 'English'},
@@ -46,19 +47,19 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   static const _waDivider = Color(0xFFE9EDEF);
   static const _waText = Color(0xFF111B21);
 
-  @override
-  void initState() {
-    super.initState();
-    final user = ref.read(authProvider).value;
-    _nameController = TextEditingController(text: user?.name ?? '');
+  /// Called once when user data is first available
+  void _initControllers(dynamic user) {
+    if (_controllersInitialized) return;
+    _controllersInitialized = true;
+    _nameController = TextEditingController(text: user.name ?? '');
     _statusController = TextEditingController(text: 'Available');
-    _selectedLanguage = user?.preferredLanguage ?? 'en';
+    _selectedLanguage = user.preferredLanguage ?? 'en';
   }
 
   @override
   void dispose() {
-    _nameController.dispose();
-    _statusController.dispose();
+    _nameController?.dispose();
+    _statusController?.dispose();
     super.dispose();
   }
 
@@ -67,7 +68,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     setState(() => _isLoading = true);
     try {
       await ref.read(authProvider.notifier).updateProfile(
-            name: _nameController.text.trim(),
+            name: _nameController!.text.trim(),
             preferredLanguage: _selectedLanguage,
           );
       if (mounted) {
@@ -108,259 +109,290 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final user = ref.watch(authProvider).value;
+    // Watch the full async value — handle loading/error/data
+    final authState = ref.watch(authProvider);
 
-    if (user == null) {
-      return const Scaffold(
+    return authState.when(
+      // ── Still loading auth ──
+      loading: () => const Scaffold(
+        backgroundColor: _waDark,
+        body: Center(
+          child: CircularProgressIndicator(color: Colors.white),
+        ),
+      ),
+      // ── Auth error ──
+      error: (e, __) => Scaffold(
         backgroundColor: _waBg,
-        body: Center(child: CircularProgressIndicator(color: _waTeal)),
-      );
-    }
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.error_outline, color: Colors.red, size: 48),
+              const SizedBox(height: 12),
+              Text('Error: $e',
+                  style: const TextStyle(color: _waText)),
+            ],
+          ),
+        ),
+      ),
+      // ── User loaded ──
+      data: (user) {
+        if (user == null) {
+          // Not logged in — shouldn't normally reach here
+          return const Scaffold(
+            backgroundColor: _waBg,
+            body: Center(
+              child: Text('Not logged in',
+                  style: TextStyle(color: _waText)),
+            ),
+          );
+        }
 
-    return Scaffold(
-      backgroundColor: _waBg,
-      body: Form(
-        key: _formKey,
-        child: CustomScrollView(
-          slivers: [
-            // WhatsApp-style collapsible AppBar
-            SliverAppBar(
-              expandedHeight: 260,
-              pinned: true,
-              backgroundColor: _waDark,
-              automaticallyImplyLeading: false,
-              iconTheme: const IconThemeData(color: Colors.white),
-              title: const Text(
-                'Profile',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 20,
-                ),
-              ),
-              actions: [
-                PopupMenuButton<String>(
-                  icon: const Icon(Icons.more_vert, color: Colors.white),
-                  onSelected: (v) {
-                    if (v == 'logout') _showLogoutDialog();
-                  },
-                  itemBuilder: (_) => [
-                    const PopupMenuItem(
-                      value: 'logout',
-                      child: Text('Log out'),
+        // Initialize controllers once with real user data
+        _initControllers(user);
+
+        return Scaffold(
+          backgroundColor: _waBg,
+          body: Form(
+            key: _formKey,
+            child: CustomScrollView(
+              slivers: [
+                // WhatsApp-style collapsible AppBar
+                SliverAppBar(
+                  expandedHeight: 260,
+                  pinned: true,
+                  backgroundColor: _waDark,
+                  automaticallyImplyLeading: false,
+                  iconTheme: const IconThemeData(color: Colors.white),
+                  title: const Text(
+                    'Profile',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 20,
+                    ),
+                  ),
+                  actions: [
+                    PopupMenuButton<String>(
+                      icon: const Icon(Icons.more_vert, color: Colors.white),
+                      onSelected: (v) {
+                        if (v == 'logout') _showLogoutDialog();
+                      },
+                      itemBuilder: (_) => [
+                        const PopupMenuItem(
+                          value: 'logout',
+                          child: Text('Log out'),
+                        ),
+                      ],
                     ),
                   ],
-                ),
-              ],
-              flexibleSpace: FlexibleSpaceBar(
-                background: Container(
-                  color: _waDark,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const SizedBox(height: 60),
-                      // Avatar with camera button
-                      Stack(
+                  flexibleSpace: FlexibleSpaceBar(
+                    background: Container(
+                      color: _waDark,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          CircleAvatar(
-                            radius: 58,
-                            backgroundColor: _waTeal,
-                            child: Text(
-                              _initialsFromName(user.name),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 38,
-                                fontWeight: FontWeight.bold,
+                          const SizedBox(height: 60),
+                          Stack(
+                            children: [
+                              CircleAvatar(
+                                radius: 58,
+                                backgroundColor: _waTeal,
+                                child: Text(
+                                  _initialsFromName(user.name),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 38,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
                               ),
+                              Positioned(
+                                bottom: 0,
+                                right: 0,
+                                child: GestureDetector(
+                                  onTap: () {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content:
+                                            Text('Photo upload coming soon!'),
+                                        backgroundColor: _waTeal,
+                                      ),
+                                    );
+                                  },
+                                  child: Container(
+                                    width: 36,
+                                    height: 36,
+                                    decoration: const BoxDecoration(
+                                      color: _waGreen,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      Icons.camera_alt,
+                                      color: Colors.white,
+                                      size: 20,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            user.name.isEmpty ? 'Your Name' : user.name,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 20,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
-                          Positioned(
-                            bottom: 0,
-                            right: 0,
-                            child: GestureDetector(
-                              onTap: () {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Photo upload coming soon!'),
-                                    backgroundColor: _waTeal,
-                                  ),
-                                );
-                              },
-                              child: Container(
-                                width: 36,
-                                height: 36,
-                                decoration: const BoxDecoration(
-                                  color: _waGreen,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(
-                                  Icons.camera_alt,
-                                  color: Colors.white,
-                                  size: 20,
-                                ),
-                              ),
+                          const SizedBox(height: 4),
+                          Text(
+                            user.email,
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.75),
+                              fontSize: 13,
                             ),
                           ),
                         ],
                       ),
+                    ),
+                  ),
+                ),
+
+                SliverToBoxAdapter(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 16),
+
+                      _buildSectionLabel('Your name'),
+                      _buildEditableCard(
+                        icon: Icons.person_outline,
+                        controller: _nameController!,
+                        isEditing: _isEditingName,
+                        hint: 'Enter your name',
+                        onEditToggle: () =>
+                            setState(() => _isEditingName = !_isEditingName),
+                        onSave: _updateProfile,
+                        validator: (v) {
+                          if (v == null || v.isEmpty)
+                            return 'Please enter your name';
+                          if (v.length < 2) return 'At least 2 characters';
+                          return null;
+                        },
+                      ),
+                      _buildSectionNote(
+                        'This is not your username or pin. This name will be visible to your contacts.',
+                      ),
+
+                      const SizedBox(height: 8),
+
+                      _buildSectionLabel('About'),
+                      _buildEditableCard(
+                        icon: Icons.info_outline,
+                        controller: _statusController!,
+                        isEditing: _isEditingStatus,
+                        hint: 'Available',
+                        onEditToggle: () => setState(
+                            () => _isEditingStatus = !_isEditingStatus),
+                        onSave: () {},
+                      ),
+
+                      const SizedBox(height: 8),
+
+                      _buildSectionLabel('Email'),
+                      _buildReadonlyCard(
+                        icon: Icons.email_outlined,
+                        value: user.email,
+                      ),
+
+                      const SizedBox(height: 8),
+
+                      _buildSectionLabel('Preferred Language'),
+                      _buildLanguageCard(),
+
+                      const SizedBox(height: 8),
+
+                      _buildSectionLabel('Account'),
+                      _buildInfoCard(user),
+
+                      const SizedBox(height: 24),
+
+                      // Save button
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: SizedBox(
+                          width: double.infinity,
+                          height: 50,
+                          child: ElevatedButton(
+                            onPressed: _isLoading ? null : _updateProfile,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: _waGreen,
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                            child: _isLoading
+                                ? const SizedBox(
+                                    height: 20,
+                                    width: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : const Text(
+                                    'Save Changes',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                          ),
+                        ),
+                      ),
+
                       const SizedBox(height: 12),
-                      Text(
-                        user.name.isEmpty ? 'Your Name' : user.name,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.w600,
+
+                      // Logout button
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: SizedBox(
+                          width: double.infinity,
+                          height: 50,
+                          child: OutlinedButton.icon(
+                            onPressed: _showLogoutDialog,
+                            icon: const Icon(Icons.logout, color: Colors.red),
+                            label: const Text(
+                              'Log out',
+                              style: TextStyle(
+                                color: Colors.red,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 16,
+                              ),
+                            ),
+                            style: OutlinedButton.styleFrom(
+                              side: const BorderSide(color: Colors.red),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                          ),
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        user.email,
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.75),
-                          fontSize: 13,
-                        ),
-                      ),
+
+                      const SizedBox(height: 40),
                     ],
                   ),
                 ),
-              ),
+              ],
             ),
-
-            SliverToBoxAdapter(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 16),
-
-                  // ── Your Name ──
-                  _buildSectionLabel('Your name'),
-                  _buildEditableCard(
-                    icon: Icons.person_outline,
-                    controller: _nameController,
-                    isEditing: _isEditingName,
-                    hint: 'Enter your name',
-                    onEditToggle: () =>
-                        setState(() => _isEditingName = !_isEditingName),
-                    onSave: _updateProfile,
-                    validator: (v) {
-                      if (v == null || v.isEmpty) return 'Please enter your name';
-                      if (v.length < 2) return 'At least 2 characters';
-                      return null;
-                    },
-                  ),
-                  _buildSectionNote(
-                    'This is not your username or pin. This name will be visible to your contacts.',
-                  ),
-
-                  const SizedBox(height: 8),
-
-                  // ── About ──
-                  _buildSectionLabel('About'),
-                  _buildEditableCard(
-                    icon: Icons.info_outline,
-                    controller: _statusController,
-                    isEditing: _isEditingStatus,
-                    hint: 'Available',
-                    onEditToggle: () =>
-                        setState(() => _isEditingStatus = !_isEditingStatus),
-                    onSave: () {},
-                  ),
-
-                  const SizedBox(height: 8),
-
-                  // ── Email ──
-                  _buildSectionLabel('Email'),
-                  _buildReadonlyCard(
-                    icon: Icons.email_outlined,
-                    value: user.email,
-                  ),
-
-                  const SizedBox(height: 8),
-
-                  // ── Preferred Language ──
-                  _buildSectionLabel('Preferred Language'),
-                  _buildLanguageCard(),
-
-                  const SizedBox(height: 8),
-
-                  // ── Account Info ──
-                  _buildSectionLabel('Account'),
-                  _buildInfoCard(user),
-
-                  const SizedBox(height: 24),
-
-                  // ── Save Button ──
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: SizedBox(
-                      width: double.infinity,
-                      height: 50,
-                      child: ElevatedButton(
-                        onPressed: _isLoading ? null : _updateProfile,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: _waGreen,
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                        child: _isLoading
-                            ? const SizedBox(
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : const Text(
-                                'Save Changes',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 16,
-                                ),
-                              ),
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  // ── Log Out Button ──
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: SizedBox(
-                      width: double.infinity,
-                      height: 50,
-                      child: OutlinedButton.icon(
-                        onPressed: _showLogoutDialog,
-                        icon: const Icon(Icons.logout, color: Colors.red),
-                        label: const Text(
-                          'Log out',
-                          style: TextStyle(
-                            color: Colors.red,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 16,
-                          ),
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: Colors.red),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 40),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
@@ -450,10 +482,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       color: _waCardBg,
       child: ListTile(
         leading: Icon(icon, color: _waSubtitle),
-        title: Text(
-          value,
-          style: const TextStyle(color: _waText, fontSize: 16),
-        ),
+        title: Text(value,
+            style: const TextStyle(color: _waText, fontSize: 16)),
         trailing: trailing,
       ),
     );
@@ -464,10 +494,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       color: _waCardBg,
       child: ListTile(
         leading: const Icon(Icons.language, color: _waSubtitle),
-        title: Text(
-          _selectedLanguageName,
-          style: const TextStyle(color: _waText, fontSize: 16),
-        ),
+        title: Text(_selectedLanguageName,
+            style: const TextStyle(color: _waText, fontSize: 16)),
         trailing: const Icon(Icons.chevron_right, color: _waSubtitle),
         onTap: _showLanguagePicker,
       ),
@@ -496,10 +524,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             child: Text(
               'Select Language',
               style: TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.w600,
-                color: _waText,
-              ),
+                  fontSize: 17,
+                  fontWeight: FontWeight.w600,
+                  color: _waText),
             ),
           ),
           const Divider(height: 1, color: _waDivider),
@@ -544,44 +571,29 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           ListTile(
             leading: const Icon(Icons.calendar_today_outlined,
                 color: _waSubtitle),
-            title: const Text(
-              'Member since',
-              style: TextStyle(color: _waSubtitle, fontSize: 13),
-            ),
-            subtitle: Text(
-              _formatDate(user.createdAt),
-              style: const TextStyle(color: _waText, fontSize: 15),
-            ),
+            title: const Text('Member since',
+                style: TextStyle(color: _waSubtitle, fontSize: 13)),
+            subtitle: Text(_formatDate(user.createdAt),
+                style: const TextStyle(color: _waText, fontSize: 15)),
           ),
           const Divider(height: 1, indent: 56, color: _waDivider),
           ListTile(
-            leading: Icon(
-              Icons.circle,
-              color: user.isOnline ? _waGreen : _waSubtitle,
-              size: 14,
-            ),
-            title: const Text(
-              'Status',
-              style: TextStyle(color: _waSubtitle, fontSize: 13),
-            ),
-            subtitle: Text(
-              user.isOnline ? 'Online' : 'Offline',
-              style: const TextStyle(color: _waText, fontSize: 15),
-            ),
+            leading: Icon(Icons.circle,
+                color: user.isOnline ? _waGreen : _waSubtitle, size: 14),
+            title: const Text('Status',
+                style: TextStyle(color: _waSubtitle, fontSize: 13)),
+            subtitle: Text(user.isOnline ? 'Online' : 'Offline',
+                style: const TextStyle(color: _waText, fontSize: 15)),
           ),
           if (!user.isOnline && user.lastSeen != null) ...[
             const Divider(height: 1, indent: 56, color: _waDivider),
             ListTile(
               leading: const Icon(Icons.access_time,
                   color: _waSubtitle, size: 20),
-              title: const Text(
-                'Last seen',
-                style: TextStyle(color: _waSubtitle, fontSize: 13),
-              ),
-              subtitle: Text(
-                _formatDate(user.lastSeen!),
-                style: const TextStyle(color: _waText, fontSize: 15),
-              ),
+              title: const Text('Last seen',
+                  style: TextStyle(color: _waSubtitle, fontSize: 13)),
+              subtitle: Text(_formatDate(user.lastSeen!),
+                  style: const TextStyle(color: _waText, fontSize: 15)),
             ),
           ],
         ],
@@ -594,17 +606,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        title: const Text(
-          'Log out?',
-          style: TextStyle(color: _waText, fontWeight: FontWeight.w600),
-        ),
-        content: const Text(
-          'Are you sure you want to log out?',
-          style: TextStyle(color: _waSubtitle),
-        ),
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: const Text('Log out?',
+            style:
+                TextStyle(color: _waText, fontWeight: FontWeight.w600)),
+        content: const Text('Are you sure you want to log out?',
+            style: TextStyle(color: _waSubtitle)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
@@ -616,13 +624,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               Navigator.pop(ctx);
               await ref.read(authProvider.notifier).logout();
             },
-            child: const Text(
-              'Log out',
-              style: TextStyle(
-                color: Colors.red,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+            child: const Text('Log out',
+                style: TextStyle(
+                    color: Colors.red, fontWeight: FontWeight.w600)),
           ),
         ],
       ),
