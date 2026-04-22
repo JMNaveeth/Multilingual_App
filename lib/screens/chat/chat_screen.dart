@@ -1,70 +1,135 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:multilingual_chat_app/models/message.dart';
 import 'package:multilingual_chat_app/models/user.dart';
 import 'package:multilingual_chat_app/providers/auth_provider.dart';
 import 'package:multilingual_chat_app/widgets/message_bubble.dart';
 
-// Mock messages for demonstration - replace with real data
+// ── Nexus Design Tokens (same as home_screen) ────────────────────────────────
+class _N {
+  static const bg            = Color(0xFF0D0E1A);
+  static const surface       = Color(0xFF151626);
+  static const card          = Color(0xFF1C1E31);
+  static const cardBorder    = Color(0xFF252842);
+  static const indigo        = Color(0xFF6366F1);
+  static const indigoLight   = Color(0xFF818CF8);
+  static const cyan          = Color(0xFF22D3EE);
+  static const violet        = Color(0xFF8B5CF6);
+  static const textPrimary   = Color(0xFFF1F5F9);
+  static const textSecondary = Color(0xFF94A3B8);
+  static const textMuted     = Color(0xFF475569);
+  static const inputBg       = Color(0xFF13141F);
+  static const inputBorder   = Color(0xFF1E2035);
+
+  // Message bubbles
+  static const bubbleMe      = Color(0xFF3730A3); // sent – deep indigo
+  static const bubbleThem    = Color(0xFF1C1E31); // received – dark card
+  static const bubbleMeEnd   = Color(0xFF6D28D9); // gradient end for sent
+}
+
+// Mock messages (replace with real provider)
 final mockMessagesProvider = Provider<List<Message>>((ref) => [
-      Message(
-        id: '1',
-        senderId: '1',
-        receiverId: 'current_user',
-        content: 'Hello! How are you?',
-        type: MessageType.text,
-        status: MessageStatus.read,
-        timestamp: DateTime.now().subtract(const Duration(minutes: 5)),
-      ),
-      Message(
-        id: '2',
-        senderId: 'current_user',
-        receiverId: '1',
-        content: 'Hi! I\'m doing well, thank you. How about you?',
-        type: MessageType.text,
-        status: MessageStatus.read,
-        timestamp: DateTime.now().subtract(const Duration(minutes: 4)),
-      ),
-      Message(
-        id: '3',
-        senderId: '1',
-        receiverId: 'current_user',
-        content: 'I\'m great! Ready to test the translation feature?',
-        type: MessageType.text,
-        status: MessageStatus.read,
-        timestamp: DateTime.now().subtract(const Duration(minutes: 2)),
-      ),
-    ]);
+  Message(
+    id: '1',
+    senderId: '1',
+    receiverId: 'current_user',
+    content: 'Hello! How are you?',
+    type: MessageType.text,
+    status: MessageStatus.read,
+    timestamp: DateTime.now().subtract(const Duration(minutes: 5)),
+  ),
+  Message(
+    id: '2',
+    senderId: 'current_user',
+    receiverId: '1',
+    content: 'Hi! I\'m doing well, thank you. How about you?',
+    type: MessageType.text,
+    status: MessageStatus.read,
+    timestamp: DateTime.now().subtract(const Duration(minutes: 4)),
+  ),
+  Message(
+    id: '3',
+    senderId: '1',
+    receiverId: 'current_user',
+    content: 'I\'m great! Ready to test the translation feature?',
+    type: MessageType.text,
+    status: MessageStatus.read,
+    timestamp: DateTime.now().subtract(const Duration(minutes: 2)),
+  ),
+]);
 
 class ChatScreen extends ConsumerStatefulWidget {
   final User user;
-
   const ChatScreen({super.key, required this.user});
 
   @override
   ConsumerState<ChatScreen> createState() => _ChatScreenState();
 }
 
-class _ChatScreenState extends ConsumerState<ChatScreen> {
+class _ChatScreenState extends ConsumerState<ChatScreen>
+    with TickerProviderStateMixin {
   final _messageController = TextEditingController();
-  final _scrollController = ScrollController();
+  final _scrollController  = ScrollController();
+  bool _showAttachMenu     = false;
+  bool _isTyping           = false;
+
+  late final AnimationController _onlineGlowCtrl;
+  late final AnimationController _attachMenuCtrl;
+  late final Animation<double>   _attachMenuAnim;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _onlineGlowCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..repeat(reverse: true);
+
+    _attachMenuCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 280),
+    );
+
+    _attachMenuAnim = CurvedAnimation(
+      parent: _attachMenuCtrl,
+      curve: Curves.easeOutBack,
+      reverseCurve: Curves.easeIn,
+    );
+
+    _messageController.addListener(() {
+      final typing = _messageController.text.isNotEmpty;
+      if (typing != _isTyping) setState(() => _isTyping = typing);
+    });
+
+    SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.light,
+    ));
+  }
 
   @override
   void dispose() {
     _messageController.dispose();
     _scrollController.dispose();
+    _onlineGlowCtrl.dispose();
+    _attachMenuCtrl.dispose();
     super.dispose();
   }
 
+  // ── Actions ───────────────────────────────────────────────────────────────
+
   void _sendMessage() {
-    final message = _messageController.text.trim();
-    if (message.isEmpty) return;
-
-    // TODO: Implement actual message sending
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Message sent: $message')),
-    );
-
+    final text = _messageController.text.trim();
+    if (text.isEmpty) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text('Sent: $text',
+          style: const TextStyle(color: _N.textPrimary)),
+      backgroundColor: _N.card,
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    ));
     _messageController.clear();
     _scrollToBottom();
   }
@@ -81,290 +146,676 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     });
   }
 
+  void _toggleAttachMenu() {
+    setState(() => _showAttachMenu = !_showAttachMenu);
+    if (_showAttachMenu) {
+      _attachMenuCtrl.forward();
+    } else {
+      _attachMenuCtrl.reverse();
+    }
+  }
+
   void _startVideoCall() {
-    // TODO: Implement video call functionality
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Video call feature coming soon!')),
-    );
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: const Text('Video call coming soon',
+          style: TextStyle(color: _N.textPrimary)),
+      backgroundColor: _N.card,
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    ));
   }
 
-  Widget _buildEmptyState() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 28),
-        child: Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(24),
-            gradient: const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Color(0xFFFFFFFF), Color(0xFFF3ECFF)],
-            ),
-            border: Border.all(color: const Color(0xFFE6DBFF)),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF6D3DF2).withOpacity(0.08),
-                blurRadius: 24,
-                offset: const Offset(0, 10),
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 72,
-                height: 72,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: LinearGradient(
-                    colors: [Color(0xFF8E6CF7), Color(0xFF6D3DF2)],
-                  ),
-                ),
-                child: const Icon(Icons.chat_bubble_outline,
-                    color: Colors.white, size: 32),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Start your first message',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: const Color(0xFF2A2338),
-                    ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'No messages yet. Say hi to ${widget.user.name} and begin the conversation.',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: const Color(0xFF5D566F),
-                      height: 1.4,
-                    ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMessageInput() {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.84),
-        border: const Border(
-          top: BorderSide(color: Color(0xFFE8DEFF)),
-        ),
-      ),
-      child: SafeArea(
-        top: false,
-        child: Row(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: const Color(0xFFF1EBFF),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: IconButton(
-                icon: const Icon(Icons.attach_file, size: 20),
-                onPressed: () {
-                  // TODO: Implement file attachment
-                },
-                tooltip: 'Attach',
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: TextField(
-                controller: _messageController,
-                decoration: InputDecoration(
-                  hintText: 'Type a message...',
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(28),
-                    borderSide: const BorderSide(color: Color(0xFFD6C8FF)),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(28),
-                    borderSide: const BorderSide(color: Color(0xFFD6C8FF)),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(28),
-                    borderSide:
-                        const BorderSide(color: Color(0xFF7A52F4), width: 1.4),
-                  ),
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
-                ),
-                maxLines: null,
-                textInputAction: TextInputAction.send,
-                onSubmitted: (_) => _sendMessage(),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(14),
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF8A66F6), Color(0xFF6A3EF0)],
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF6A3EF0).withOpacity(0.3),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: IconButton(
-                onPressed: _sendMessage,
-                icon: const Icon(Icons.send_rounded,
-                    color: Colors.white, size: 20),
-                tooltip: 'Send',
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  // ── Build ─────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
     final currentUser = ref.watch(authProvider).value;
-    final messages = ref.watch(mockMessagesProvider);
+    final messages    = ref.watch(mockMessagesProvider);
 
-    // Filter messages for this conversation
-    final conversationMessages = messages.where((message) {
-      return (message.senderId == widget.user.id &&
-              message.receiverId == currentUser?.id) ||
-          (message.senderId == currentUser?.id &&
-              message.receiverId == widget.user.id);
-    }).toList();
+    final conversation = messages.where((m) =>
+        (m.senderId == widget.user.id && m.receiverId == currentUser?.id) ||
+        (m.senderId == currentUser?.id && m.receiverId == widget.user.id))
+      .toList();
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F2FC),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFFF6F2FC),
-        surfaceTintColor: Colors.transparent,
-        elevation: 0,
-        titleSpacing: 0,
-        title: Row(
-          children: [
-            CircleAvatar(
-              radius: 20,
-              backgroundColor: const Color(0xFFD8CBFF),
-              child: Text(
-                widget.user.name.isNotEmpty
-                    ? widget.user.name[0].toUpperCase()
-                    : '?',
-                style: const TextStyle(
-                  color: Color(0xFF3B2D63),
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(widget.user.name),
-                Row(
-                  children: [
-                    Container(
-                      width: 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        color: widget.user.isOnline
-                            ? const Color(0xFF2ECC71)
-                            : const Color(0xFFB0AEC2),
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      widget.user.isOnline ? 'Online' : 'Offline',
-                      style: const TextStyle(
-                          fontSize: 12, fontWeight: FontWeight.normal),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ],
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.videocam_rounded),
-            onPressed: _startVideoCall,
-            tooltip: 'Start Video Call',
-          ),
-          IconButton(
-            icon: const Icon(Icons.more_vert),
-            onPressed: () {
-              // TODO: Show chat options menu
-            },
-          ),
-        ],
-      ),
+      backgroundColor: _N.bg,
       body: Stack(
         children: [
-          Positioned(
-            top: -60,
-            right: -20,
-            child: Container(
-              width: 170,
-              height: 170,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: const Color(0xFF8E6CF7).withOpacity(0.08),
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: 120,
-            left: -50,
-            child: Container(
-              width: 190,
-              height: 190,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: const Color(0xFF5DC6FF).withOpacity(0.06),
-              ),
-            ),
-          ),
-          Column(
-            children: [
-              Expanded(
-                child: conversationMessages.isEmpty
+          // ── Subtle background pattern ──
+          _buildBackground(),
+
+          Column(children: [
+            // ── Custom AppBar ──
+            _buildAppBar(),
+
+            // ── Messages ──
+            Expanded(
+              child: GestureDetector(
+                onTap: () {
+                  if (_showAttachMenu) _toggleAttachMenu();
+                  FocusScope.of(context).unfocus();
+                },
+                child: conversation.isEmpty
                     ? _buildEmptyState()
                     : ListView.builder(
                         controller: _scrollController,
-                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-                        itemCount: conversationMessages.length,
-                        itemBuilder: (context, index) {
-                          final message = conversationMessages[index];
-                          final isMe = message.senderId == currentUser?.id;
-
-                          return MessageBubble(
-                            message: message,
-                            isMe: isMe,
-                          );
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                        itemCount: conversation.length,
+                        itemBuilder: (ctx, i) {
+                          final msg  = conversation[i];
+                          final isMe = msg.senderId == currentUser?.id;
+                          final showDate = i == 0 ||
+                              !_sameDay(
+                                conversation[i - 1].timestamp,
+                                msg.timestamp,
+                              );
+                          return Column(children: [
+                            if (showDate) _buildDateChip(msg.timestamp),
+                            _buildMessageRow(msg, isMe),
+                          ]);
                         },
                       ),
               ),
-              _buildMessageInput(),
-            ],
-          ),
+            ),
+
+            // ── Attach menu (slides up) ──
+            SizeTransition(
+              sizeFactor: _attachMenuAnim,
+              child: _buildAttachMenu(),
+            ),
+
+            // ── Input bar ──
+            _buildInputBar(),
+          ]),
         ],
       ),
     );
   }
+
+  // ── Background ────────────────────────────────────────────────────────────
+
+  Widget _buildBackground() {
+    return Positioned.fill(
+      child: CustomPaint(painter: _DotGridPainter()),
+    );
+  }
+
+  // ── AppBar ────────────────────────────────────────────────────────────────
+
+  Widget _buildAppBar() {
+    return Container(
+      padding: EdgeInsets.only(
+        top: MediaQuery.of(context).padding.top + 8,
+        left: 8, right: 12, bottom: 12,
+      ),
+      decoration: BoxDecoration(
+        color: _N.surface.withOpacity(0.95),
+        border: const Border(
+          bottom: BorderSide(color: _N.cardBorder, width: 1),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.3),
+            blurRadius: 12, offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(children: [
+        // Back button
+        GestureDetector(
+          onTap: () => Navigator.of(context).pop(),
+          child: Container(
+            width: 38, height: 38,
+            decoration: BoxDecoration(
+              color: _N.card,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: _N.cardBorder),
+            ),
+            child: const Icon(Icons.arrow_back_ios_new_rounded,
+                color: _N.textSecondary, size: 16),
+          ),
+        ),
+        const SizedBox(width: 10),
+
+        // Avatar with online ring
+        _buildAvatar(),
+        const SizedBox(width: 12),
+
+        // Name + status
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(widget.user.name,
+                  style: const TextStyle(
+                    color: _N.textPrimary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.3,
+                  )),
+              const SizedBox(height: 2),
+              Row(children: [
+                if (widget.user.isOnline) ...[
+                  AnimatedBuilder(
+                    animation: _onlineGlowCtrl,
+                    builder: (_, __) => Container(
+                      width: 7, height: 7,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: _N.cyan,
+                        boxShadow: [BoxShadow(
+                          color: _N.cyan.withOpacity(
+                              0.5 + _onlineGlowCtrl.value * 0.5),
+                          blurRadius: 6, spreadRadius: 1,
+                        )],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 5),
+                  const Text('Active now',
+                      style: TextStyle(color: _N.cyan, fontSize: 11,
+                          fontWeight: FontWeight.w600)),
+                ] else
+                  const Text('Offline',
+                      style: TextStyle(color: _N.textMuted, fontSize: 11)),
+              ]),
+            ],
+          ),
+        ),
+
+        // Voice call
+        _appBarBtn(Icons.call_outlined, () {}),
+        const SizedBox(width: 6),
+        // Video call
+        _appBarBtn(Icons.videocam_outlined, _startVideoCall),
+        const SizedBox(width: 6),
+        // More
+        _appBarPopup(),
+      ]),
+    );
+  }
+
+  Widget _buildAvatar() {
+    final initials = widget.user.name
+        .split(' ')
+        .take(2)
+        .map((w) => w.isNotEmpty ? w[0].toUpperCase() : '')
+        .join();
+
+    return AnimatedBuilder(
+      animation: _onlineGlowCtrl,
+      builder: (_, __) => Container(
+        width: 42, height: 42,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(14),
+          gradient: const LinearGradient(
+            colors: [_N.indigo, _N.violet],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          boxShadow: widget.user.isOnline
+              ? [BoxShadow(
+                  color: _N.indigo.withOpacity(
+                      0.3 + _onlineGlowCtrl.value * 0.2),
+                  blurRadius: 10, spreadRadius: 1,
+                )]
+              : [],
+        ),
+        child: Center(
+          child: Text(initials, style: const TextStyle(
+            color: Colors.white, fontSize: 15, fontWeight: FontWeight.w700,
+          )),
+        ),
+      ),
+    );
+  }
+
+  Widget _appBarBtn(IconData icon, VoidCallback onTap) => GestureDetector(
+    onTap: onTap,
+    child: Container(
+      width: 38, height: 38,
+      decoration: BoxDecoration(
+        color: _N.card,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _N.cardBorder),
+      ),
+      child: Icon(icon, color: _N.textSecondary, size: 18),
+    ),
+  );
+
+  Widget _appBarPopup() => PopupMenuButton<String>(
+    color: _N.card,
+    elevation: 8,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(14),
+      side: const BorderSide(color: _N.cardBorder),
+    ),
+    icon: Container(
+      width: 38, height: 38,
+      decoration: BoxDecoration(
+        color: _N.card,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _N.cardBorder),
+      ),
+      child: const Icon(Icons.more_horiz_rounded,
+          color: _N.textSecondary, size: 18),
+    ),
+    itemBuilder: (_) => [
+      _popItem(Icons.search_rounded,           'Search'),
+      _popItem(Icons.translate_rounded,        'Translate'),
+      _popItem(Icons.wallpaper_rounded,        'Wallpaper'),
+      _popItem(Icons.notifications_off_outlined, 'Mute'),
+      _popItem(Icons.block_rounded,            'Block'),
+    ],
+  );
+
+  PopupMenuItem<String> _popItem(IconData icon, String label) =>
+    PopupMenuItem<String>(
+      value: label,
+      child: Row(children: [
+        Icon(icon, size: 17, color: _N.indigoLight),
+        const SizedBox(width: 12),
+        Text(label, style: const TextStyle(
+            color: _N.textPrimary, fontSize: 13.5)),
+      ]),
+    );
+
+  // ── Empty state ───────────────────────────────────────────────────────────
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Container(
+          width: 88, height: 88,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(28),
+            gradient: LinearGradient(
+              colors: [
+                _N.indigo.withOpacity(0.15),
+                _N.violet.withOpacity(0.15),
+              ],
+            ),
+            border: Border.all(
+              color: _N.indigo.withOpacity(0.3), width: 1.5),
+          ),
+          child: const Icon(Icons.forum_outlined,
+              size: 40, color: _N.indigoLight),
+        ),
+        const SizedBox(height: 20),
+        Text('Start a conversation',
+            style: TextStyle(
+              color: _N.textPrimary.withOpacity(0.9),
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              letterSpacing: -0.3,
+            )),
+        const SizedBox(height: 6),
+        Text('Say hello to ${widget.user.name.split(' ').first}!',
+            style: const TextStyle(
+              color: _N.textMuted, fontSize: 13)),
+      ]),
+    );
+  }
+
+  // ── Date chip ─────────────────────────────────────────────────────────────
+
+  Widget _buildDateChip(DateTime dt) {
+    final now   = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final d     = DateTime(dt.year, dt.month, dt.day);
+    final label = d == today
+        ? 'Today'
+        : d == today.subtract(const Duration(days: 1))
+            ? 'Yesterday'
+            : '${dt.day}/${dt.month}/${dt.year}';
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Center(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+          decoration: BoxDecoration(
+            color: _N.card,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: _N.cardBorder),
+          ),
+          child: Text(label, style: const TextStyle(
+            color: _N.textMuted, fontSize: 11, fontWeight: FontWeight.w600,
+          )),
+        ),
+      ),
+    );
+  }
+
+  // ── Message row ───────────────────────────────────────────────────────────
+
+  Widget _buildMessageRow(Message msg, bool isMe) {
+    final time =
+        '${msg.timestamp.hour.toString().padLeft(2, '0')}:${msg.timestamp.minute.toString().padLeft(2, '0')}';
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        mainAxisAlignment:
+            isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          // Their avatar (left)
+          if (!isMe) ...[
+            _miniAvatar(),
+            const SizedBox(width: 6),
+          ],
+
+          // Bubble
+          Flexible(
+            child: Container(
+              constraints: BoxConstraints(
+                maxWidth: MediaQuery.of(context).size.width * 0.72,
+              ),
+              decoration: BoxDecoration(
+                gradient: isMe
+                    ? const LinearGradient(
+                        colors: [_N.bubbleMe, _N.bubbleMeEnd],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      )
+                    : null,
+                color: isMe ? null : _N.bubbleThem,
+                borderRadius: BorderRadius.only(
+                  topLeft:     const Radius.circular(18),
+                  topRight:    const Radius.circular(18),
+                  bottomLeft:  Radius.circular(isMe ? 18 : 4),
+                  bottomRight: Radius.circular(isMe ? 4 : 18),
+                ),
+                border: isMe
+                    ? null
+                    : Border.all(color: _N.cardBorder, width: 1),
+                boxShadow: isMe
+                    ? [BoxShadow(
+                        color: _N.indigo.withOpacity(0.25),
+                        blurRadius: 10, offset: const Offset(0, 4),
+                      )]
+                    : [BoxShadow(
+                        color: Colors.black.withOpacity(0.2),
+                        blurRadius: 6, offset: const Offset(0, 2),
+                      )],
+              ),
+              padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(msg.content, style: TextStyle(
+                    color: isMe
+                        ? Colors.white
+                        : _N.textPrimary,
+                    fontSize: 14.5,
+                    height: 1.4,
+                  )),
+                  const SizedBox(height: 4),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(time, style: TextStyle(
+                        color: isMe
+                            ? Colors.white.withOpacity(0.6)
+                            : _N.textMuted,
+                        fontSize: 10,
+                      )),
+                      if (isMe) ...[
+                        const SizedBox(width: 4),
+                        _statusIcon(msg.status),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // My avatar (right) — optional spacer
+          if (isMe) const SizedBox(width: 4),
+        ],
+      ),
+    );
+  }
+
+  Widget _miniAvatar() {
+    final initials = widget.user.name
+        .split(' ')
+        .take(2)
+        .map((w) => w.isNotEmpty ? w[0].toUpperCase() : '')
+        .join();
+
+    return Container(
+      width: 28, height: 28,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(9),
+        gradient: const LinearGradient(
+          colors: [_N.indigo, _N.violet],
+        ),
+      ),
+      child: Center(
+        child: Text(initials, style: const TextStyle(
+          color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700,
+        )),
+      ),
+    );
+  }
+
+  Widget _statusIcon(MessageStatus status) {
+    switch (status) {
+      case MessageStatus.sending:
+        return const SizedBox(width: 12, height: 12,
+            child: CircularProgressIndicator(
+                strokeWidth: 1.5, color: Colors.white54));
+      case MessageStatus.sent:
+        return const Icon(Icons.check_rounded,
+            size: 13, color: Colors.white54);
+      case MessageStatus.delivered:
+        return const Icon(Icons.done_all_rounded,
+            size: 13, color: Colors.white54);
+      case MessageStatus.read:
+        return const Icon(Icons.done_all_rounded,
+            size: 13, color: _N.cyan);
+      default:
+        return const SizedBox.shrink();
+    }
+  }
+
+  // ── Attach menu ───────────────────────────────────────────────────────────
+
+  Widget _buildAttachMenu() {
+    final options = [
+      (Icons.image_outlined,    'Gallery',   _N.violet),
+      (Icons.insert_drive_file_outlined, 'Document', _N.indigo),
+      (Icons.camera_alt_outlined, 'Camera',  _N.cyan),
+      (Icons.location_on_outlined, 'Location', const Color(0xFFF59E0B)),
+      (Icons.person_outline_rounded, 'Contact', const Color(0xFF10B981)),
+    ];
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 14, 20, 10),
+      color: _N.inputBg,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: options.map((o) => GestureDetector(
+          onTap: () {
+            _toggleAttachMenu();
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: Text('${o.$2} coming soon',
+                  style: const TextStyle(color: _N.textPrimary)),
+              backgroundColor: _N.card,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+            ));
+          },
+          child: Column(children: [
+            Container(
+              width: 50, height: 50,
+              decoration: BoxDecoration(
+                color: o.$3.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: o.$3.withOpacity(0.3)),
+              ),
+              child: Icon(o.$1, color: o.$3, size: 22),
+            ),
+            const SizedBox(height: 6),
+            Text(o.$2, style: const TextStyle(
+              color: _N.textMuted, fontSize: 10.5,
+              fontWeight: FontWeight.w500,
+            )),
+          ]),
+        )).toList(),
+      ),
+    );
+  }
+
+  // ── Input bar ─────────────────────────────────────────────────────────────
+
+  Widget _buildInputBar() {
+    return Container(
+      padding: EdgeInsets.only(
+        left: 12, right: 12, top: 10,
+        bottom: MediaQuery.of(context).padding.bottom + 10,
+      ),
+      decoration: BoxDecoration(
+        color: _N.inputBg,
+        border: const Border(
+          top: BorderSide(color: _N.inputBorder, width: 1),
+        ),
+      ),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+        // Attach button
+        GestureDetector(
+          onTap: _toggleAttachMenu,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            width: 42, height: 42,
+            decoration: BoxDecoration(
+              color: _showAttachMenu
+                  ? _N.indigo.withOpacity(0.2)
+                  : _N.card,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: _showAttachMenu ? _N.indigo : _N.cardBorder,
+              ),
+            ),
+            child: Icon(
+              _showAttachMenu
+                  ? Icons.close_rounded
+                  : Icons.add_rounded,
+              color: _showAttachMenu ? _N.indigoLight : _N.textSecondary,
+              size: 22,
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+
+        // Text field
+        Expanded(
+          child: Container(
+            constraints: const BoxConstraints(minHeight: 42, maxHeight: 120),
+            decoration: BoxDecoration(
+              color: _N.card,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: _N.cardBorder),
+            ),
+            child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+              Expanded(
+                child: TextField(
+                  controller: _messageController,
+                  style: const TextStyle(
+                      color: _N.textPrimary, fontSize: 14.5),
+                  cursorColor: _N.indigoLight,
+                  maxLines: null,
+                  textInputAction: TextInputAction.newline,
+                  onSubmitted: (_) => _sendMessage(),
+                  decoration: const InputDecoration(
+                    hintText: 'Write a message…',
+                    hintStyle: TextStyle(
+                        color: _N.textMuted, fontSize: 14.5),
+                    border: InputBorder.none,
+                    contentPadding: EdgeInsets.fromLTRB(14, 11, 4, 11),
+                    isDense: true,
+                  ),
+                ),
+              ),
+              // Emoji button
+              Padding(
+                padding: const EdgeInsets.only(right: 6, bottom: 6),
+                child: GestureDetector(
+                  onTap: () {},
+                  child: const Icon(Icons.emoji_emotions_outlined,
+                      color: _N.textMuted, size: 20),
+                ),
+              ),
+            ]),
+          ),
+        ),
+        const SizedBox(width: 8),
+
+        // Send / mic button
+        GestureDetector(
+          onTap: _isTyping ? _sendMessage : () {},
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            width: 42, height: 42,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              gradient: _isTyping
+                  ? const LinearGradient(
+                      colors: [_N.indigo, _N.violet],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    )
+                  : null,
+              color: _isTyping ? null : _N.card,
+              border: _isTyping
+                  ? null
+                  : Border.all(color: _N.cardBorder),
+              boxShadow: _isTyping
+                  ? [BoxShadow(
+                      color: _N.indigo.withOpacity(0.5),
+                      blurRadius: 14, offset: const Offset(0, 4),
+                    )]
+                  : [],
+            ),
+            child: Icon(
+              _isTyping
+                  ? Icons.send_rounded
+                  : Icons.mic_none_rounded,
+              color: _isTyping ? Colors.white : _N.textSecondary,
+              size: 20,
+            ),
+          ),
+        ),
+      ]),
+    );
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+
+  bool _sameDay(DateTime a, DateTime b) =>
+      a.year == b.year && a.month == b.month && a.day == b.day;
+}
+
+// ── Dot grid background painter ───────────────────────────────────────────────
+class _DotGridPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    const spacing = 28.0;
+    final paint = Paint()
+      ..color = const Color(0xFF6366F1).withOpacity(0.035)
+      ..strokeCap = StrokeCap.round;
+
+    for (double x = 0; x < size.width; x += spacing) {
+      for (double y = 0; y < size.height; y += spacing) {
+        canvas.drawCircle(Offset(x, y), 1.2, paint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_DotGridPainter old) => false;
 }
