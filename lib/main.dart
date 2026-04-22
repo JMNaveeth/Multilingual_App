@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:multilingual_chat_app/providers/auth_provider.dart';
 import 'package:multilingual_chat_app/screens/auth/login_screen.dart';
+import 'package:multilingual_chat_app/screens/auth/register_screen.dart';
 import 'package:multilingual_chat_app/screens/home/home_screen.dart';
 import 'package:multilingual_chat_app/services/auth_service.dart';
 
@@ -27,9 +28,14 @@ class MultilingualChatApp extends ConsumerWidget {
         useMaterial3: true,
         fontFamily: 'Roboto',
       ),
-      home: const HomeScreen(),
+      home: authState.when(
+        data: (user) => user == null ? const LoginScreen() : const HomeScreen(),
+        loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
+        error: (e, st) => Scaffold(body: Center(child: Text('Error: $e'))),
+      ),
       routes: {
-       // '/login': (context) => const LoginScreen(),
+        '/login': (context) => const LoginScreen(),
+        '/register': (context) => const RegisterScreen(),
         '/home': (context) => const HomeScreen(),
       },
     );
