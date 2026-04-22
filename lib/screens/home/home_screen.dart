@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:ui';
 import 'package:multilingual_chat_app/screens/contacts/contacts_screen.dart';
 import 'package:flutter_contacts/flutter_contacts.dart' as fc;
 
@@ -9,18 +10,21 @@ import 'package:multilingual_chat_app/providers/auth_provider.dart';
 import 'package:multilingual_chat_app/screens/chat/chat_list_screen.dart';
 import 'package:multilingual_chat_app/screens/profile/profile_screen.dart';
 
-// ── WhatsApp brand colours ──────────────────────────────────────────────────
-class _WA {
-  static const teal        = Color(0xFF075E54); // dark header
-  static const tealLight   = Color(0xFF128C7E); // slightly lighter
-  static const green       = Color(0xFF25D366); // FAB / online dot
-  static const bg          = Color(0xFFFFFFFF); // list background
-  static const divider     = Color(0xFFE0E0E0);
-  static const textPrimary = Color(0xFF111B21);
-  static const textSecondary = Color(0xFF667781);
-  static const tabIndicator = Colors.white;
-  static const tabLabel    = Colors.white;
-  static const unselected  = Color(0xFFB2DFDB); // translucent white on teal
+// ── Nexus Design Tokens ─────────────────────────────────────────────────────
+class _N {
+  static const bg            = Color(0xFF0D0E1A);
+  static const card          = Color(0xFF1C1E31);
+  static const cardBorder    = Color(0xFF252842);
+  static const indigo        = Color(0xFF6366F1);
+  static const indigoLight   = Color(0xFF818CF8);
+  static const violet        = Color(0xFF8B5CF6);
+  static const textPrimary   = Color(0xFFF1F5F9);
+  static const textSecondary = Color(0xFF94A3B8);
+  static const textMuted     = Color(0xFF475569);
+  static const navBg         = Color(0xFF10111F);
+  static const navBorder     = Color(0xFF1E2035);
+  static const segBg         = Color(0xFF1C1E31);
+  static const segActive     = Color(0xFF6366F1);
 }
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -31,249 +35,440 @@ class HomeScreen extends ConsumerStatefulWidget {
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen>
-    with SingleTickerProviderStateMixin {
-  late final TabController _tabController;
+    with TickerProviderStateMixin {
+  int _segmentIndex = 0;
+  int _bottomIndex  = 0;
 
-  // bottom-nav index: 0 = Chats, 1 = Profile
-  int _bottomIndex = 0;
+  late final AnimationController _glowController;
+  late final AnimationController _fadeController;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
 
-    // Make status bar icons light (white) over the teal header.
+    _glowController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..repeat(reverse: true);
+
+    _fadeController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+    )..forward();
+
     SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-      statusBarColor: _WA.teal,
+      statusBarColor: Colors.transparent,
       statusBarIconBrightness: Brightness.light,
     ));
   }
 
   @override
   void dispose() {
-    _tabController.dispose();
+    _glowController.dispose();
+    _fadeController.dispose();
     super.dispose();
   }
 
-  // ── Main build ─────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    // Profile tab – full-screen, plain background
-    if (_bottomIndex == 1) {
-      return Scaffold(
-        backgroundColor: const Color(0xFFF0F2F5),
-        appBar: _buildProfileAppBar(),
-        body: const ProfileScreen(),
-        bottomNavigationBar: _buildBottomNav(),
-      );
-    }
-
-    // Chats tab
     return Scaffold(
-      backgroundColor: _WA.bg,
-      appBar: _buildChatsAppBar(),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          // ── CHATS tab ──
-          const ChatListScreen(),
-
-          // ── STATUS tab (placeholder) ──
-          _buildComingSoon(Icons.circle_outlined, 'Status'),
-
-          // ── CALLS tab (placeholder) ──
-          _buildComingSoon(Icons.call_outlined, 'Calls'),
-        ],
+      backgroundColor: _N.bg,
+      extendBodyBehindAppBar: true,
+      body: FadeTransition(
+        opacity: CurvedAnimation(parent: _fadeController, curve: Curves.easeOut),
+        child: _buildBody(),
       ),
-      floatingActionButton: _buildFAB(),
       bottomNavigationBar: _buildBottomNav(),
+      floatingActionButton: _bottomIndex == 0 ? _buildComposeFAB() : null,
     );
   }
 
-  // ── AppBars ────────────────────────────────────────────────────────────────
+  // ── Body router ───────────────────────────────────────────────────────────
+  Widget _buildBody() {
+    switch (_bottomIndex) {
+      case 3:
+        return Column(children: [
+          _buildHeader(title: 'My Profile', showActions: false),
+          const Expanded(child: ProfileScreen()),
+        ]);
+      case 1:
+        return Column(children: [
+          _buildHeader(title: 'Discover'),
+          Expanded(child: _buildComingSoon(Icons.explore_outlined, 'Discover')),
+        ]);
+      case 2:
+        return Column(children: [
+          _buildHeader(title: 'Voice'),
+          Expanded(child: _buildComingSoon(Icons.graphic_eq_rounded, 'Voice Calls')),
+        ]);
+      default:
+        return _buildMessagesView();
+    }
+  }
 
-  PreferredSizeWidget _buildChatsAppBar() {
+  Widget _buildMessagesView() {
+    return Column(children: [
+      _buildHeader(title: 'Nexus'),
+      const SizedBox(height: 6),
+      _buildSearchBar(),
+      const SizedBox(height: 12),
+      _buildSegmentControl(),
+      const SizedBox(height: 4),
+      Expanded(child: _buildSegmentContent()),
+    ]);
+  }
+
+  // ── Header ────────────────────────────────────────────────────────────────
+  Widget _buildHeader({required String title, bool showActions = true}) {
     final user = ref.watch(authProvider).value;
-
-    return AppBar(
-      backgroundColor: _WA.teal,
-      elevation: 0,
-      titleSpacing: 18,
-      title: Text(
-        user != null ? 'Hi, ${user.name.split(' ').first}' : 'WhatsApp',
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 20,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.2,
+    return Container(
+      padding: EdgeInsets.only(
+        top: MediaQuery.of(context).padding.top + 12,
+        left: 20, right: 12, bottom: 14,
+      ),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFF111224), Color(0x000D0E1A)],
         ),
       ),
-      actions: [
-        // Camera icon
-        IconButton(
-          icon: const Icon(Icons.camera_alt_outlined, color: Colors.white, size: 22),
-          onPressed: () {},
-          tooltip: 'Camera',
-        ),
-        // Search icon
-        IconButton(
-          icon: const Icon(Icons.search, color: Colors.white, size: 22),
-          onPressed: () {},
-          tooltip: 'Search',
-        ),
-        // More-vert / Logout
-        PopupMenuButton<String>(
-          icon: const Icon(Icons.more_vert, color: Colors.white, size: 22),
-          color: Colors.white,
-          elevation: 4,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          onSelected: (v) async {
-            if (v == 'logout') {
-              await ref.read(authProvider.notifier).logout();
-            }
-          },
-          itemBuilder: (_) => [
-            _menuItem(Icons.group_add_outlined,  'New group'),
-            _menuItem(Icons.devices_outlined,    'Linked devices'),
-            _menuItem(Icons.star_outline,        'Starred messages'),
-            _menuItem(Icons.settings_outlined,   'Settings'),
-            _menuItem(Icons.logout,              'Log out', value: 'logout'),
-          ],
-        ),
-        const SizedBox(width: 4),
-      ],
-      bottom: TabBar(
-        controller: _tabController,
-        indicatorColor: _WA.tabIndicator,
-        indicatorWeight: 3,
-        labelColor: _WA.tabLabel,
-        unselectedLabelColor: _WA.unselected,
-        labelStyle: const TextStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.w600,
-          letterSpacing: 0.8,
-        ),
-        unselectedLabelStyle: const TextStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.w500,
-          letterSpacing: 0.8,
-        ),
-        tabs: const [
-          Tab(text: 'CHATS'),
-          Tab(text: 'STATUS'),
-          Tab(text: 'CALLS'),
-        ],
-      ),
-    );
-  }
-
-  PreferredSizeWidget _buildProfileAppBar() => AppBar(
-        backgroundColor: _WA.teal,
-        elevation: 0,
-        titleSpacing: 18,
-        title: const Text(
-          'Profile',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
+      child: Row(children: [
+        // Animated logo
+        AnimatedBuilder(
+          animation: _glowController,
+          builder: (_, __) => Container(
+            width: 36, height: 36,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(10),
+              gradient: const LinearGradient(
+                colors: [_N.indigo, _N.violet],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              boxShadow: [BoxShadow(
+                color: _N.indigo.withOpacity(0.4 + _glowController.value * 0.3),
+                blurRadius: 12 + _glowController.value * 8,
+                spreadRadius: 1,
+              )],
+            ),
+            child: const Icon(Icons.bolt_rounded, color: Colors.white, size: 20),
           ),
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.more_vert, color: Colors.white),
-            onPressed: () {},
+        const SizedBox(width: 12),
+
+        // Title & subtitle
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: const TextStyle(
+                color: _N.textPrimary, fontSize: 22,
+                fontWeight: FontWeight.w800, letterSpacing: -0.5,
+              )),
+              if (user != null)
+                Text(user.name, style: const TextStyle(
+                  color: _N.textMuted, fontSize: 11, fontWeight: FontWeight.w500,
+                )),
+            ],
           ),
-        ],
-      );
-
-  // ── FAB ────────────────────────────────────────────────────────────────────
-
-  Widget _buildFAB() {
-    return FloatingActionButton(
-      onPressed: _openNewChat,
-      backgroundColor: _WA.green,
-      foregroundColor: Colors.white,
-      elevation: 6,
-      shape: const CircleBorder(),
-      tooltip: 'New chat',
-      child: const Icon(Icons.chat_outlined, size: 26),
-    );
-  }
-
-  // ── Bottom Nav ─────────────────────────────────────────────────────────────
-
-  Widget _buildBottomNav() {
-    return BottomNavigationBar(
-      backgroundColor: Colors.white,
-      selectedItemColor: _WA.tealLight,
-      unselectedItemColor: _WA.textSecondary,
-      selectedLabelStyle: const TextStyle(
-        fontSize: 12,
-        fontWeight: FontWeight.w600,
-      ),
-      unselectedLabelStyle: const TextStyle(fontSize: 12),
-      currentIndex: _bottomIndex,
-      type: BottomNavigationBarType.fixed,
-      elevation: 8,
-      onTap: (i) => setState(() => _bottomIndex = i),
-      items: const [
-        BottomNavigationBarItem(
-          icon: Icon(Icons.chat_bubble_outline_rounded),
-          activeIcon: Icon(Icons.chat_bubble_rounded),
-          label: 'Chats',
         ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.person_outline_rounded),
-          activeIcon: Icon(Icons.person_rounded),
-          label: 'Profile',
-        ),
-      ],
-    );
-  }
 
-  // ── Helpers ────────────────────────────────────────────────────────────────
-
-  PopupMenuItem<String> _menuItem(IconData icon, String label,
-      {String? value}) {
-    return PopupMenuItem<String>(
-      value: value ?? label.toLowerCase().replaceAll(' ', '_'),
-      child: Row(
-        children: [
-          Icon(icon, size: 20, color: _WA.textSecondary),
-          const SizedBox(width: 12),
-          Text(label,
-              style: const TextStyle(
-                  color: _WA.textPrimary, fontSize: 14.5)),
+        if (showActions) ...[
+          _headerIconBtn(Icons.notifications_none_rounded, () {}),
+          _headerIconBtn(Icons.search_rounded, () {}),
+          _moreMenu(),
         ],
-      ),
+      ]),
     );
   }
 
-  Widget _buildComingSoon(IconData icon, String label) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 64, color: _WA.divider),
-          const SizedBox(height: 12),
-          Text(
-            label,
-            style: const TextStyle(
-              color: _WA.textSecondary,
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
+  Widget _headerIconBtn(IconData icon, VoidCallback onTap) => GestureDetector(
+    onTap: onTap,
+    child: Container(
+      width: 38, height: 38,
+      margin: const EdgeInsets.only(left: 4),
+      decoration: BoxDecoration(
+        color: _N.card,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _N.cardBorder),
+      ),
+      child: Icon(icon, color: _N.textSecondary, size: 20),
+    ),
+  );
+
+  Widget _moreMenu() => PopupMenuButton<String>(
+    color: _N.card,
+    elevation: 8,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(14),
+      side: const BorderSide(color: _N.cardBorder),
+    ),
+    icon: Container(
+      width: 38, height: 38,
+      margin: const EdgeInsets.only(left: 4),
+      decoration: BoxDecoration(
+        color: _N.card,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _N.cardBorder),
+      ),
+      child: const Icon(Icons.more_horiz_rounded, color: _N.textSecondary, size: 20),
+    ),
+    onSelected: (v) async {
+      if (v == 'logout') await ref.read(authProvider.notifier).logout();
+    },
+    itemBuilder: (_) => [
+      _popItem(Icons.group_add_outlined,   'New group'),
+      _popItem(Icons.devices_outlined,     'Linked devices'),
+      _popItem(Icons.star_border_rounded,  'Starred'),
+      _popItem(Icons.tune_rounded,         'Settings'),
+      _popItem(Icons.logout_rounded,       'Sign out', value: 'logout'),
+    ],
+  );
+
+  PopupMenuItem<String> _popItem(IconData icon, String label, {String? value}) =>
+    PopupMenuItem<String>(
+      value: value ?? label,
+      child: Row(children: [
+        Icon(icon, size: 18, color: _N.indigoLight),
+        const SizedBox(width: 12),
+        Text(label, style: const TextStyle(color: _N.textPrimary, fontSize: 14)),
+      ]),
+    );
+
+  // ── Search bar ────────────────────────────────────────────────────────────
+  Widget _buildSearchBar() => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 20),
+    child: Container(
+      height: 44,
+      decoration: BoxDecoration(
+        color: _N.card,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _N.cardBorder),
+      ),
+      child: Row(children: [
+        const SizedBox(width: 14),
+        const Icon(Icons.search_rounded, color: _N.textMuted, size: 20),
+        const SizedBox(width: 10),
+        Expanded(
+          child: TextField(
+            style: const TextStyle(color: _N.textPrimary, fontSize: 14),
+            cursorColor: _N.indigo,
+            decoration: const InputDecoration(
+              border: InputBorder.none,
+              hintText: 'Search conversations…',
+              hintStyle: TextStyle(color: _N.textMuted, fontSize: 14),
+              isDense: true,
             ),
           ),
-          const SizedBox(height: 6),
-          const Text(
-            'Coming soon',
-            style: TextStyle(color: _WA.textSecondary, fontSize: 13),
+        ),
+        Container(
+          margin: const EdgeInsets.only(right: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: _N.indigo.withOpacity(0.15),
+            borderRadius: BorderRadius.circular(8),
           ),
-        ],
+          child: const Text('⌘ K',
+            style: TextStyle(color: _N.indigoLight, fontSize: 11, fontWeight: FontWeight.w600)),
+        ),
+      ]),
+    ),
+  );
+
+  // ── Segment control ───────────────────────────────────────────────────────
+  static const _segLabels = ['Messages', 'Moments', 'Calls'];
+  static const _segIcons  = [
+    Icons.forum_outlined,
+    Icons.auto_awesome_outlined,
+    Icons.mic_none_rounded,
+  ];
+
+  Widget _buildSegmentControl() => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 20),
+    child: Container(
+      height: 44,
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: _N.segBg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _N.cardBorder),
+      ),
+      child: Row(
+        children: List.generate(_segLabels.length, (i) {
+          final active = _segmentIndex == i;
+          return Expanded(
+            child: GestureDetector(
+              onTap: () => setState(() => _segmentIndex = i),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.easeInOut,
+                decoration: BoxDecoration(
+                  color: active ? _N.segActive : Colors.transparent,
+                  borderRadius: BorderRadius.circular(10),
+                  boxShadow: active
+                    ? [BoxShadow(color: _N.indigo.withOpacity(0.4), blurRadius: 8)]
+                    : [],
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(_segIcons[i], size: 15,
+                        color: active ? Colors.white : _N.textMuted),
+                    const SizedBox(width: 5),
+                    Text(_segLabels[i], style: TextStyle(
+                      color: active ? Colors.white : _N.textMuted,
+                      fontSize: 12.5,
+                      fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                    )),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }),
+      ),
+    ),
+  );
+
+  Widget _buildSegmentContent() {
+    switch (_segmentIndex) {
+      case 0:
+        return Container(
+          margin: const EdgeInsets.symmetric(horizontal: 16),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(18),
+            child: const ChatListScreen(),
+          ),
+        );
+      case 1:
+        return _buildComingSoon(Icons.auto_awesome_outlined, 'Moments');
+      case 2:
+        return _buildComingSoon(Icons.mic_none_rounded, 'Calls');
+      default:
+        return const SizedBox();
+    }
+  }
+
+  // ── Compose FAB ───────────────────────────────────────────────────────────
+  Widget _buildComposeFAB() => Container(
+    decoration: BoxDecoration(
+      borderRadius: BorderRadius.circular(18),
+      gradient: const LinearGradient(
+        colors: [_N.indigo, _N.violet],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ),
+      boxShadow: [BoxShadow(
+        color: _N.indigo.withOpacity(0.5),
+        blurRadius: 20, offset: const Offset(0, 6),
+      )],
+    ),
+    child: Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: _openNewChat,
+        child: const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.edit_outlined, color: Colors.white, size: 20),
+              SizedBox(width: 8),
+              Text('Compose', style: TextStyle(
+                color: Colors.white, fontWeight: FontWeight.w700,
+                fontSize: 14, letterSpacing: 0.3,
+              )),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+
+  // ── Bottom Nav ────────────────────────────────────────────────────────────
+  Widget _buildBottomNav() {
+    final items = [
+      (Icons.forum_outlined,         Icons.forum_rounded,         'Messages'),
+      (Icons.explore_outlined,       Icons.explore_rounded,       'Discover'),
+      (Icons.graphic_eq_rounded,     Icons.graphic_eq_rounded,    'Calls'),
+      (Icons.person_outline_rounded, Icons.person_rounded,        'Profile'),
+    ];
+
+    return Container(
+      decoration: const BoxDecoration(
+        color: _N.navBg,
+        border: Border(top: BorderSide(color: _N.navBorder, width: 1)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: Row(
+            children: List.generate(items.length, (i) {
+              final active = _bottomIndex == i;
+              return Expanded(
+                child: GestureDetector(
+                  onTap: () => setState(() => _bottomIndex = i),
+                  behavior: HitTestBehavior.opaque,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 250),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: active
+                              ? _N.indigo.withOpacity(0.15)
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(
+                          active ? items[i].$2 : items[i].$1,
+                          color: active ? _N.indigoLight : _N.textMuted,
+                          size: 22,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(items[i].$3, style: TextStyle(
+                        color: active ? _N.indigoLight : _N.textMuted,
+                        fontSize: 10.5,
+                        fontWeight: active ? FontWeight.w700 : FontWeight.w400,
+                      )),
+                    ],
+                  ),
+                ),
+              );
+            }),
+          ),
+        ),
       ),
     );
   }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  Widget _buildComingSoon(IconData icon, String label) => Center(
+    child: Column(mainAxisSize: MainAxisSize.min, children: [
+      Container(
+        width: 80, height: 80,
+        decoration: BoxDecoration(
+          color: _N.card,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: _N.cardBorder),
+        ),
+        child: Icon(icon, size: 36, color: _N.textMuted),
+      ),
+      const SizedBox(height: 16),
+      Text(label, style: const TextStyle(
+        color: _N.textPrimary, fontSize: 18, fontWeight: FontWeight.w700,
+      )),
+      const SizedBox(height: 6),
+      const Text('Coming soon',
+          style: TextStyle(color: _N.textMuted, fontSize: 13)),
+    ]),
+  );
 
   Future<void> _openNewChat() async {
     try {
@@ -282,28 +477,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         if (granted) {
           if (mounted) {
             Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const ContactsScreen()),
-            );
+                MaterialPageRoute(builder: (_) => const ContactsScreen()));
           }
         } else {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Contacts permission denied')),
-            );
-          }
+          _snack('Contacts permission denied');
         }
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Not available on this platform')),
-        );
+        _snack('Not available on this platform');
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
-      }
+      _snack('Error: $e');
     }
+  }
+
+  void _snack(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(msg, style: const TextStyle(color: _N.textPrimary)),
+      backgroundColor: _N.card,
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    ));
   }
 
   Future<bool> _requestContactsPermission() async {
@@ -313,7 +507,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       }
       return false;
     } catch (e) {
-      debugPrint('Error requesting contacts permission: $e');
+      debugPrint('Contacts permission error: $e');
       return false;
     }
   }

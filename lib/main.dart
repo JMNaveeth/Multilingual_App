@@ -4,7 +4,6 @@ import 'package:multilingual_chat_app/providers/auth_provider.dart';
 import 'package:multilingual_chat_app/screens/auth/login_screen.dart';
 import 'package:multilingual_chat_app/screens/auth/register_screen.dart';
 import 'package:multilingual_chat_app/screens/home/home_screen.dart';
-import 'package:multilingual_chat_app/services/auth_service.dart';
 
 void main() {
   runApp(
