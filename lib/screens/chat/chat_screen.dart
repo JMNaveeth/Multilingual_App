@@ -1,10 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:multilingual_chat_app/models/message.dart';
 import 'package:multilingual_chat_app/models/user.dart';
 import 'package:multilingual_chat_app/providers/auth_provider.dart';
-import 'package:multilingual_chat_app/widgets/message_bubble.dart';
+import 'package:multilingual_chat_app/screens/chat/call_screen.dart';
+import 'package:multilingual_chat_app/services/call_socket_service.dart';
 
 // ── Nexus Design Tokens (same as home_screen) ────────────────────────────────
 class _N {
@@ -73,6 +76,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   final _scrollController  = ScrollController();
   bool _showAttachMenu     = false;
   bool _isTyping           = false;
+  bool _socketReady        = false;
+  bool _incomingDialogOpen  = false;
+  StreamSubscription<IncomingCall>? _incomingCallSub;
 
   late final AnimationController _onlineGlowCtrl;
   late final AnimationController _attachMenuCtrl;
@@ -111,11 +117,85 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
 
   @override
   void dispose() {
+    _incomingCallSub?.cancel();
     _messageController.dispose();
     _scrollController.dispose();
     _onlineGlowCtrl.dispose();
     _attachMenuCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _ensureSocket(User? currentUser) async {
+    if (currentUser == null || _socketReady) {
+      return;
+    }
+
+    _socketReady = true;
+    await CallSocketService.instance.connect(userId: currentUser.id);
+
+    _incomingCallSub ??= CallSocketService.instance.incomingCalls.listen(
+      (incomingCall) {
+        if (!mounted) {
+          return;
+        }
+
+        if (incomingCall.fromUserId != widget.user.id || _incomingDialogOpen) {
+          return;
+        }
+
+        _incomingDialogOpen = true;
+        showDialog<void>(
+          context: context,
+          barrierDismissible: false,
+          builder: (dialogContext) {
+            return AlertDialog(
+              backgroundColor: _N.card,
+              title: Text(
+                'Incoming ${incomingCall.callType} call',
+                style: const TextStyle(color: _N.textPrimary),
+              ),
+              content: Text(
+                '${incomingCall.fromName} is calling you.',
+                style: const TextStyle(color: _N.textSecondary),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    _incomingDialogOpen = false;
+                    Navigator.of(dialogContext).pop();
+                  },
+                  child: const Text('Decline'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    CallSocketService.instance.answerCall(
+                      to: incomingCall.fromUserId,
+                      callType: incomingCall.callType,
+                    );
+                    _incomingDialogOpen = false;
+                    Navigator.of(dialogContext).pop();
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => CallScreen(
+                          peerUser: widget.user,
+                          callType: incomingCall.callType == 'video'
+                              ? CallType.video
+                              : CallType.voice,
+                          isIncoming: true,
+                        ),
+                      ),
+                    );
+                  },
+                  child: const Text('Accept'),
+                ),
+              ],
+            );
+          },
+        ).then((_) {
+          _incomingDialogOpen = false;
+        });
+      },
+    );
   }
 
   // ── Actions ───────────────────────────────────────────────────────────────
@@ -156,13 +236,30 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   }
 
   void _startVideoCall() {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: const Text('Video call coming soon',
-          style: TextStyle(color: _N.textPrimary)),
-      backgroundColor: _N.card,
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-    ));
+    _startCall(CallType.video);
+  }
+
+  void _startVoiceCall() {
+    _startCall(CallType.voice);
+  }
+
+  void _startCall(CallType callType) {
+    final currentUser = ref.read(authProvider).value;
+    if (currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please sign in to start a call.')),
+      );
+      return;
+    }
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => CallScreen(
+          peerUser: widget.user,
+          callType: callType,
+        ),
+      ),
+    );
   }
 
   // ── Build ─────────────────────────────────────────────────────────────────
@@ -171,6 +268,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   Widget build(BuildContext context) {
     final currentUser = ref.watch(authProvider).value;
     final messages    = ref.watch(mockMessagesProvider);
+
+    _ensureSocket(currentUser);
 
     final conversation = messages.where((m) =>
         (m.senderId == widget.user.id && m.receiverId == currentUser?.id) ||
@@ -324,7 +423,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         ),
 
         // Voice call
-        _appBarBtn(Icons.call_outlined, () {}),
+        _appBarBtn(Icons.call_outlined, _startVoiceCall),
         const SizedBox(width: 6),
         // Video call
         _appBarBtn(Icons.videocam_outlined, _startVideoCall),
@@ -617,8 +716,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       case MessageStatus.read:
         return const Icon(Icons.done_all_rounded,
             size: 13, color: _N.cyan);
-      default:
-        return const SizedBox.shrink();
     }
   }
 
@@ -745,7 +842,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
               Padding(
                 padding: const EdgeInsets.only(right: 6, bottom: 6),
                 child: GestureDetector(
-                  onTap: () {},
+                  onTap: () {
+                    final text = _messageController.text;
+                    final selection = _messageController.selection;
+                    final insertAt = selection.isValid ? selection.start : text.length;
+                    final updatedText = text.replaceRange(insertAt, insertAt, ' 😊');
+                    _messageController.value = TextEditingValue(
+                      text: updatedText,
+                      selection: TextSelection.collapsed(offset: updatedText.length),
+                    );
+                  },
                   child: const Icon(Icons.emoji_emotions_outlined,
                       color: _N.textMuted, size: 20),
                 ),
@@ -757,7 +863,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
 
         // Send / mic button
         GestureDetector(
-          onTap: _isTyping ? _sendMessage : () {},
+          onTap: _isTyping
+              ? _sendMessage
+              : () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Hold to record voice notes is not enabled yet.')),
+                  );
+                },
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 200),
             width: 42, height: 42,
