@@ -104,7 +104,8 @@ class _CallScreenState extends ConsumerState<CallScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final callLabel = widget.callType == CallType.video ? 'Video call' : 'Voice call';
+    final callLabel =
+        widget.callType == CallType.video ? 'Video call' : 'Voice call';
 
     return Scaffold(
       backgroundColor: const Color(0xFF0D0E1A),
@@ -120,12 +121,14 @@ class _CallScreenState extends ConsumerState<CallScreen> {
           child: Column(
             children: [
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 child: Row(
                   children: [
                     IconButton(
                       onPressed: _endCall,
-                      icon: const Icon(Icons.close_rounded, color: Colors.white),
+                      icon:
+                          const Icon(Icons.close_rounded, color: Colors.white),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
@@ -172,14 +175,18 @@ class _CallScreenState extends ConsumerState<CallScreen> {
                   ],
                 ),
                 child: Icon(
-                  widget.callType == CallType.video ? Icons.videocam_rounded : Icons.call_rounded,
+                  widget.callType == CallType.video
+                      ? Icons.videocam_rounded
+                      : Icons.call_rounded,
                   color: Colors.white,
                   size: 52,
                 ),
               ),
               const SizedBox(height: 28),
               Text(
-                _connected ? 'Connected' : (_dialing ? 'Connecting...' : 'Incoming call'),
+                _connected
+                    ? 'Connected'
+                    : (_dialing ? 'Connecting...' : 'Incoming call'),
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 26,
@@ -203,7 +210,8 @@ class _CallScreenState extends ConsumerState<CallScreen> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    _actionButton(Icons.call_end_rounded, const Color(0xFFE23B4F), _endCall),
+                    _actionButton(Icons.call_end_rounded,
+                        const Color(0xFFE23B4F), _endCall),
                     const SizedBox(width: 16),
                     _actionButton(
                       widget.callType == CallType.video

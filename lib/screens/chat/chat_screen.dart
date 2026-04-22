@@ -11,56 +11,56 @@ import 'package:multilingual_chat_app/services/call_socket_service.dart';
 
 // ── Nexus Design Tokens (same as home_screen) ────────────────────────────────
 class _N {
-  static const bg            = Color(0xFF0D0E1A);
-  static const surface       = Color(0xFF151626);
-  static const card          = Color(0xFF1C1E31);
-  static const cardBorder    = Color(0xFF252842);
-  static const indigo        = Color(0xFF6366F1);
-  static const indigoLight   = Color(0xFF818CF8);
-  static const cyan          = Color(0xFF22D3EE);
-  static const violet        = Color(0xFF8B5CF6);
-  static const textPrimary   = Color(0xFFF1F5F9);
+  static const bg = Color(0xFF0D0E1A);
+  static const surface = Color(0xFF151626);
+  static const card = Color(0xFF1C1E31);
+  static const cardBorder = Color(0xFF252842);
+  static const indigo = Color(0xFF6366F1);
+  static const indigoLight = Color(0xFF818CF8);
+  static const cyan = Color(0xFF22D3EE);
+  static const violet = Color(0xFF8B5CF6);
+  static const textPrimary = Color(0xFFF1F5F9);
   static const textSecondary = Color(0xFF94A3B8);
-  static const textMuted     = Color(0xFF475569);
-  static const inputBg       = Color(0xFF13141F);
-  static const inputBorder   = Color(0xFF1E2035);
+  static const textMuted = Color(0xFF475569);
+  static const inputBg = Color(0xFF13141F);
+  static const inputBorder = Color(0xFF1E2035);
 
   // Message bubbles
-  static const bubbleMe      = Color(0xFF3730A3); // sent – deep indigo
-  static const bubbleThem    = Color(0xFF1C1E31); // received – dark card
-  static const bubbleMeEnd   = Color(0xFF6D28D9); // gradient end for sent
+  static const bubbleMe = Color(0xFF3730A3); // sent – deep indigo
+  static const bubbleThem = Color(0xFF1C1E31); // received – dark card
+  static const bubbleMeEnd = Color(0xFF6D28D9); // gradient end for sent
 }
 
 // Mock messages (replace with real provider)
 final mockMessagesProvider = Provider<List<Message>>((ref) => [
-  Message(
-    id: '1',
-    senderId: '1',
-    receiverId: 'current_user',
-    content: 'Hello! How are you?',
-    type: MessageType.text,
-    status: MessageStatus.read,
-    timestamp: DateTime.now().subtract(const Duration(minutes: 5)),
-  ),
-  Message(
-    id: '2',
-    senderId: 'current_user',
-    receiverId: '1',
-    content: 'Hi! I\'m doing well, thank you. How about you?',
-    type: MessageType.text,
-    status: MessageStatus.read,
-    timestamp: DateTime.now().subtract(const Duration(minutes: 4)),
-  ),
-  Message(
-    id: '3',
-    senderId: '1',
-    receiverId: 'current_user',
-    content: 'I\'m great! Ready to test the translation feature?',
-    type: MessageType.text,
-    status: MessageStatus.read,
-    timestamp: DateTime.now().subtract(const Duration(minutes: 2)),
-  ),
-]);
+      Message(
+        id: '1',
+        senderId: '1',
+        receiverId: 'current_user',
+        content: 'Hello! How are you?',
+        type: MessageType.text,
+        status: MessageStatus.read,
+        timestamp: DateTime.now().subtract(const Duration(minutes: 5)),
+      ),
+      Message(
+        id: '2',
+        senderId: 'current_user',
+        receiverId: '1',
+        content: 'Hi! I\'m doing well, thank you. How about you?',
+        type: MessageType.text,
+        status: MessageStatus.read,
+        timestamp: DateTime.now().subtract(const Duration(minutes: 4)),
+      ),
+      Message(
+        id: '3',
+        senderId: '1',
+        receiverId: 'current_user',
+        content: 'I\'m great! Ready to test the translation feature?',
+        type: MessageType.text,
+        status: MessageStatus.read,
+        timestamp: DateTime.now().subtract(const Duration(minutes: 2)),
+      ),
+    ]);
 
 class ChatScreen extends ConsumerStatefulWidget {
   final User user;
@@ -73,16 +73,16 @@ class ChatScreen extends ConsumerStatefulWidget {
 class _ChatScreenState extends ConsumerState<ChatScreen>
     with TickerProviderStateMixin {
   final _messageController = TextEditingController();
-  final _scrollController  = ScrollController();
-  bool _showAttachMenu     = false;
-  bool _isTyping           = false;
-  bool _socketReady        = false;
-  bool _incomingDialogOpen  = false;
+  final _scrollController = ScrollController();
+  bool _showAttachMenu = false;
+  bool _isTyping = false;
+  bool _socketReady = false;
+  bool _incomingDialogOpen = false;
   StreamSubscription<IncomingCall>? _incomingCallSub;
 
   late final AnimationController _onlineGlowCtrl;
   late final AnimationController _attachMenuCtrl;
-  late final Animation<double>   _attachMenuAnim;
+  late final Animation<double> _attachMenuAnim;
 
   @override
   void initState() {
@@ -204,8 +204,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text('Sent: $text',
-          style: const TextStyle(color: _N.textPrimary)),
+      content:
+          Text('Sent: $text', style: const TextStyle(color: _N.textPrimary)),
       backgroundColor: _N.card,
       behavior: SnackBarBehavior.floating,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -267,14 +267,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   @override
   Widget build(BuildContext context) {
     final currentUser = ref.watch(authProvider).value;
-    final messages    = ref.watch(mockMessagesProvider);
+    final messages = ref.watch(mockMessagesProvider);
 
     _ensureSocket(currentUser);
 
-    final conversation = messages.where((m) =>
-        (m.senderId == widget.user.id && m.receiverId == currentUser?.id) ||
-        (m.senderId == currentUser?.id && m.receiverId == widget.user.id))
-      .toList();
+    final conversation = messages
+        .where((m) =>
+            (m.senderId == widget.user.id && m.receiverId == currentUser?.id) ||
+            (m.senderId == currentUser?.id && m.receiverId == widget.user.id))
+        .toList();
 
     return Scaffold(
       backgroundColor: _N.bg,
@@ -301,7 +302,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                         padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                         itemCount: conversation.length,
                         itemBuilder: (ctx, i) {
-                          final msg  = conversation[i];
+                          final msg = conversation[i];
                           final isMe = msg.senderId == currentUser?.id;
                           final showDate = i == 0 ||
                               !_sameDay(
@@ -345,7 +346,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     return Container(
       padding: EdgeInsets.only(
         top: MediaQuery.of(context).padding.top + 8,
-        left: 8, right: 12, bottom: 12,
+        left: 8,
+        right: 12,
+        bottom: 12,
       ),
       decoration: BoxDecoration(
         color: _N.surface.withOpacity(0.95),
@@ -355,7 +358,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.3),
-            blurRadius: 12, offset: const Offset(0, 4),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -364,7 +368,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         GestureDetector(
           onTap: () => Navigator.of(context).pop(),
           child: Container(
-            width: 38, height: 38,
+            width: 38,
+            height: 38,
             decoration: BoxDecoration(
               color: _N.card,
               borderRadius: BorderRadius.circular(12),
@@ -398,21 +403,27 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                   AnimatedBuilder(
                     animation: _onlineGlowCtrl,
                     builder: (_, __) => Container(
-                      width: 7, height: 7,
+                      width: 7,
+                      height: 7,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: _N.cyan,
-                        boxShadow: [BoxShadow(
-                          color: _N.cyan.withOpacity(
-                              0.5 + _onlineGlowCtrl.value * 0.5),
-                          blurRadius: 6, spreadRadius: 1,
-                        )],
+                        boxShadow: [
+                          BoxShadow(
+                            color: _N.cyan
+                                .withOpacity(0.5 + _onlineGlowCtrl.value * 0.5),
+                            blurRadius: 6,
+                            spreadRadius: 1,
+                          )
+                        ],
                       ),
                     ),
                   ),
                   const SizedBox(width: 5),
                   const Text('Active now',
-                      style: TextStyle(color: _N.cyan, fontSize: 11,
+                      style: TextStyle(
+                          color: _N.cyan,
+                          fontSize: 11,
                           fontWeight: FontWeight.w600)),
                 ] else
                   const Text('Offline',
@@ -444,7 +455,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     return AnimatedBuilder(
       animation: _onlineGlowCtrl,
       builder: (_, __) => Container(
-        width: 42, height: 42,
+        width: 42,
+        height: 42,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(14),
           gradient: const LinearGradient(
@@ -453,71 +465,79 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
             end: Alignment.bottomRight,
           ),
           boxShadow: widget.user.isOnline
-              ? [BoxShadow(
-                  color: _N.indigo.withOpacity(
-                      0.3 + _onlineGlowCtrl.value * 0.2),
-                  blurRadius: 10, spreadRadius: 1,
-                )]
+              ? [
+                  BoxShadow(
+                    color: _N.indigo
+                        .withOpacity(0.3 + _onlineGlowCtrl.value * 0.2),
+                    blurRadius: 10,
+                    spreadRadius: 1,
+                  )
+                ]
               : [],
         ),
         child: Center(
-          child: Text(initials, style: const TextStyle(
-            color: Colors.white, fontSize: 15, fontWeight: FontWeight.w700,
-          )),
+          child: Text(initials,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+              )),
         ),
       ),
     );
   }
 
   Widget _appBarBtn(IconData icon, VoidCallback onTap) => GestureDetector(
-    onTap: onTap,
-    child: Container(
-      width: 38, height: 38,
-      decoration: BoxDecoration(
-        color: _N.card,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: _N.cardBorder),
-      ),
-      child: Icon(icon, color: _N.textSecondary, size: 18),
-    ),
-  );
+        onTap: onTap,
+        child: Container(
+          width: 38,
+          height: 38,
+          decoration: BoxDecoration(
+            color: _N.card,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: _N.cardBorder),
+          ),
+          child: Icon(icon, color: _N.textSecondary, size: 18),
+        ),
+      );
 
   Widget _appBarPopup() => PopupMenuButton<String>(
-    color: _N.card,
-    elevation: 8,
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(14),
-      side: const BorderSide(color: _N.cardBorder),
-    ),
-    icon: Container(
-      width: 38, height: 38,
-      decoration: BoxDecoration(
         color: _N.card,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: _N.cardBorder),
-      ),
-      child: const Icon(Icons.more_horiz_rounded,
-          color: _N.textSecondary, size: 18),
-    ),
-    itemBuilder: (_) => [
-      _popItem(Icons.search_rounded,           'Search'),
-      _popItem(Icons.translate_rounded,        'Translate'),
-      _popItem(Icons.wallpaper_rounded,        'Wallpaper'),
-      _popItem(Icons.notifications_off_outlined, 'Mute'),
-      _popItem(Icons.block_rounded,            'Block'),
-    ],
-  );
+        elevation: 8,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: const BorderSide(color: _N.cardBorder),
+        ),
+        icon: Container(
+          width: 38,
+          height: 38,
+          decoration: BoxDecoration(
+            color: _N.card,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: _N.cardBorder),
+          ),
+          child: const Icon(Icons.more_horiz_rounded,
+              color: _N.textSecondary, size: 18),
+        ),
+        itemBuilder: (_) => [
+          _popItem(Icons.search_rounded, 'Search'),
+          _popItem(Icons.translate_rounded, 'Translate'),
+          _popItem(Icons.wallpaper_rounded, 'Wallpaper'),
+          _popItem(Icons.notifications_off_outlined, 'Mute'),
+          _popItem(Icons.block_rounded, 'Block'),
+        ],
+      );
 
   PopupMenuItem<String> _popItem(IconData icon, String label) =>
-    PopupMenuItem<String>(
-      value: label,
-      child: Row(children: [
-        Icon(icon, size: 17, color: _N.indigoLight),
-        const SizedBox(width: 12),
-        Text(label, style: const TextStyle(
-            color: _N.textPrimary, fontSize: 13.5)),
-      ]),
-    );
+      PopupMenuItem<String>(
+        value: label,
+        child: Row(children: [
+          Icon(icon, size: 17, color: _N.indigoLight),
+          const SizedBox(width: 12),
+          Text(label,
+              style: const TextStyle(color: _N.textPrimary, fontSize: 13.5)),
+        ]),
+      );
 
   // ── Empty state ───────────────────────────────────────────────────────────
 
@@ -525,7 +545,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     return Center(
       child: Column(mainAxisSize: MainAxisSize.min, children: [
         Container(
-          width: 88, height: 88,
+          width: 88,
+          height: 88,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(28),
             gradient: LinearGradient(
@@ -534,11 +555,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                 _N.violet.withOpacity(0.15),
               ],
             ),
-            border: Border.all(
-              color: _N.indigo.withOpacity(0.3), width: 1.5),
+            border: Border.all(color: _N.indigo.withOpacity(0.3), width: 1.5),
           ),
-          child: const Icon(Icons.forum_outlined,
-              size: 40, color: _N.indigoLight),
+          child:
+              const Icon(Icons.forum_outlined, size: 40, color: _N.indigoLight),
         ),
         const SizedBox(height: 20),
         Text('Start a conversation',
@@ -550,8 +570,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
             )),
         const SizedBox(height: 6),
         Text('Say hello to ${widget.user.name.split(' ').first}!',
-            style: const TextStyle(
-              color: _N.textMuted, fontSize: 13)),
+            style: const TextStyle(color: _N.textMuted, fontSize: 13)),
       ]),
     );
   }
@@ -559,9 +578,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   // ── Date chip ─────────────────────────────────────────────────────────────
 
   Widget _buildDateChip(DateTime dt) {
-    final now   = DateTime.now();
+    final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final d     = DateTime(dt.year, dt.month, dt.day);
+    final d = DateTime(dt.year, dt.month, dt.day);
     final label = d == today
         ? 'Today'
         : d == today.subtract(const Duration(days: 1))
@@ -578,9 +597,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
             borderRadius: BorderRadius.circular(20),
             border: Border.all(color: _N.cardBorder),
           ),
-          child: Text(label, style: const TextStyle(
-            color: _N.textMuted, fontSize: 11, fontWeight: FontWeight.w600,
-          )),
+          child: Text(label,
+              style: const TextStyle(
+                color: _N.textMuted,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              )),
         ),
       ),
     );
@@ -621,45 +643,50 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                     : null,
                 color: isMe ? null : _N.bubbleThem,
                 borderRadius: BorderRadius.only(
-                  topLeft:     const Radius.circular(18),
-                  topRight:    const Radius.circular(18),
-                  bottomLeft:  Radius.circular(isMe ? 18 : 4),
+                  topLeft: const Radius.circular(18),
+                  topRight: const Radius.circular(18),
+                  bottomLeft: Radius.circular(isMe ? 18 : 4),
                   bottomRight: Radius.circular(isMe ? 4 : 18),
                 ),
-                border: isMe
-                    ? null
-                    : Border.all(color: _N.cardBorder, width: 1),
+                border:
+                    isMe ? null : Border.all(color: _N.cardBorder, width: 1),
                 boxShadow: isMe
-                    ? [BoxShadow(
-                        color: _N.indigo.withOpacity(0.25),
-                        blurRadius: 10, offset: const Offset(0, 4),
-                      )]
-                    : [BoxShadow(
-                        color: Colors.black.withOpacity(0.2),
-                        blurRadius: 6, offset: const Offset(0, 2),
-                      )],
+                    ? [
+                        BoxShadow(
+                          color: _N.indigo.withOpacity(0.25),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        )
+                      ]
+                    : [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.2),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        )
+                      ],
               ),
               padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text(msg.content, style: TextStyle(
-                    color: isMe
-                        ? Colors.white
-                        : _N.textPrimary,
-                    fontSize: 14.5,
-                    height: 1.4,
-                  )),
+                  Text(msg.content,
+                      style: TextStyle(
+                        color: isMe ? Colors.white : _N.textPrimary,
+                        fontSize: 14.5,
+                        height: 1.4,
+                      )),
                   const SizedBox(height: 4),
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(time, style: TextStyle(
-                        color: isMe
-                            ? Colors.white.withOpacity(0.6)
-                            : _N.textMuted,
-                        fontSize: 10,
-                      )),
+                      Text(time,
+                          style: TextStyle(
+                            color: isMe
+                                ? Colors.white.withOpacity(0.6)
+                                : _N.textMuted,
+                            fontSize: 10,
+                          )),
                       if (isMe) ...[
                         const SizedBox(width: 4),
                         _statusIcon(msg.status),
@@ -686,7 +713,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         .join();
 
     return Container(
-      width: 28, height: 28,
+      width: 28,
+      height: 28,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(9),
         gradient: const LinearGradient(
@@ -694,9 +722,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         ),
       ),
       child: Center(
-        child: Text(initials, style: const TextStyle(
-          color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700,
-        )),
+        child: Text(initials,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+            )),
       ),
     );
   }
@@ -704,18 +735,18 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   Widget _statusIcon(MessageStatus status) {
     switch (status) {
       case MessageStatus.sending:
-        return const SizedBox(width: 12, height: 12,
+        return const SizedBox(
+            width: 12,
+            height: 12,
             child: CircularProgressIndicator(
                 strokeWidth: 1.5, color: Colors.white54));
       case MessageStatus.sent:
-        return const Icon(Icons.check_rounded,
-            size: 13, color: Colors.white54);
+        return const Icon(Icons.check_rounded, size: 13, color: Colors.white54);
       case MessageStatus.delivered:
         return const Icon(Icons.done_all_rounded,
             size: 13, color: Colors.white54);
       case MessageStatus.read:
-        return const Icon(Icons.done_all_rounded,
-            size: 13, color: _N.cyan);
+        return const Icon(Icons.done_all_rounded, size: 13, color: _N.cyan);
     }
   }
 
@@ -723,9 +754,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
 
   Widget _buildAttachMenu() {
     final options = [
-      (Icons.image_outlined,    'Gallery',   _N.violet),
+      (Icons.image_outlined, 'Gallery', _N.violet),
       (Icons.insert_drive_file_outlined, 'Document', _N.indigo),
-      (Icons.camera_alt_outlined, 'Camera',  _N.cyan),
+      (Icons.camera_alt_outlined, 'Camera', _N.cyan),
       (Icons.location_on_outlined, 'Location', const Color(0xFFF59E0B)),
       (Icons.person_outline_rounded, 'Contact', const Color(0xFF10B981)),
     ];
@@ -735,35 +766,40 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       color: _N.inputBg,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: options.map((o) => GestureDetector(
-          onTap: () {
-            _toggleAttachMenu();
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-              content: Text('${o.$2} coming soon',
-                  style: const TextStyle(color: _N.textPrimary)),
-              backgroundColor: _N.card,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-            ));
-          },
-          child: Column(children: [
-            Container(
-              width: 50, height: 50,
-              decoration: BoxDecoration(
-                color: o.$3.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: o.$3.withOpacity(0.3)),
-              ),
-              child: Icon(o.$1, color: o.$3, size: 22),
-            ),
-            const SizedBox(height: 6),
-            Text(o.$2, style: const TextStyle(
-              color: _N.textMuted, fontSize: 10.5,
-              fontWeight: FontWeight.w500,
-            )),
-          ]),
-        )).toList(),
+        children: options
+            .map((o) => GestureDetector(
+                  onTap: () {
+                    _toggleAttachMenu();
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Text('${o.$2} coming soon',
+                          style: const TextStyle(color: _N.textPrimary)),
+                      backgroundColor: _N.card,
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                    ));
+                  },
+                  child: Column(children: [
+                    Container(
+                      width: 50,
+                      height: 50,
+                      decoration: BoxDecoration(
+                        color: o.$3.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: o.$3.withOpacity(0.3)),
+                      ),
+                      child: Icon(o.$1, color: o.$3, size: 22),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(o.$2,
+                        style: const TextStyle(
+                          color: _N.textMuted,
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w500,
+                        )),
+                  ]),
+                ))
+            .toList(),
       ),
     );
   }
@@ -773,7 +809,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   Widget _buildInputBar() {
     return Container(
       padding: EdgeInsets.only(
-        left: 12, right: 12, top: 10,
+        left: 12,
+        right: 12,
+        top: 10,
         bottom: MediaQuery.of(context).padding.bottom + 10,
       ),
       decoration: BoxDecoration(
@@ -788,20 +826,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
           onTap: _toggleAttachMenu,
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 200),
-            width: 42, height: 42,
+            width: 42,
+            height: 42,
             decoration: BoxDecoration(
-              color: _showAttachMenu
-                  ? _N.indigo.withOpacity(0.2)
-                  : _N.card,
+              color: _showAttachMenu ? _N.indigo.withOpacity(0.2) : _N.card,
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
                 color: _showAttachMenu ? _N.indigo : _N.cardBorder,
               ),
             ),
             child: Icon(
-              _showAttachMenu
-                  ? Icons.close_rounded
-                  : Icons.add_rounded,
+              _showAttachMenu ? Icons.close_rounded : Icons.add_rounded,
               color: _showAttachMenu ? _N.indigoLight : _N.textSecondary,
               size: 22,
             ),
@@ -822,16 +857,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
               Expanded(
                 child: TextField(
                   controller: _messageController,
-                  style: const TextStyle(
-                      color: _N.textPrimary, fontSize: 14.5),
+                  style: const TextStyle(color: _N.textPrimary, fontSize: 14.5),
                   cursorColor: _N.indigoLight,
                   maxLines: null,
                   textInputAction: TextInputAction.newline,
                   onSubmitted: (_) => _sendMessage(),
                   decoration: const InputDecoration(
                     hintText: 'Write a message…',
-                    hintStyle: TextStyle(
-                        color: _N.textMuted, fontSize: 14.5),
+                    hintStyle: TextStyle(color: _N.textMuted, fontSize: 14.5),
                     border: InputBorder.none,
                     contentPadding: EdgeInsets.fromLTRB(14, 11, 4, 11),
                     isDense: true,
@@ -845,11 +878,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                   onTap: () {
                     final text = _messageController.text;
                     final selection = _messageController.selection;
-                    final insertAt = selection.isValid ? selection.start : text.length;
-                    final updatedText = text.replaceRange(insertAt, insertAt, ' 😊');
+                    final insertAt =
+                        selection.isValid ? selection.start : text.length;
+                    final updatedText =
+                        text.replaceRange(insertAt, insertAt, ' 😊');
                     _messageController.value = TextEditingValue(
                       text: updatedText,
-                      selection: TextSelection.collapsed(offset: updatedText.length),
+                      selection:
+                          TextSelection.collapsed(offset: updatedText.length),
                     );
                   },
                   child: const Icon(Icons.emoji_emotions_outlined,
@@ -867,12 +903,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
               ? _sendMessage
               : () {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Hold to record voice notes is not enabled yet.')),
+                    const SnackBar(
+                        content: Text(
+                            'Hold to record voice notes is not enabled yet.')),
                   );
                 },
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 200),
-            width: 42, height: 42,
+            width: 42,
+            height: 42,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(14),
               gradient: _isTyping
@@ -883,20 +922,19 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                     )
                   : null,
               color: _isTyping ? null : _N.card,
-              border: _isTyping
-                  ? null
-                  : Border.all(color: _N.cardBorder),
+              border: _isTyping ? null : Border.all(color: _N.cardBorder),
               boxShadow: _isTyping
-                  ? [BoxShadow(
-                      color: _N.indigo.withOpacity(0.5),
-                      blurRadius: 14, offset: const Offset(0, 4),
-                    )]
+                  ? [
+                      BoxShadow(
+                        color: _N.indigo.withOpacity(0.5),
+                        blurRadius: 14,
+                        offset: const Offset(0, 4),
+                      )
+                    ]
                   : [],
             ),
             child: Icon(
-              _isTyping
-                  ? Icons.send_rounded
-                  : Icons.mic_none_rounded,
+              _isTyping ? Icons.send_rounded : Icons.mic_none_rounded,
               color: _isTyping ? Colors.white : _N.textSecondary,
               size: 20,
             ),

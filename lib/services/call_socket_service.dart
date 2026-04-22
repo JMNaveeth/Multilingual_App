@@ -48,7 +48,8 @@ class CallSocketService {
       StreamController<Map<String, dynamic>>.broadcast();
 
   Stream<IncomingCall> get incomingCalls => _incomingCallController.stream;
-  Stream<Map<String, dynamic>> get callAccepted => _callAcceptedController.stream;
+  Stream<Map<String, dynamic>> get callAccepted =>
+      _callAcceptedController.stream;
   Stream<Map<String, dynamic>> get callEnded => _callEndedController.stream;
 
   bool get isConnected => _socket?.connected ?? false;
