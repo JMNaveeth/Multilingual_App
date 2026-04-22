@@ -355,7 +355,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
 
   Widget _buildBackground() {
     return Positioned.fill(
-      child: CustomPaint(painter: _DotGridPainter()),
+      child: CustomPaint(painter: _WhatsAppWallpaperPainter()),
     );
   }
 
@@ -955,22 +955,66 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       a.year == b.year && a.month == b.month && a.day == b.day;
 }
 
-// ── Dot grid background painter ───────────────────────────────────────────────
-class _DotGridPainter extends CustomPainter {
+// ── WhatsApp-style wallpaper painter ──────────────────────────────────────────
+class _WhatsAppWallpaperPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    const spacing = 28.0;
-    final paint = Paint()
-      ..color = const Color(0xFF6366F1).withOpacity(0.035)
-      ..strokeCap = StrokeCap.round;
+    canvas.drawRect(
+      Offset.zero & size,
+      Paint()..color = const Color(0xFF0B141A),
+    );
 
-    for (double x = 0; x < size.width; x += spacing) {
-      for (double y = 0; y < size.height; y += spacing) {
-        canvas.drawCircle(Offset(x, y), 1.2, paint);
+    final topGlow = Paint()
+      ..shader = RadialGradient(
+        colors: [
+          const Color(0xFF1F5D4B).withOpacity(0.34),
+          const Color(0xFF0B141A).withOpacity(0.0),
+        ],
+      ).createShader(Rect.fromCircle(
+        center: Offset(size.width * 0.84, size.height * 0.12),
+        radius: size.shortestSide * 0.8,
+      ));
+
+    final bottomGlow = Paint()
+      ..shader = RadialGradient(
+        colors: [
+          const Color(0xFF123B31).withOpacity(0.28),
+          const Color(0xFF0B141A).withOpacity(0.0),
+        ],
+      ).createShader(Rect.fromCircle(
+        center: Offset(size.width * 0.1, size.height * 0.92),
+        radius: size.shortestSide * 0.85,
+      ));
+
+    canvas.drawRect(Offset.zero & size, topGlow);
+    canvas.drawRect(Offset.zero & size, bottomGlow);
+
+    const spacing = 92.0;
+    final doodlePaint = Paint()
+      ..color = const Color(0xFFB7D7CE).withOpacity(0.045)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.1;
+
+    for (double y = -spacing; y < size.height + spacing; y += spacing) {
+      for (double x = -spacing; x < size.width + spacing; x += spacing) {
+        final offset = Offset(x, y);
+        canvas.drawCircle(offset, 6, doodlePaint);
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(
+            Rect.fromCenter(center: offset, width: 18, height: 12),
+            const Radius.circular(4),
+          ),
+          doodlePaint,
+        );
+        canvas.drawLine(
+          offset + const Offset(-10, 10),
+          offset + const Offset(10, -10),
+          doodlePaint,
+        );
       }
     }
   }
 
   @override
-  bool shouldRepaint(_DotGridPainter old) => false;
+  bool shouldRepaint(_WhatsAppWallpaperPainter old) => false;
 }
