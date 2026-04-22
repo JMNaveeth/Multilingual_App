@@ -7,34 +7,34 @@ import 'package:multilingual_chat_app/widgets/message_bubble.dart';
 
 // Mock messages for demonstration - replace with real data
 final mockMessagesProvider = Provider<List<Message>>((ref) => [
-  Message(
-    id: '1',
-    senderId: '1',
-    receiverId: 'current_user',
-    content: 'Hello! How are you?',
-    type: MessageType.text,
-    status: MessageStatus.read,
-    timestamp: DateTime.now().subtract(const Duration(minutes: 5)),
-  ),
-  Message(
-    id: '2',
-    senderId: 'current_user',
-    receiverId: '1',
-    content: 'Hi! I\'m doing well, thank you. How about you?',
-    type: MessageType.text,
-    status: MessageStatus.read,
-    timestamp: DateTime.now().subtract(const Duration(minutes: 4)),
-  ),
-  Message(
-    id: '3',
-    senderId: '1',
-    receiverId: 'current_user',
-    content: 'I\'m great! Ready to test the translation feature?',
-    type: MessageType.text,
-    status: MessageStatus.read,
-    timestamp: DateTime.now().subtract(const Duration(minutes: 2)),
-  ),
-]);
+      Message(
+        id: '1',
+        senderId: '1',
+        receiverId: 'current_user',
+        content: 'Hello! How are you?',
+        type: MessageType.text,
+        status: MessageStatus.read,
+        timestamp: DateTime.now().subtract(const Duration(minutes: 5)),
+      ),
+      Message(
+        id: '2',
+        senderId: 'current_user',
+        receiverId: '1',
+        content: 'Hi! I\'m doing well, thank you. How about you?',
+        type: MessageType.text,
+        status: MessageStatus.read,
+        timestamp: DateTime.now().subtract(const Duration(minutes: 4)),
+      ),
+      Message(
+        id: '3',
+        senderId: '1',
+        receiverId: 'current_user',
+        content: 'I\'m great! Ready to test the translation feature?',
+        type: MessageType.text,
+        status: MessageStatus.read,
+        timestamp: DateTime.now().subtract(const Duration(minutes: 2)),
+      ),
+    ]);
 
 class ChatScreen extends ConsumerStatefulWidget {
   final User user;
@@ -122,7 +122,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     colors: [Color(0xFF8E6CF7), Color(0xFF6D3DF2)],
                   ),
                 ),
-                child: const Icon(Icons.chat_bubble_outline, color: Colors.white, size: 32),
+                child: const Icon(Icons.chat_bubble_outline,
+                    color: Colors.white, size: 32),
               ),
               const SizedBox(height: 16),
               Text(
@@ -194,9 +195,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(28),
-                    borderSide: const BorderSide(color: Color(0xFF7A52F4), width: 1.4),
+                    borderSide:
+                        const BorderSide(color: Color(0xFF7A52F4), width: 1.4),
                   ),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
                 ),
                 maxLines: null,
                 textInputAction: TextInputAction.send,
@@ -222,7 +225,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               ),
               child: IconButton(
                 onPressed: _sendMessage,
-                icon: const Icon(Icons.send_rounded, color: Colors.white, size: 20),
+                icon: const Icon(Icons.send_rounded,
+                    color: Colors.white, size: 20),
                 tooltip: 'Send',
               ),
             ),
@@ -239,8 +243,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
     // Filter messages for this conversation
     final conversationMessages = messages.where((message) {
-      return (message.senderId == widget.user.id && message.receiverId == currentUser?.id) ||
-             (message.senderId == currentUser?.id && message.receiverId == widget.user.id);
+      return (message.senderId == widget.user.id &&
+              message.receiverId == currentUser?.id) ||
+          (message.senderId == currentUser?.id &&
+              message.receiverId == widget.user.id);
     }).toList();
 
     return Scaffold(
@@ -256,7 +262,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               radius: 20,
               backgroundColor: const Color(0xFFD8CBFF),
               child: Text(
-                widget.user.name.isNotEmpty ? widget.user.name[0].toUpperCase() : '?',
+                widget.user.name.isNotEmpty
+                    ? widget.user.name[0].toUpperCase()
+                    : '?',
                 style: const TextStyle(
                   color: Color(0xFF3B2D63),
                   fontWeight: FontWeight.w700,
@@ -274,14 +282,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       width: 8,
                       height: 8,
                       decoration: BoxDecoration(
-                        color: widget.user.isOnline ? const Color(0xFF2ECC71) : const Color(0xFFB0AEC2),
+                        color: widget.user.isOnline
+                            ? const Color(0xFF2ECC71)
+                            : const Color(0xFFB0AEC2),
                         shape: BoxShape.circle,
                       ),
                     ),
                     const SizedBox(width: 6),
                     Text(
                       widget.user.isOnline ? 'Online' : 'Offline',
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.normal),
+                      style: const TextStyle(
+                          fontSize: 12, fontWeight: FontWeight.normal),
                     ),
                   ],
                 ),
@@ -356,6 +367,4 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       ),
     );
   }
-
 }
-
