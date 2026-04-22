@@ -1,14 +1,27 @@
 import 'dart:io';
-import 'dart:ui';
-import 'dart:math' as math;
 import 'package:multilingual_chat_app/screens/contacts/contacts_screen.dart';
 import 'package:flutter_contacts/flutter_contacts.dart' as fc;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:multilingual_chat_app/providers/auth_provider.dart';
 import 'package:multilingual_chat_app/screens/chat/chat_list_screen.dart';
 import 'package:multilingual_chat_app/screens/profile/profile_screen.dart';
+
+// ── WhatsApp brand colours ──────────────────────────────────────────────────
+class _WA {
+  static const teal        = Color(0xFF075E54); // dark header
+  static const tealLight   = Color(0xFF128C7E); // slightly lighter
+  static const green       = Color(0xFF25D366); // FAB / online dot
+  static const bg          = Color(0xFFFFFFFF); // list background
+  static const divider     = Color(0xFFE0E0E0);
+  static const textPrimary = Color(0xFF111B21);
+  static const textSecondary = Color(0xFF667781);
+  static const tabIndicator = Colors.white;
+  static const tabLabel    = Colors.white;
+  static const unselected  = Color(0xFFB2DFDB); // translucent white on teal
+}
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -18,241 +31,279 @@ class HomeScreen extends ConsumerStatefulWidget {
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen>
-    with TickerProviderStateMixin {
-  int _selectedIndex = 0;
-  late AnimationController _floatingController;
-  late AnimationController _rotationController;
-  late AnimationController _pulseController;
+    with SingleTickerProviderStateMixin {
+  late final TabController _tabController;
+
+  // bottom-nav index: 0 = Chats, 1 = Profile
+  int _bottomIndex = 0;
 
   @override
   void initState() {
     super.initState();
-    _floatingController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 3),
-    )..repeat(reverse: true);
+    _tabController = TabController(length: 3, vsync: this);
 
-    _rotationController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 20),
-    )..repeat();
-
-    _pulseController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1500),
-    )..repeat(reverse: true);
+    // Make status bar icons light (white) over the teal header.
+    SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+      statusBarColor: _WA.teal,
+      statusBarIconBrightness: Brightness.light,
+    ));
   }
 
   @override
   void dispose() {
-    _floatingController.dispose();
-    _rotationController.dispose();
-    _pulseController.dispose();
+    _tabController.dispose();
     super.dispose();
   }
 
+  // ── Main build ─────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    final user = ref.watch(authProvider).value;
-
-    // ── Profile tab: full-screen, no glass wrapper, no extra chrome ──
-    if (_selectedIndex == 1) {
+    // Profile tab – full-screen, plain background
+    if (_bottomIndex == 1) {
       return Scaffold(
         backgroundColor: const Color(0xFFF0F2F5),
+        appBar: _buildProfileAppBar(),
         body: const ProfileScreen(),
         bottomNavigationBar: _buildBottomNav(),
       );
     }
 
-    // ── Chats tab: original animated home layout ──
+    // Chats tab
     return Scaffold(
-      extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        title: Text(
-          user != null ? 'Hi, ${user.name}' : 'Multilingual Chat',
-          style:
-              const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.search, color: Colors.white),
-            onPressed: () {},
-          ),
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert, color: Colors.white),
-            onSelected: (v) async {
-              if (v == 'logout') {
-                await ref.read(authProvider.notifier).logout();
-              }
-            },
-            itemBuilder: (_) => [
-              const PopupMenuItem(value: 'logout', child: Text('Log out')),
-            ],
-          ),
-        ],
-      ),
-      body: Stack(
+      backgroundColor: _WA.bg,
+      appBar: _buildChatsAppBar(),
+      body: TabBarView(
+        controller: _tabController,
         children: [
-          // Animated gradient background
-          AnimatedBuilder(
-            animation: _rotationController,
-            builder: (context, child) {
-              return Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      const Color(0xFF0F2027),
-                      const Color(0xFF203A43),
-                      const Color(0xFF2C5364),
-                      Color.lerp(
-                        const Color(0xFF2C5364),
-                        const Color(0xFF0F2027),
-                        _rotationController.value * 0.3,
-                      )!,
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
+          // ── CHATS tab ──
+          const ChatListScreen(),
 
-          // Floating particles background
-          ...List.generate(15, (index) {
-            return AnimatedBuilder(
-              animation: _floatingController,
-              builder: (context, child) {
-                final offset = math.sin(
-                        (_floatingController.value * 2 * math.pi) + index) *
-                    30;
-                final scale = 0.5 +
-                    math.sin((_floatingController.value * 2 * math.pi) +
-                            index * 0.5) *
-                        0.3;
-                return Positioned(
-                  left: (index * 70.0) % MediaQuery.of(context).size.width,
-                  top: (index * 90.0) % MediaQuery.of(context).size.height +
-                      offset,
-                  child: Transform.scale(
-                    scale: scale,
-                    child: Container(
-                      width: 60 + (index % 3) * 20,
-                      height: 60 + (index % 3) * 20,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: RadialGradient(
-                          colors: [
-                            Colors.white.withOpacity(0.03),
-                            Colors.transparent,
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                );
-              },
-            );
-          }),
+          // ── STATUS tab (placeholder) ──
+          _buildComingSoon(Icons.circle_outlined, 'Status'),
 
-          // Main content
-          SafeArea(
-            child: Column(
-              children: [
-                const SizedBox(height: 12),
-                // Chat list with glass morphism
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12.0),
-                    child: _buildGlassMorphicContainer(
-                      child: const ChatListScreen(),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
+          // ── CALLS tab (placeholder) ──
+          _buildComingSoon(Icons.call_outlined, 'Calls'),
         ],
       ),
-      floatingActionButton: AnimatedBuilder(
-        animation: _pulseController,
-        builder: (context, child) {
-          final scale = 1.0 + (_pulseController.value * 0.1);
-          return Transform.scale(
-            scale: scale,
-            child: FloatingActionButton.extended(
-              onPressed: () async {
-                try {
-                  if (Platform.isAndroid || Platform.isIOS) {
-                    final granted = await _requestContactsPermission();
-                    if (granted) {
-                      if (mounted) {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                              builder: (_) => const ContactsScreen()),
-                        );
-                      }
-                    } else {
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                              content: Text('Contacts permission denied')),
-                        );
-                      }
-                    }
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                          content: Text('Not available on this platform')),
-                    );
-                  }
-                } catch (e) {
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Error: ${e.toString()}')),
-                    );
-                  }
-                }
-              },
-              icon: const Icon(Icons.add),
-              label: const Text('New Chat'),
-              backgroundColor: Colors.cyanAccent,
-              foregroundColor: Colors.black,
-              elevation: 8,
-            ),
-          );
-        },
-      ),
+      floatingActionButton: _buildFAB(),
       bottomNavigationBar: _buildBottomNav(),
     );
   }
 
-  // ── Shared bottom nav ──
+  // ── AppBars ────────────────────────────────────────────────────────────────
+
+  PreferredSizeWidget _buildChatsAppBar() {
+    final user = ref.watch(authProvider).value;
+
+    return AppBar(
+      backgroundColor: _WA.teal,
+      elevation: 0,
+      titleSpacing: 18,
+      title: Text(
+        user != null ? 'Hi, ${user.name.split(' ').first}' : 'WhatsApp',
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 20,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.2,
+        ),
+      ),
+      actions: [
+        // Camera icon
+        IconButton(
+          icon: const Icon(Icons.camera_alt_outlined, color: Colors.white, size: 22),
+          onPressed: () {},
+          tooltip: 'Camera',
+        ),
+        // Search icon
+        IconButton(
+          icon: const Icon(Icons.search, color: Colors.white, size: 22),
+          onPressed: () {},
+          tooltip: 'Search',
+        ),
+        // More-vert / Logout
+        PopupMenuButton<String>(
+          icon: const Icon(Icons.more_vert, color: Colors.white, size: 22),
+          color: Colors.white,
+          elevation: 4,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          onSelected: (v) async {
+            if (v == 'logout') {
+              await ref.read(authProvider.notifier).logout();
+            }
+          },
+          itemBuilder: (_) => [
+            _menuItem(Icons.group_add_outlined,  'New group'),
+            _menuItem(Icons.devices_outlined,    'Linked devices'),
+            _menuItem(Icons.star_outline,        'Starred messages'),
+            _menuItem(Icons.settings_outlined,   'Settings'),
+            _menuItem(Icons.logout,              'Log out', value: 'logout'),
+          ],
+        ),
+        const SizedBox(width: 4),
+      ],
+      bottom: TabBar(
+        controller: _tabController,
+        indicatorColor: _WA.tabIndicator,
+        indicatorWeight: 3,
+        labelColor: _WA.tabLabel,
+        unselectedLabelColor: _WA.unselected,
+        labelStyle: const TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.8,
+        ),
+        unselectedLabelStyle: const TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w500,
+          letterSpacing: 0.8,
+        ),
+        tabs: const [
+          Tab(text: 'CHATS'),
+          Tab(text: 'STATUS'),
+          Tab(text: 'CALLS'),
+        ],
+      ),
+    );
+  }
+
+  PreferredSizeWidget _buildProfileAppBar() => AppBar(
+        backgroundColor: _WA.teal,
+        elevation: 0,
+        titleSpacing: 18,
+        title: const Text(
+          'Profile',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.more_vert, color: Colors.white),
+            onPressed: () {},
+          ),
+        ],
+      );
+
+  // ── FAB ────────────────────────────────────────────────────────────────────
+
+  Widget _buildFAB() {
+    return FloatingActionButton(
+      onPressed: _openNewChat,
+      backgroundColor: _WA.green,
+      foregroundColor: Colors.white,
+      elevation: 6,
+      shape: const CircleBorder(),
+      tooltip: 'New chat',
+      child: const Icon(Icons.chat_outlined, size: 26),
+    );
+  }
+
+  // ── Bottom Nav ─────────────────────────────────────────────────────────────
+
   Widget _buildBottomNav() {
     return BottomNavigationBar(
-      backgroundColor: _selectedIndex == 1
-          ? const Color(0xFF075E54)
-          : Colors.white.withOpacity(0.06),
-      selectedItemColor: _selectedIndex == 1 ? Colors.white : Colors.cyanAccent,
-      unselectedItemColor:
-          _selectedIndex == 1 ? Colors.white60 : Colors.white70,
-      currentIndex: _selectedIndex,
-      onTap: (index) => setState(() => _selectedIndex = index),
+      backgroundColor: Colors.white,
+      selectedItemColor: _WA.tealLight,
+      unselectedItemColor: _WA.textSecondary,
+      selectedLabelStyle: const TextStyle(
+        fontSize: 12,
+        fontWeight: FontWeight.w600,
+      ),
+      unselectedLabelStyle: const TextStyle(fontSize: 12),
+      currentIndex: _bottomIndex,
+      type: BottomNavigationBarType.fixed,
+      elevation: 8,
+      onTap: (i) => setState(() => _bottomIndex = i),
       items: const [
         BottomNavigationBarItem(
-          icon: Icon(Icons.chat_bubble_outline),
-          activeIcon: Icon(Icons.chat_bubble),
+          icon: Icon(Icons.chat_bubble_outline_rounded),
+          activeIcon: Icon(Icons.chat_bubble_rounded),
           label: 'Chats',
         ),
         BottomNavigationBarItem(
-          icon: Icon(Icons.person_outline),
-          activeIcon: Icon(Icons.person),
+          icon: Icon(Icons.person_outline_rounded),
+          activeIcon: Icon(Icons.person_rounded),
           label: 'Profile',
         ),
       ],
     );
+  }
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
+
+  PopupMenuItem<String> _menuItem(IconData icon, String label,
+      {String? value}) {
+    return PopupMenuItem<String>(
+      value: value ?? label.toLowerCase().replaceAll(' ', '_'),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: _WA.textSecondary),
+          const SizedBox(width: 12),
+          Text(label,
+              style: const TextStyle(
+                  color: _WA.textPrimary, fontSize: 14.5)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildComingSoon(IconData icon, String label) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 64, color: _WA.divider),
+          const SizedBox(height: 12),
+          Text(
+            label,
+            style: const TextStyle(
+              color: _WA.textSecondary,
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Coming soon',
+            style: TextStyle(color: _WA.textSecondary, fontSize: 13),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _openNewChat() async {
+    try {
+      if (Platform.isAndroid || Platform.isIOS) {
+        final granted = await _requestContactsPermission();
+        if (granted) {
+          if (mounted) {
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const ContactsScreen()),
+            );
+          }
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Contacts permission denied')),
+            );
+          }
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Not available on this platform')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    }
   }
 
   Future<bool> _requestContactsPermission() async {
@@ -265,33 +316,5 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       debugPrint('Error requesting contacts permission: $e');
       return false;
     }
-  }
-
-  // ── Glassmorphic container ──
-  Widget _buildGlassMorphicContainer({required Widget child}) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(24),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-        child: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                Colors.white.withOpacity(0.08),
-                Colors.white.withOpacity(0.04),
-              ],
-            ),
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(
-              color: Colors.white.withOpacity(0.2),
-              width: 1.5,
-            ),
-          ),
-          child: child,
-        ),
-      ),
-    );
   }
 }
