@@ -175,6 +175,47 @@ const initializeSocket = (io) => {
       }
     });
 
+    socket.on('webrtc_offer', (data) => {
+      const { to, offer, callType } = data;
+      const from = socketToUser.get(socket.id);
+      const receiverSocketId = activeUsers.get(to);
+
+      if (receiverSocketId) {
+        io.to(receiverSocketId).emit('webrtc_offer', {
+          from,
+          offer,
+          callType
+        });
+      }
+    });
+
+    socket.on('webrtc_answer', (data) => {
+      const { to, answer, callType } = data;
+      const from = socketToUser.get(socket.id);
+      const receiverSocketId = activeUsers.get(to);
+
+      if (receiverSocketId) {
+        io.to(receiverSocketId).emit('webrtc_answer', {
+          from,
+          answer,
+          callType
+        });
+      }
+    });
+
+    socket.on('webrtc_ice_candidate', (data) => {
+      const { to, candidate } = data;
+      const from = socketToUser.get(socket.id);
+      const receiverSocketId = activeUsers.get(to);
+
+      if (receiverSocketId) {
+        io.to(receiverSocketId).emit('webrtc_ice_candidate', {
+          from,
+          candidate
+        });
+      }
+    });
+
     // AI Translation signaling
     socket.on('start_translation', (data) => {
       const { targetUserId, language } = data;

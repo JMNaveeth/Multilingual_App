@@ -46,11 +46,20 @@ class CallSocketService {
       StreamController<Map<String, dynamic>>.broadcast();
   final StreamController<Map<String, dynamic>> _callEndedController =
       StreamController<Map<String, dynamic>>.broadcast();
+  final StreamController<Map<String, dynamic>> _offerController =
+      StreamController<Map<String, dynamic>>.broadcast();
+  final StreamController<Map<String, dynamic>> _answerController =
+      StreamController<Map<String, dynamic>>.broadcast();
+  final StreamController<Map<String, dynamic>> _candidateController =
+      StreamController<Map<String, dynamic>>.broadcast();
 
   Stream<IncomingCall> get incomingCalls => _incomingCallController.stream;
   Stream<Map<String, dynamic>> get callAccepted =>
       _callAcceptedController.stream;
   Stream<Map<String, dynamic>> get callEnded => _callEndedController.stream;
+  Stream<Map<String, dynamic>> get offers => _offerController.stream;
+  Stream<Map<String, dynamic>> get answers => _answerController.stream;
+  Stream<Map<String, dynamic>> get candidates => _candidateController.stream;
 
   bool get isConnected => _socket?.connected ?? false;
 
@@ -126,6 +135,33 @@ class CallSocketService {
         _callEndedController.add(payload);
       });
 
+      _socket!.on('webrtc_offer', (data) {
+        final payload = data is Map<String, dynamic>
+            ? data
+            : data is Map
+                ? Map<String, dynamic>.from(data)
+                : <String, dynamic>{};
+        _offerController.add(payload);
+      });
+
+      _socket!.on('webrtc_answer', (data) {
+        final payload = data is Map<String, dynamic>
+            ? data
+            : data is Map
+                ? Map<String, dynamic>.from(data)
+                : <String, dynamic>{};
+        _answerController.add(payload);
+      });
+
+      _socket!.on('webrtc_ice_candidate', (data) {
+        final payload = data is Map<String, dynamic>
+            ? data
+            : data is Map
+                ? Map<String, dynamic>.from(data)
+                : <String, dynamic>{};
+        _candidateController.add(payload);
+      });
+
       _socket!.connect();
     } finally {
       _connecting = false;
@@ -167,6 +203,40 @@ class CallSocketService {
   }) {
     _socket?.emit('end_call', {
       'to': to,
+    });
+  }
+
+  void sendOffer({
+    required String to,
+    required dynamic offer,
+    required String callType,
+  }) {
+    _socket?.emit('webrtc_offer', {
+      'to': to,
+      'offer': offer,
+      'callType': callType,
+    });
+  }
+
+  void sendAnswer({
+    required String to,
+    required dynamic answer,
+    required String callType,
+  }) {
+    _socket?.emit('webrtc_answer', {
+      'to': to,
+      'answer': answer,
+      'callType': callType,
+    });
+  }
+
+  void sendIceCandidate({
+    required String to,
+    required dynamic candidate,
+  }) {
+    _socket?.emit('webrtc_ice_candidate', {
+      'to': to,
+      'candidate': candidate,
     });
   }
 
