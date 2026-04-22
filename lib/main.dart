@@ -29,9 +29,64 @@ class MultilingualChatApp extends ConsumerWidget {
         fontFamily: 'Roboto',
       ),
       home: authState.when(
-        data: (user) => user == null ? const LoginScreen() : const HomeScreen(),
-        loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
-        error: (e, st) => Scaffold(body: Center(child: Text('Error: $e'))),
+        data: (user) => const HomeScreen(),
+        loading: () =>
+            const Scaffold(body: Center(child: CircularProgressIndicator())),
+        error: (e, st) => Scaffold(
+          appBar: AppBar(title: const Text('Connection error')),
+          body: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.wifi_off, size: 64, color: Colors.redAccent),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Unable to reach backend server',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    e.toString(),
+                    style: const TextStyle(color: Colors.black54),
+                    textAlign: TextAlign.center,
+                    maxLines: 4,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: () async {
+                      await ref.read(authProvider.notifier).refreshUser();
+                    },
+                    child: const Text('Retry'),
+                  ),
+                  const SizedBox(height: 8),
+                  OutlinedButton(
+                    onPressed: () {
+                      showDialog<void>(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: const Text('Start backend server'),
+                          content: const SelectableText(
+                            '1) Open a terminal\n2) cd backend\n3) npm install\n4) npm run dev\n\nThe backend listens on port 3000 by default. Start it and then press Retry.',
+                          ),
+                          actions: [
+                            TextButton(
+                                onPressed: () => Navigator.of(context).pop(),
+                                child: const Text('Close')),
+                          ],
+                        ),
+                      );
+                    },
+                    child: const Text('How to start backend'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
       routes: {
         '/login': (context) => const LoginScreen(),
@@ -41,4 +96,3 @@ class MultilingualChatApp extends ConsumerWidget {
     );
   }
 }
-
