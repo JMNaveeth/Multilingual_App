@@ -745,7 +745,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
             child: CircularProgressIndicator(
                 strokeWidth: 1.5, color: Color(0xFFB7D7CE)));
       case MessageStatus.sent:
-        return const Icon(Icons.check_rounded, size: 13, color: Color(0xFFB7D7CE));
+        return const Icon(Icons.check_rounded,
+            size: 13, color: Color(0xFFB7D7CE));
       case MessageStatus.delivered:
         return const Icon(Icons.done_all_rounded,
             size: 13, color: Color(0xFFB7D7CE));
