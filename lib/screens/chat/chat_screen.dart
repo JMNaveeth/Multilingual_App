@@ -74,6 +74,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     with TickerProviderStateMixin {
   final _messageController = TextEditingController();
   final _scrollController = ScrollController();
+  final List<Message> _messages = [];
   bool _showAttachMenu = false;
   bool _isTyping = false;
   bool _socketReady = false;
@@ -103,6 +104,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       curve: Curves.easeOutBack,
       reverseCurve: Curves.easeIn,
     );
+
+    _messages.addAll(List<Message>.from(ref.read(mockMessagesProvider)));
 
     _messageController.addListener(() {
       final typing = _messageController.text.isNotEmpty;
@@ -203,13 +206,29 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   void _sendMessage() {
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content:
-          Text('Sent: $text', style: const TextStyle(color: _N.textPrimary)),
-      backgroundColor: _N.card,
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-    ));
+
+    final currentUser = ref.read(authProvider).value;
+    if (currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Please sign in to send a message.'),
+      ));
+      return;
+    }
+
+    setState(() {
+      _messages.add(
+        Message(
+          id: DateTime.now().microsecondsSinceEpoch.toString(),
+          senderId: currentUser.id,
+          receiverId: widget.user.id,
+          content: text,
+          type: MessageType.text,
+          status: MessageStatus.sent,
+          timestamp: DateTime.now(),
+        ),
+      );
+    });
+
     _messageController.clear();
     _scrollToBottom();
   }
@@ -267,7 +286,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   @override
   Widget build(BuildContext context) {
     final currentUser = ref.watch(authProvider).value;
-    final messages = ref.watch(mockMessagesProvider);
+    final messages = _messages;
 
     _ensureSocket(currentUser);
 
@@ -634,37 +653,22 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                 maxWidth: MediaQuery.of(context).size.width * 0.72,
               ),
               decoration: BoxDecoration(
-                gradient: isMe
-                    ? const LinearGradient(
-                        colors: [_N.bubbleMe, _N.bubbleMeEnd],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      )
-                    : null,
-                color: isMe ? null : _N.bubbleThem,
+                color: isMe ? const Color(0xFF005C4B) : const Color(0xFF202C33),
                 borderRadius: BorderRadius.only(
                   topLeft: const Radius.circular(18),
                   topRight: const Radius.circular(18),
                   bottomLeft: Radius.circular(isMe ? 18 : 4),
                   bottomRight: Radius.circular(isMe ? 4 : 18),
                 ),
-                border:
-                    isMe ? null : Border.all(color: _N.cardBorder, width: 1),
                 boxShadow: isMe
                     ? [
                         BoxShadow(
-                          color: _N.indigo.withOpacity(0.25),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        )
-                      ]
-                    : [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.2),
+                          color: Colors.black.withOpacity(0.18),
                           blurRadius: 6,
                           offset: const Offset(0, 2),
                         )
-                      ],
+                      ]
+                    : [],
               ),
               padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
               child: Column(
@@ -672,7 +676,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                 children: [
                   Text(msg.content,
                       style: TextStyle(
-                        color: isMe ? Colors.white : _N.textPrimary,
+                        color: isMe ? Colors.white : const Color(0xFFE9F0F4),
                         fontSize: 14.5,
                         height: 1.4,
                       )),
@@ -683,8 +687,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                       Text(time,
                           style: TextStyle(
                             color: isMe
-                                ? Colors.white.withOpacity(0.6)
-                                : _N.textMuted,
+                                ? Colors.white.withOpacity(0.65)
+                                : const Color(0xFF8696A0),
                             fontSize: 10,
                           )),
                       if (isMe) ...[
@@ -739,12 +743,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
             width: 12,
             height: 12,
             child: CircularProgressIndicator(
-                strokeWidth: 1.5, color: Colors.white54));
+                strokeWidth: 1.5, color: Color(0xFFB7D7CE)));
       case MessageStatus.sent:
-        return const Icon(Icons.check_rounded, size: 13, color: Colors.white54);
+        return const Icon(Icons.check_rounded, size: 13, color: Color(0xFFB7D7CE));
       case MessageStatus.delivered:
         return const Icon(Icons.done_all_rounded,
-            size: 13, color: Colors.white54);
+            size: 13, color: Color(0xFFB7D7CE));
       case MessageStatus.read:
         return const Icon(Icons.done_all_rounded, size: 13, color: _N.cyan);
     }
