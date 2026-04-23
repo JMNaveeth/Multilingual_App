@@ -17,46 +17,47 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:multilingual_chat_app/screens/discover/discover_games.dart';
 
 // ---------------------------------------------------------------------------
 // Design tokens
 // ---------------------------------------------------------------------------
 abstract class _D {
-  static const bg          = Color(0xFF080A14);
-  static const surface     = Color(0xFF111320);
-  static const card        = Color(0xFF181B2E);
-  static const cardBorder  = Color(0xFF242742);
-  static const cardHover   = Color(0xFF1E2238);
+  static const bg = Color(0xFF080A14);
+  static const surface = Color(0xFF111320);
+  static const card = Color(0xFF181B2E);
+  static const cardBorder = Color(0xFF242742);
+  static const cardHover = Color(0xFF1E2238);
 
-  static const indigo      = Color(0xFF6366F1);
-  static const indigoDeep  = Color(0xFF4F52D4);
+  static const indigo = Color(0xFF6366F1);
+  static const indigoDeep = Color(0xFF4F52D4);
   static const indigoLight = Color(0xFF818CF8);
-  static const violet      = Color(0xFF8B5CF6);
+  static const violet = Color(0xFF8B5CF6);
   static const violetLight = Color(0xFFA78BFA);
-  static const cyan        = Color(0xFF22D3EE);
-  static const cyanLight   = Color(0xFF67E8F9);
-  static const emerald     = Color(0xFF10B981);
+  static const cyan = Color(0xFF22D3EE);
+  static const cyanLight = Color(0xFF67E8F9);
+  static const emerald = Color(0xFF10B981);
   static const emeraldGlow = Color(0xFF34D399);
-  static const amber       = Color(0xFFF59E0B);
-  static const amberLight  = Color(0xFFFBBF24);
-  static const rose        = Color(0xFFF43F5E);
+  static const amber = Color(0xFFF59E0B);
+  static const amberLight = Color(0xFFFBBF24);
+  static const rose = Color(0xFFF43F5E);
 
-  static const textPrimary   = Color(0xFFF1F5F9);
+  static const textPrimary = Color(0xFFF1F5F9);
   static const textSecondary = Color(0xFF94A3B8);
-  static const textMuted     = Color(0xFF475569);
-  static const textDim       = Color(0xFF2D3748);
+  static const textMuted = Color(0xFF475569);
+  static const textDim = Color(0xFF2D3748);
 
-  static const shimmerBase      = Color(0xFF1C2030);
+  static const shimmerBase = Color(0xFF1C2030);
   static const shimmerHighlight = Color(0xFF252A40);
 
-  static const Duration fast   = Duration(milliseconds: 150);
+  static const Duration fast = Duration(milliseconds: 150);
   static const Duration normal = Duration(milliseconds: 280);
-  static const Duration slow   = Duration(milliseconds: 480);
+  static const Duration slow = Duration(milliseconds: 480);
 
-  static const BorderRadius radiusSm  = BorderRadius.all(Radius.circular(10));
-  static const BorderRadius radiusMd  = BorderRadius.all(Radius.circular(14));
-  static const BorderRadius radiusLg  = BorderRadius.all(Radius.circular(18));
-  static const BorderRadius radiusXl  = BorderRadius.all(Radius.circular(24));
+  static const BorderRadius radiusSm = BorderRadius.all(Radius.circular(10));
+  static const BorderRadius radiusMd = BorderRadius.all(Radius.circular(14));
+  static const BorderRadius radiusLg = BorderRadius.all(Radius.circular(18));
+  static const BorderRadius radiusXl = BorderRadius.all(Radius.circular(24));
 }
 
 // ---------------------------------------------------------------------------
@@ -77,14 +78,14 @@ class MiniGame {
     this.isNew = false,
   });
 
-  final String   id;
-  final String   name;
-  final String   subtitle;
+  final String id;
+  final String name;
+  final String subtitle;
   final IconData icon;
-  final Color    color;
-  final GameTag  tag;
-  final int      playersOnline;
-  final bool     isNew;
+  final Color color;
+  final GameTag tag;
+  final int playersOnline;
+  final bool isNew;
 }
 
 enum ChallengeStatus { idle, sending, sent, accepted, declined }
@@ -100,27 +101,27 @@ class Friend {
     this.currentGame,
   });
 
-  final String          id;
-  final String          name;
-  final int             avatarSeed;
-  final bool            isOnline;
-  final DateTime        lastSeen;
+  final String id;
+  final String name;
+  final int avatarSeed;
+  final bool isOnline;
+  final DateTime lastSeen;
   final ChallengeStatus challengeStatus;
-  final String?         currentGame;
+  final String? currentGame;
 
   Friend copyWith({
-    bool?            isOnline,
+    bool? isOnline,
     ChallengeStatus? challengeStatus,
-    String?          currentGame,
+    String? currentGame,
   }) =>
       Friend(
-        id:              id,
-        name:            name,
-        avatarSeed:      avatarSeed,
-        isOnline:        isOnline ?? this.isOnline,
-        lastSeen:        lastSeen,
+        id: id,
+        name: name,
+        avatarSeed: avatarSeed,
+        isOnline: isOnline ?? this.isOnline,
+        lastSeen: lastSeen,
         challengeStatus: challengeStatus ?? this.challengeStatus,
-        currentGame:     currentGame ?? this.currentGame,
+        currentGame: currentGame ?? this.currentGame,
       );
 }
 
@@ -181,12 +182,12 @@ class GameInviteService {
 
 class DiscoverController extends ChangeNotifier {
   DiscoverController({
-    PresenceService?  presenceService,
+    PresenceService? presenceService,
     GameInviteService? inviteService,
   })  : _presence = presenceService ?? PresenceService.instance,
-        _invite   = inviteService   ?? GameInviteService();
+        _invite = inviteService ?? GameInviteService();
 
-  final PresenceService  _presence;
+  final PresenceService _presence;
   final GameInviteService _invite;
   StreamSubscription<Map<String, bool>>? _presenceSub;
 
@@ -196,8 +197,8 @@ class DiscoverController extends ChangeNotifier {
 
   String? _toastMessage;
   String? get toastMessage => _toastMessage;
-  bool    _toastIsError = false;
-  bool    get toastIsError => _toastIsError;
+  bool _toastIsError = false;
+  bool get toastIsError => _toastIsError;
 
   List<MiniGame> _games = [];
   List<MiniGame> get games => _games;
@@ -305,81 +306,81 @@ class DiscoverController extends ChangeNotifier {
   // ── Default data ───────────────────────────────────────────────────────
   static const _defaultGames = [
     MiniGame(
-      id:            'word_sprint',
-      name:          'Word Sprint',
-      subtitle:      'Type fast. Beat your friend.',
-      icon:          Icons.keyboard_rounded,
-      color:         _D.indigo,
-      tag:           GameTag.fast,
+      id: 'word_sprint',
+      name: 'Word Sprint',
+      subtitle: 'Type fast. Beat your friend.',
+      icon: Icons.keyboard_rounded,
+      color: _D.indigo,
+      tag: GameTag.fast,
       playersOnline: 214,
-      isNew:         false,
+      isNew: false,
     ),
     MiniGame(
-      id:            'emoji_match',
-      name:          'Emoji Match',
-      subtitle:      'Memory game in 60 s.',
-      icon:          Icons.emoji_emotions_outlined,
-      color:         _D.violet,
-      tag:           GameTag.memory,
+      id: 'emoji_match',
+      name: 'Emoji Match',
+      subtitle: 'Memory game in 60 s.',
+      icon: Icons.emoji_emotions_outlined,
+      color: _D.violet,
+      tag: GameTag.memory,
       playersOnline: 87,
-      isNew:         true,
+      isNew: true,
     ),
     MiniGame(
-      id:            'number_duel',
-      name:          'Number Duel',
-      subtitle:      'Pick bigger. Go faster.',
-      icon:          Icons.bolt_rounded,
-      color:         _D.cyan,
-      tag:           GameTag.fast,
+      id: 'number_duel',
+      name: 'Number Duel',
+      subtitle: 'Pick bigger. Go faster.',
+      icon: Icons.bolt_rounded,
+      color: _D.cyan,
+      tag: GameTag.fast,
       playersOnline: 163,
     ),
     MiniGame(
-      id:            'tic_tac_toe',
-      name:          'Tic Tac Toe',
-      subtitle:      'Classic 1v1 quick game.',
-      icon:          Icons.grid_3x3_rounded,
-      color:         _D.emerald,
-      tag:           GameTag.classic,
+      id: 'tic_tac_toe',
+      name: 'Tic Tac Toe',
+      subtitle: 'Classic 1v1 quick game.',
+      icon: Icons.grid_3x3_rounded,
+      color: _D.emerald,
+      tag: GameTag.classic,
       playersOnline: 56,
     ),
   ];
 
   static final _defaultFriends = [
     Friend(
-      id:         'friend_1',
-      name:       'John',
+      id: 'friend_1',
+      name: 'John',
       avatarSeed: 1,
-      isOnline:   true,
-      lastSeen:   DateTime.now(),
+      isOnline: true,
+      lastSeen: DateTime.now(),
     ),
     Friend(
-      id:         'friend_2',
-      name:       'Marie',
+      id: 'friend_2',
+      name: 'Marie',
       avatarSeed: 2,
-      isOnline:   false,
-      lastSeen:   DateTime.now().subtract(const Duration(minutes: 23)),
+      isOnline: false,
+      lastSeen: DateTime.now().subtract(const Duration(minutes: 23)),
     ),
     Friend(
-      id:         'friend_3',
-      name:       'Satoshi',
+      id: 'friend_3',
+      name: 'Satoshi',
       avatarSeed: 3,
-      isOnline:   true,
-      lastSeen:   DateTime.now(),
+      isOnline: true,
+      lastSeen: DateTime.now(),
       currentGame: 'Word Sprint',
     ),
     Friend(
-      id:         'friend_4',
-      name:       'Nadia',
+      id: 'friend_4',
+      name: 'Nadia',
       avatarSeed: 4,
-      isOnline:   true,
-      lastSeen:   DateTime.now(),
+      isOnline: true,
+      lastSeen: DateTime.now(),
     ),
     Friend(
-      id:         'friend_5',
-      name:       'Luca',
+      id: 'friend_5',
+      name: 'Luca',
       avatarSeed: 5,
-      isOnline:   false,
-      lastSeen:   DateTime.now().subtract(const Duration(hours: 2)),
+      isOnline: false,
+      lastSeen: DateTime.now().subtract(const Duration(hours: 2)),
     ),
   ];
 }
@@ -397,11 +398,10 @@ class DiscoverScreen extends StatefulWidget {
 
 class _DiscoverScreenState extends State<DiscoverScreen>
     with TickerProviderStateMixin {
-
   late final DiscoverController _controller;
   late final AnimationController _staggerCtrl;
   late final AnimationController _toastCtrl;
-  late final Animation<double>   _toastAnim;
+  late final Animation<double> _toastAnim;
 
   @override
   void initState() {
@@ -422,7 +422,8 @@ class _DiscoverScreenState extends State<DiscoverScreen>
       vsync: this,
       duration: const Duration(milliseconds: 320),
     );
-    _toastAnim = CurvedAnimation(parent: _toastCtrl, curve: Curves.easeOutCubic);
+    _toastAnim =
+        CurvedAnimation(parent: _toastCtrl, curve: Curves.easeOutCubic);
   }
 
   void _onControllerChange() {
@@ -456,8 +457,8 @@ class _DiscoverScreenState extends State<DiscoverScreen>
           _buildBody(),
           if (_controller.toastMessage != null)
             _ToastOverlay(
-              message:  _controller.toastMessage!,
-              isError:  _controller.toastIsError,
+              message: _controller.toastMessage!,
+              isError: _controller.toastIsError,
               animation: _toastAnim,
               onDismiss: _controller.clearToast,
             ),
@@ -489,7 +490,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
               _staggerChild(
                 1,
                 child: const _SectionHeader(
-                  title:    'Mini games',
+                  title: 'Mini games',
                   subtitle: 'Quick 1v1 games · tap to play',
                 ),
               ),
@@ -497,18 +498,18 @@ class _DiscoverScreenState extends State<DiscoverScreen>
               _staggerChild(
                 2,
                 child: GridView.builder(
-                  itemCount:   _controller.games.length,
-                  shrinkWrap:  true,
-                  physics:     const NeverScrollableScrollPhysics(),
+                  itemCount: _controller.games.length,
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount:   2,
-                    mainAxisSpacing:  10,
+                    crossAxisCount: 2,
+                    mainAxisSpacing: 10,
                     crossAxisSpacing: 10,
                     childAspectRatio: 0.98,
                   ),
                   itemBuilder: (_, i) => _GameCard(
-                    game:       _controller.games[i],
-                    onTap:      () => _controller.launchGame(_controller.games[i]),
+                    game: _controller.games[i],
+                    onTap: () => _openGame(_controller.games[i]),
                     tickerProvider: this,
                   ),
                 ),
@@ -519,11 +520,12 @@ class _DiscoverScreenState extends State<DiscoverScreen>
               _staggerChild(
                 3,
                 child: _SectionHeader(
-                  title:    'Friends online',
-                  subtitle: '${_controller.onlineFriendCount} available to play',
+                  title: 'Friends online',
+                  subtitle:
+                      '${_controller.onlineFriendCount} available to play',
                   trailing: _TextButton(
                     label: 'See all',
-                    onTap:  () {},
+                    onTap: () {},
                   ),
                 ),
               ),
@@ -534,11 +536,11 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                   height: 118,
                   child: ListView.separated(
                     scrollDirection: Axis.horizontal,
-                    padding:         EdgeInsets.zero,
-                    itemCount:       _controller.friends.length,
+                    padding: EdgeInsets.zero,
+                    itemCount: _controller.friends.length,
                     separatorBuilder: (_, __) => const SizedBox(width: 10),
                     itemBuilder: (_, i) => _FriendTile(
-                      friend:      _controller.friends[i],
+                      friend: _controller.friends[i],
                       onChallenge: () => _controller.sendChallenge(
                         _controller.friends[i],
                       ),
@@ -560,13 +562,38 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     );
   }
 
+  void _openGame(MiniGame game) {
+    Widget? target;
+    switch (game.id) {
+      case 'word_sprint':
+        target = const WordSprintGameScreen();
+        break;
+      case 'emoji_match':
+        target = const EmojiMatchGameScreen();
+        break;
+      case 'number_duel':
+        target = const NumberDuelGameScreen();
+        break;
+      case 'tic_tac_toe':
+        target = const TicTacToeGameScreen();
+        break;
+      default:
+        _controller.launchGame(game);
+        return;
+    }
+
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => target!),
+    );
+  }
+
   /// Staggered slide-in + fade for each section
   Widget _staggerChild(int index, {required Widget child}) {
-    final start  = (index * 0.12).clamp(0.0, 0.85);
-    final end    = (start + 0.4).clamp(0.0, 1.0);
+    final start = (index * 0.12).clamp(0.0, 0.85);
+    final end = (start + 0.4).clamp(0.0, 1.0);
     final curved = CurvedAnimation(
       parent: _staggerCtrl,
-      curve:  Interval(start, end, curve: Curves.easeOutCubic),
+      curve: Interval(start, end, curve: Curves.easeOutCubic),
     );
     return AnimatedBuilder(
       animation: curved,
@@ -599,7 +626,7 @@ class _OnlineBadge extends StatelessWidget {
         Text(
           '$count friend${count == 1 ? '' : 's'} online now',
           style: const TextStyle(
-            color:    _D.emeraldGlow,
+            color: _D.emeraldGlow,
             fontSize: 12.5,
             fontWeight: FontWeight.w600,
             letterSpacing: 0.2,
@@ -621,8 +648,8 @@ class _SectionHeader extends StatelessWidget {
     this.trailing,
   });
 
-  final String  title;
-  final String  subtitle;
+  final String title;
+  final String subtitle;
   final Widget? trailing;
 
   @override
@@ -637,8 +664,8 @@ class _SectionHeader extends StatelessWidget {
               Text(
                 title,
                 style: const TextStyle(
-                  color:      _D.textPrimary,
-                  fontSize:   17,
+                  color: _D.textPrimary,
+                  fontSize: 17,
                   fontWeight: FontWeight.w800,
                   letterSpacing: -0.3,
                 ),
@@ -647,7 +674,7 @@ class _SectionHeader extends StatelessWidget {
               Text(
                 subtitle,
                 style: const TextStyle(
-                  color:    _D.textMuted,
+                  color: _D.textMuted,
                   fontSize: 12,
                 ),
               ),
@@ -671,8 +698,8 @@ class _GameCard extends StatefulWidget {
     required this.tickerProvider,
   });
 
-  final MiniGame       game;
-  final VoidCallback   onTap;
+  final MiniGame game;
+  final VoidCallback onTap;
   final TickerProvider tickerProvider;
 
   @override
@@ -681,15 +708,14 @@ class _GameCard extends StatefulWidget {
 
 class _GameCardState extends State<_GameCard>
     with SingleTickerProviderStateMixin {
-
   late final AnimationController _pressCtrl;
-  late final Animation<double>   _scaleAnim;
+  late final Animation<double> _scaleAnim;
 
   @override
   void initState() {
     super.initState();
     _pressCtrl = AnimationController(
-      vsync:    this,
+      vsync: this,
       duration: const Duration(milliseconds: 100),
     );
     _scaleAnim = Tween<double>(begin: 1.0, end: 0.96)
@@ -702,16 +728,24 @@ class _GameCardState extends State<_GameCard>
     super.dispose();
   }
 
-  void _onTapDown(_)  => _pressCtrl.forward();
-  void _onTapUp(_)    { _pressCtrl.reverse(); widget.onTap(); }
+  void _onTapDown(_) => _pressCtrl.forward();
+  void _onTapUp(_) {
+    _pressCtrl.reverse();
+    widget.onTap();
+  }
+
   void _onTapCancel() => _pressCtrl.reverse();
 
   String _tagLabel(GameTag tag) {
     switch (tag) {
-      case GameTag.fast:     return 'FAST';
-      case GameTag.strategy: return 'STRATEGY';
-      case GameTag.memory:   return 'MEMORY';
-      case GameTag.classic:  return 'CLASSIC';
+      case GameTag.fast:
+        return 'FAST';
+      case GameTag.strategy:
+        return 'STRATEGY';
+      case GameTag.memory:
+        return 'MEMORY';
+      case GameTag.classic:
+        return 'CLASSIC';
     }
   }
 
@@ -721,19 +755,19 @@ class _GameCardState extends State<_GameCard>
     return ScaleTransition(
       scale: _scaleAnim,
       child: GestureDetector(
-        onTapDown:   _onTapDown,
-        onTapUp:     _onTapUp,
+        onTapDown: _onTapDown,
+        onTapUp: _onTapUp,
         onTapCancel: _onTapCancel,
         child: Container(
           padding: const EdgeInsets.all(13),
           decoration: BoxDecoration(
-            color:        _D.card,
+            color: _D.card,
             borderRadius: _D.radiusLg,
-            border:       Border.all(color: _D.cardBorder),
+            border: Border.all(color: _D.cardBorder),
             boxShadow: [
               BoxShadow(
-                color:       g.color.withOpacity(0.06),
-                blurRadius:  20,
+                color: g.color.withOpacity(0.06),
+                blurRadius: 20,
                 spreadRadius: -4,
               ),
             ],
@@ -749,7 +783,7 @@ class _GameCardState extends State<_GameCard>
                     width: 38,
                     height: 38,
                     decoration: BoxDecoration(
-                      color:        g.color.withOpacity(0.15),
+                      color: g.color.withOpacity(0.15),
                       borderRadius: _D.radiusSm,
                     ),
                     child: Icon(g.icon, color: g.color, size: 20),
@@ -760,16 +794,15 @@ class _GameCardState extends State<_GameCard>
                       padding: const EdgeInsets.symmetric(
                           horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
-                        color:        _D.rose.withOpacity(0.15),
+                        color: _D.rose.withOpacity(0.15),
                         borderRadius: _D.radiusSm,
-                        border:       Border.all(
-                            color: _D.rose.withOpacity(0.3)),
+                        border: Border.all(color: _D.rose.withOpacity(0.3)),
                       ),
                       child: const Text(
                         'NEW',
                         style: TextStyle(
-                          color:      _D.rose,
-                          fontSize:   9.5,
+                          color: _D.rose,
+                          fontSize: 9.5,
                           fontWeight: FontWeight.w800,
                           letterSpacing: 0.5,
                         ),
@@ -782,12 +815,12 @@ class _GameCardState extends State<_GameCard>
               // Title
               Text(
                 g.name,
-                maxLines:        1,
-                overflow:        TextOverflow.ellipsis,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
-                  color:      _D.textPrimary,
+                  color: _D.textPrimary,
                   fontWeight: FontWeight.w700,
-                  fontSize:   14.5,
+                  fontSize: 14.5,
                   letterSpacing: -0.2,
                 ),
               ),
@@ -796,12 +829,12 @@ class _GameCardState extends State<_GameCard>
               // Subtitle
               Text(
                 g.subtitle,
-                maxLines:  2,
-                overflow:  TextOverflow.ellipsis,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
-                  color:    _D.textSecondary,
+                  color: _D.textSecondary,
                   fontSize: 11.5,
-                  height:   1.35,
+                  height: 1.35,
                 ),
               ),
               const Spacer(),
@@ -814,22 +847,21 @@ class _GameCardState extends State<_GameCard>
                   const SizedBox(width: 3),
                   Text(
                     '${g.playersOnline}',
-                    style: const TextStyle(
-                        color: _D.textMuted, fontSize: 11),
+                    style: const TextStyle(color: _D.textMuted, fontSize: 11),
                   ),
                   const Spacer(),
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 6, vertical: 2),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
-                      color:        g.color.withOpacity(0.12),
+                      color: g.color.withOpacity(0.12),
                       borderRadius: _D.radiusSm,
                     ),
                     child: Text(
                       _tagLabel(g.tag),
                       style: TextStyle(
-                        color:      g.color,
-                        fontSize:   9,
+                        color: g.color,
+                        fontSize: 9,
                         fontWeight: FontWeight.w700,
                         letterSpacing: 0.6,
                       ),
@@ -851,9 +883,9 @@ class _GameCardState extends State<_GameCard>
                     borderRadius: _D.radiusSm,
                     boxShadow: [
                       BoxShadow(
-                        color:      g.color.withOpacity(0.30),
+                        color: g.color.withOpacity(0.30),
                         blurRadius: 8,
-                        offset:     const Offset(0, 3),
+                        offset: const Offset(0, 3),
                       ),
                     ],
                   ),
@@ -861,9 +893,9 @@ class _GameCardState extends State<_GameCard>
                     child: Text(
                       'Play',
                       style: TextStyle(
-                        color:      Colors.white,
+                        color: Colors.white,
                         fontWeight: FontWeight.w700,
-                        fontSize:   13,
+                        fontSize: 13,
                         letterSpacing: 0.2,
                       ),
                     ),
@@ -884,7 +916,7 @@ class _GameCardState extends State<_GameCard>
 
 class _FriendTile extends StatefulWidget {
   const _FriendTile({required this.friend, required this.onChallenge});
-  final Friend       friend;
+  final Friend friend;
   final VoidCallback onChallenge;
 
   @override
@@ -893,14 +925,13 @@ class _FriendTile extends StatefulWidget {
 
 class _FriendTileState extends State<_FriendTile>
     with SingleTickerProviderStateMixin {
-
   late final AnimationController _btnCtrl;
 
   @override
   void initState() {
     super.initState();
     _btnCtrl = AnimationController(
-      vsync:    this,
+      vsync: this,
       duration: const Duration(milliseconds: 200),
     );
   }
@@ -912,7 +943,11 @@ class _FriendTileState extends State<_FriendTile>
   }
 
   static const _avatarColors = [
-    _D.indigo, _D.violet, _D.cyan, _D.emerald, _D.amber,
+    _D.indigo,
+    _D.violet,
+    _D.cyan,
+    _D.emerald,
+    _D.amber,
   ];
 
   Color get _avatarColor =>
@@ -920,15 +955,15 @@ class _FriendTileState extends State<_FriendTile>
 
   String _lastSeenLabel() {
     final diff = DateTime.now().difference(widget.friend.lastSeen);
-    if (diff.inMinutes < 1)  return 'just now';
+    if (diff.inMinutes < 1) return 'just now';
     if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
-    if (diff.inHours   < 24) return '${diff.inHours}h ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
     return '${diff.inDays}d ago';
   }
 
   @override
   Widget build(BuildContext context) {
-    final f      = widget.friend;
+    final f = widget.friend;
     final status = f.challengeStatus;
 
     return AnimatedContainer(
@@ -960,19 +995,19 @@ class _FriendTileState extends State<_FriendTile>
                     child: Text(
                       f.name.characters.first.toUpperCase(),
                       style: TextStyle(
-                        color:      _avatarColor,
+                        color: _avatarColor,
                         fontWeight: FontWeight.w800,
-                        fontSize:   14,
+                        fontSize: 14,
                       ),
                     ),
                   ),
                   Positioned(
-                    right:  0,
+                    right: 0,
                     bottom: 0,
-                    child:  _PulsingDot(
-                      color:    f.isOnline ? _D.emerald : _D.textMuted,
-                      size:     8,
-                      animate:  f.isOnline,
+                    child: _PulsingDot(
+                      color: f.isOnline ? _D.emerald : _D.textMuted,
+                      size: 8,
+                      animate: f.isOnline,
                     ),
                   ),
                 ],
@@ -986,8 +1021,8 @@ class _FriendTileState extends State<_FriendTile>
                       f.name,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        color:      _D.textPrimary,
-                        fontSize:   13,
+                        color: _D.textPrimary,
+                        fontSize: 13,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -1013,12 +1048,13 @@ class _FriendTileState extends State<_FriendTile>
 
           // Challenge button
           SizedBox(
-            width:  double.infinity,
+            width: double.infinity,
             height: 30,
             child: _ChallengeButton(
-              status:     status,
-              isOnline:   f.isOnline,
-              onPressed:  status == ChallengeStatus.idle ? widget.onChallenge : null,
+              status: status,
+              isOnline: f.isOnline,
+              onPressed:
+                  status == ChallengeStatus.idle ? widget.onChallenge : null,
             ),
           ),
         ],
@@ -1039,18 +1075,18 @@ class _ChallengeButton extends StatelessWidget {
   });
 
   final ChallengeStatus status;
-  final bool            isOnline;
-  final VoidCallback?   onPressed;
+  final bool isOnline;
+  final VoidCallback? onPressed;
 
   @override
   Widget build(BuildContext context) {
-    final isSent    = status == ChallengeStatus.sent;
+    final isSent = status == ChallengeStatus.sent;
     final isSending = status == ChallengeStatus.sending;
-    final canPress  = isOnline && status == ChallengeStatus.idle;
+    final canPress = isOnline && status == ChallengeStatus.idle;
 
     return AnimatedContainer(
       duration: _D.normal,
-      curve:    Curves.easeInOut,
+      curve: Curves.easeInOut,
       decoration: BoxDecoration(
         color: isSent
             ? _D.emerald.withOpacity(0.12)
@@ -1067,31 +1103,35 @@ class _ChallengeButton extends StatelessWidget {
         ),
       ),
       child: Material(
-        color:        Colors.transparent,
+        color: Colors.transparent,
         borderRadius: _D.radiusSm,
         child: InkWell(
-          onTap:        onPressed,
+          onTap: onPressed,
           borderRadius: _D.radiusSm,
-          splashColor:  _D.amber.withOpacity(0.15),
+          splashColor: _D.amber.withOpacity(0.15),
           child: Center(
             child: isSending
                 ? const SizedBox(
-                    width:  14,
+                    width: 14,
                     height: 14,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color:       _D.amber,
+                      color: _D.amber,
                     ),
                   )
                 : Text(
-                    isSent ? '✓ Sent' : isOnline ? 'Challenge' : 'Offline',
+                    isSent
+                        ? '✓ Sent'
+                        : isOnline
+                            ? 'Challenge'
+                            : 'Offline',
                     style: TextStyle(
                       color: isSent
                           ? _D.emerald
                           : canPress
                               ? _D.amberLight
                               : _D.textMuted,
-                      fontSize:   11.5,
+                      fontSize: 11.5,
                       fontWeight: FontWeight.w700,
                       letterSpacing: 0.1,
                     ),
@@ -1116,34 +1156,33 @@ class _PartyBanner extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color:        _D.card,
+        color: _D.card,
         borderRadius: _D.radiusLg,
-        border:       Border.all(color: _D.cardBorder),
+        border: Border.all(color: _D.cardBorder),
         gradient: LinearGradient(
           colors: [
             _D.indigo.withOpacity(0.12),
             _D.violet.withOpacity(0.08),
           ],
           begin: Alignment.topLeft,
-          end:   Alignment.bottomRight,
+          end: Alignment.bottomRight,
         ),
       ),
       child: Row(
         children: [
           // Icon
           Container(
-            width:  42,
+            width: 42,
             height: 42,
             decoration: BoxDecoration(
-              color:        _D.indigo.withOpacity(0.18),
+              color: _D.indigo.withOpacity(0.18),
               borderRadius: _D.radiusMd,
-              border:       Border.all(
-                  color: _D.indigo.withOpacity(0.2)),
+              border: Border.all(color: _D.indigo.withOpacity(0.2)),
             ),
             child: const Icon(
               Icons.groups_2_rounded,
               color: _D.indigoLight,
-              size:  22,
+              size: 22,
             ),
           ),
           const SizedBox(width: 12),
@@ -1156,9 +1195,9 @@ class _PartyBanner extends StatelessWidget {
                 Text(
                   'Party Room',
                   style: TextStyle(
-                    color:      _D.textPrimary,
+                    color: _D.textPrimary,
                     fontWeight: FontWeight.w800,
-                    fontSize:   15,
+                    fontSize: 15,
                     letterSpacing: -0.2,
                   ),
                 ),
@@ -1166,7 +1205,7 @@ class _PartyBanner extends StatelessWidget {
                 Text(
                   'Invite up to 4 friends · play together',
                   style: TextStyle(
-                    color:    _D.textSecondary,
+                    color: _D.textSecondary,
                     fontSize: 12,
                   ),
                 ),
@@ -1182,14 +1221,13 @@ class _PartyBanner extends StatelessWidget {
               style: ElevatedButton.styleFrom(
                 backgroundColor: _D.indigo,
                 foregroundColor: Colors.white,
-                elevation:       0,
-                shadowColor:     _D.indigo.withOpacity(0.4),
-                shape: RoundedRectangleBorder(
-                    borderRadius: _D.radiusSm),
+                elevation: 0,
+                shadowColor: _D.indigo.withOpacity(0.4),
+                shape: RoundedRectangleBorder(borderRadius: _D.radiusSm),
                 padding: const EdgeInsets.symmetric(horizontal: 14),
                 textStyle: const TextStyle(
-                  fontWeight:    FontWeight.w700,
-                  fontSize:      13,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
                   letterSpacing: 0.2,
                 ),
               ),
@@ -1210,13 +1248,13 @@ class _PartyBanner extends StatelessWidget {
 class _PulsingDot extends StatefulWidget {
   const _PulsingDot({
     required this.color,
-    this.size   = 10,
+    this.size = 10,
     this.animate = true,
   });
 
-  final Color  color;
+  final Color color;
   final double size;
-  final bool   animate;
+  final bool animate;
 
   @override
   State<_PulsingDot> createState() => _PulsingDotState();
@@ -1224,15 +1262,14 @@ class _PulsingDot extends StatefulWidget {
 
 class _PulsingDotState extends State<_PulsingDot>
     with SingleTickerProviderStateMixin {
-
   late final AnimationController _ctrl;
-  late final Animation<double>   _pulse;
+  late final Animation<double> _pulse;
 
   @override
   void initState() {
     super.initState();
     _ctrl = AnimationController(
-      vsync:    this,
+      vsync: this,
       duration: const Duration(milliseconds: 1600),
     );
     _pulse = Tween<double>(begin: 0.5, end: 1.0)
@@ -1243,8 +1280,8 @@ class _PulsingDotState extends State<_PulsingDot>
   @override
   void didUpdateWidget(_PulsingDot old) {
     super.didUpdateWidget(old);
-    if (widget.animate && !_ctrl.isAnimating)  _ctrl.repeat(reverse: true);
-    if (!widget.animate && _ctrl.isAnimating)  _ctrl.stop();
+    if (widget.animate && !_ctrl.isAnimating) _ctrl.repeat(reverse: true);
+    if (!widget.animate && _ctrl.isAnimating) _ctrl.stop();
   }
 
   @override
@@ -1258,7 +1295,7 @@ class _PulsingDotState extends State<_PulsingDot>
     return AnimatedBuilder(
       animation: _pulse,
       builder: (_, __) => Container(
-        width:  widget.size,
+        width: widget.size,
         height: widget.size,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
@@ -1268,7 +1305,7 @@ class _PulsingDotState extends State<_PulsingDot>
           boxShadow: widget.animate
               ? [
                   BoxShadow(
-                    color:      widget.color.withOpacity(0.4 * _pulse.value),
+                    color: widget.color.withOpacity(0.4 * _pulse.value),
                     blurRadius: 4,
                     spreadRadius: 1,
                   ),
@@ -1292,18 +1329,18 @@ class _ToastOverlay extends StatelessWidget {
     required this.onDismiss,
   });
 
-  final String           message;
-  final bool             isError;
+  final String message;
+  final bool isError;
   final Animation<double> animation;
-  final VoidCallback     onDismiss;
+  final VoidCallback onDismiss;
 
   @override
   Widget build(BuildContext context) {
     final color = isError ? _D.rose : _D.emerald;
     return Positioned(
       bottom: MediaQuery.of(context).padding.bottom + 24,
-      left:   16,
-      right:  16,
+      left: 16,
+      right: 16,
       child: AnimatedBuilder(
         animation: animation,
         builder: (_, child) => Opacity(
@@ -1318,14 +1355,14 @@ class _ToastOverlay extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
             decoration: BoxDecoration(
-              color:        _D.surface,
+              color: _D.surface,
               borderRadius: _D.radiusMd,
               border: Border.all(color: color.withOpacity(0.3)),
               boxShadow: [
                 BoxShadow(
-                  color:      Colors.black.withOpacity(0.35),
+                  color: Colors.black.withOpacity(0.35),
                   blurRadius: 20,
-                  offset:     const Offset(0, 6),
+                  offset: const Offset(0, 6),
                 ),
               ],
             ),
@@ -1336,15 +1373,15 @@ class _ToastOverlay extends StatelessWidget {
                       ? Icons.error_outline_rounded
                       : Icons.check_circle_outline_rounded,
                   color: color,
-                  size:  18,
+                  size: 18,
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     message,
                     style: TextStyle(
-                      color:      isError ? _D.rose : _D.textPrimary,
-                      fontSize:   13.5,
+                      color: isError ? _D.rose : _D.textPrimary,
+                      fontSize: 13.5,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -1365,7 +1402,7 @@ class _ToastOverlay extends StatelessWidget {
 
 class _TextButton extends StatelessWidget {
   const _TextButton({required this.label, required this.onTap});
-  final String       label;
+  final String label;
   final VoidCallback onTap;
 
   @override
@@ -1375,8 +1412,8 @@ class _TextButton extends StatelessWidget {
       child: Text(
         label,
         style: const TextStyle(
-          color:      _D.indigoLight,
-          fontSize:   12.5,
+          color: _D.indigoLight,
+          fontSize: 12.5,
           fontWeight: FontWeight.w600,
         ),
       ),
@@ -1397,15 +1434,14 @@ class _LoadingShimmer extends StatefulWidget {
 
 class _LoadingShimmerState extends State<_LoadingShimmer>
     with SingleTickerProviderStateMixin {
-
   late final AnimationController _ctrl;
-  late final Animation<double>   _shimmer;
+  late final Animation<double> _shimmer;
 
   @override
   void initState() {
     super.initState();
     _ctrl = AnimationController(
-      vsync:    this,
+      vsync: this,
       duration: const Duration(milliseconds: 1400),
     )..repeat();
     _shimmer = CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut);
@@ -1433,19 +1469,19 @@ class _LoadingShimmerState extends State<_LoadingShimmer>
               _ShimmerBox(width: 160, height: 14, color: highlight),
               const SizedBox(height: 16),
               GridView.builder(
-                shrinkWrap:  true,
-                physics:     const NeverScrollableScrollPhysics(),
-                itemCount:   4,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: 4,
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount:   2,
-                  mainAxisSpacing:  10,
+                  crossAxisCount: 2,
+                  mainAxisSpacing: 10,
                   crossAxisSpacing: 10,
                   childAspectRatio: 0.98,
                 ),
                 itemBuilder: (_, __) => _ShimmerBox(
-                  width:  double.infinity,
+                  width: double.infinity,
                   height: double.infinity,
-                  color:  highlight,
+                  color: highlight,
                   radius: 18,
                 ),
               ),
@@ -1453,17 +1489,19 @@ class _LoadingShimmerState extends State<_LoadingShimmer>
               _ShimmerBox(width: 120, height: 14, color: highlight),
               const SizedBox(height: 12),
               Row(
-                children: List.generate(3, (_) => Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.only(right: 10),
-                    child:   _ShimmerBox(
-                      width:  double.infinity,
-                      height: 118,
-                      color:  highlight,
-                      radius: 14,
-                    ),
-                  ),
-                )),
+                children: List.generate(
+                    3,
+                    (_) => Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.only(right: 10),
+                            child: _ShimmerBox(
+                              width: double.infinity,
+                              height: 118,
+                              color: highlight,
+                              radius: 14,
+                            ),
+                          ),
+                        )),
               ),
             ],
           ),
@@ -1483,16 +1521,16 @@ class _ShimmerBox extends StatelessWidget {
 
   final double width;
   final double height;
-  final Color  color;
+  final Color color;
   final double radius;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width:  width,
+      width: width,
       height: height,
       decoration: BoxDecoration(
-        color:        color,
+        color: color,
         borderRadius: BorderRadius.circular(radius),
       ),
     );
