@@ -266,23 +266,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
 
   Widget _buildHeader() {
     return Row(children: [
-      // Back button
-      GestureDetector(
-        onTap: _openLoginScreen,
-        child: Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: _N.card,
-            borderRadius: BorderRadius.circular(13),
-            border: Border.all(color: _N.cardBorder),
-          ),
-          child: const Icon(Icons.arrow_back_ios_new_rounded,
-              color: _N.textSecondary, size: 16),
-        ),
-      ),
-      const SizedBox(width: 14),
-
       // Logo pill
       AnimatedBuilder(
         animation: _glowCtrl,

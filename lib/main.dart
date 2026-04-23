@@ -38,7 +38,7 @@ class MultilingualChatApp extends ConsumerWidget {
       ),
       home: authState.when(
         data: (user) =>
-            user != null ? const HomeScreen() : const RegisterScreen(),
+          user != null ? const HomeScreen() : const LoginScreen(),
         loading: () => const Scaffold(
           backgroundColor: Color(0xFF0D0E1A),
           body: Center(
