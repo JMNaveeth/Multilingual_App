@@ -96,7 +96,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       case 1:
         return Column(children: [
           _buildHeader(title: 'Discover'),
-          const Expanded(child: DiscoverScreen()),
+          const Expanded(child: RepaintBoundary(child: DiscoverScreen())),
         ]);
       case 2:
         return Column(children: [
@@ -123,7 +123,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   // ── Header ────────────────────────────────────────────────────────────────
   Widget _buildHeader({required String title, bool showActions = true}) {
-    final user = ref.watch(authProvider).value;
+    final userName = ref.read(authProvider).value?.name;
     return Container(
       padding: EdgeInsets.only(
         top: MediaQuery.of(context).padding.top + 12,
@@ -179,8 +179,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     fontWeight: FontWeight.w800,
                     letterSpacing: -0.5,
                   )),
-              if (user != null)
-                Text(user.name,
+              if (userName != null)
+                Text(userName,
                     style: const TextStyle(
                       color: _N.textMuted,
                       fontSize: 11,
