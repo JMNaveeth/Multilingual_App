@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/foundation.dart';
 import 'package:multilingual_chat_app/models/user.dart';
 import 'package:multilingual_chat_app/services/auth_service.dart';
 
@@ -20,22 +21,34 @@ class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
   }
 
   Future<void> _initializeAuth() async {
+    if (kDebugMode) debugPrint('[AuthNotifier] initializeAuth start');
     try {
       final user = await _authService.getCurrentUser();
       state = AsyncValue.data(user);
+      if (kDebugMode) {
+        debugPrint('[AuthNotifier] initializeAuth done: hasUser=${user != null}');
+      }
     } catch (error, stackTrace) {
       state = AsyncValue.error(error, stackTrace);
+      if (kDebugMode) {
+        debugPrint('[AuthNotifier] initializeAuth error: $error');
+      }
     }
   }
 
   Future<void> login(String email, String password) async {
     final previousState = state;
+    if (kDebugMode) debugPrint('[AuthNotifier] login start: $email');
     try {
       await _authService.login(email, password);
       final user = await _authService.getCurrentUser();
       state = AsyncValue.data(user);
+      if (kDebugMode) {
+        debugPrint('[AuthNotifier] login done: hasUser=${user != null}');
+      }
     } catch (error, stackTrace) {
       state = previousState;
+      if (kDebugMode) debugPrint('[AuthNotifier] login error: $error');
       Error.throwWithStackTrace(error, stackTrace);
     }
   }
@@ -43,12 +56,17 @@ class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
   Future<void> register(String name, String email, String password,
       String preferredLanguage) async {
     final previousState = state;
+    if (kDebugMode) debugPrint('[AuthNotifier] register start: $email');
     try {
       await _authService.register(name, email, password, preferredLanguage);
       final user = await _authService.getCurrentUser();
       state = AsyncValue.data(user);
+      if (kDebugMode) {
+        debugPrint('[AuthNotifier] register done: hasUser=${user != null}');
+      }
     } catch (error, stackTrace) {
       state = previousState;
+      if (kDebugMode) debugPrint('[AuthNotifier] register error: $error');
       Error.throwWithStackTrace(error, stackTrace);
     }
   }
@@ -77,11 +95,16 @@ class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
   }
 
   Future<void> refreshUser() async {
+    if (kDebugMode) debugPrint('[AuthNotifier] refreshUser start');
     try {
       final user = await _authService.getCurrentUser();
       state = AsyncValue.data(user);
+      if (kDebugMode) {
+        debugPrint('[AuthNotifier] refreshUser done: hasUser=${user != null}');
+      }
     } catch (error, stackTrace) {
       state = AsyncValue.error(error, stackTrace);
+      if (kDebugMode) debugPrint('[AuthNotifier] refreshUser error: $error');
     }
   }
 }

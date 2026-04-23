@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'dart:io' show Platform;
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kDebugMode, kIsWeb, debugPrint;
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:multilingual_chat_app/models/user.dart';
@@ -34,6 +34,7 @@ class AuthService {
 
   Future<Map<String, dynamic>> login(String email, String password) async {
     try {
+      if (kDebugMode) debugPrint('[AuthService] POST $baseUrl/auth/login for $email');
       final response = await http.post(
         Uri.parse('$baseUrl/auth/login'),
         headers: {'Content-Type': 'application/json'},
@@ -46,11 +47,16 @@ class AuthService {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         await saveToken(data['token']);
+        if (kDebugMode) debugPrint('[AuthService] login success (200), token saved');
         return data;
       } else {
+        if (kDebugMode) {
+          debugPrint('[AuthService] login failed (${response.statusCode}): ${response.body}');
+        }
         throw Exception('Login failed: ${response.body}');
       }
     } catch (e) {
+      if (kDebugMode) debugPrint('[AuthService] login exception: $e');
       throw Exception('Login error: $e');
     }
   }
@@ -84,8 +90,12 @@ class AuthService {
   Future<User?> getCurrentUser() async {
     try {
       final token = await getToken();
-      if (token == null) return null;
+      if (token == null) {
+        if (kDebugMode) debugPrint('[AuthService] /auth/me skipped: no token');
+        return null;
+      }
 
+      if (kDebugMode) debugPrint('[AuthService] GET $baseUrl/auth/me');
       final response = await http.get(
         Uri.parse('$baseUrl/auth/me'),
         headers: {
@@ -96,12 +106,17 @@ class AuthService {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
+        if (kDebugMode) debugPrint('[AuthService] /auth/me success (200)');
         return User.fromJson(data['user']);
       } else {
+        if (kDebugMode) {
+          debugPrint('[AuthService] /auth/me failed (${response.statusCode}), token cleared');
+        }
         await removeToken();
         return null;
       }
     } catch (e) {
+      if (kDebugMode) debugPrint('[AuthService] /auth/me exception, token cleared: $e');
       await removeToken();
       return null;
     }

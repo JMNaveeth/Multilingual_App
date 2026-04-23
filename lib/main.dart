@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:multilingual_chat_app/providers/auth_provider.dart';
 import 'package:multilingual_chat_app/screens/auth/login_screen.dart';
@@ -19,6 +20,13 @@ class MultilingualChatApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authProvider);
+    if (kDebugMode) {
+      authState.when(
+        data: (user) => debugPrint('[App] authState=data hasUser=${user != null}'),
+        loading: () => debugPrint('[App] authState=loading'),
+        error: (e, _) => debugPrint('[App] authState=error $e'),
+      );
+    }
 
     return MaterialApp(
       title: 'Multilingual Chat App',

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:multilingual_chat_app/providers/auth_provider.dart';
@@ -99,14 +100,27 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
+    final stopwatch = Stopwatch()..start();
+    if (kDebugMode) {
+      debugPrint('[LoginScreen] Sign in tapped for: ${_emailCtrl.text.trim()}');
+    }
     setState(() => _isLoading = true);
     try {
       await ref
           .read(authProvider.notifier)
           .login(_emailCtrl.text.trim(), _passwordCtrl.text);
+      if (kDebugMode) {
+        final authState = ref.read(authProvider);
+        debugPrint(
+            '[LoginScreen] Sign in completed in ${stopwatch.elapsedMilliseconds}ms, provider hasUser=${authState.value != null}');
+      }
     } catch (e) {
+      if (kDebugMode) {
+        debugPrint('[LoginScreen] Sign in failed after ${stopwatch.elapsedMilliseconds}ms: $e');
+      }
       if (mounted) _snack('Login failed: $e', _N.rose);
     } finally {
+      stopwatch.stop();
       if (mounted) setState(() => _isLoading = false);
     }
   }
