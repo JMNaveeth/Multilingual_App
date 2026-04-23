@@ -5,22 +5,22 @@ import 'package:multilingual_chat_app/providers/auth_provider.dart';
 
 // ── Nexus Design Tokens ───────────────────────────────────────────────────────
 class _N {
-  static const bg            = Color(0xFF0D0E1A);
-  static const surface       = Color(0xFF151626);
-  static const card          = Color(0xFF1C1E31);
-  static const cardBorder    = Color(0xFF252842);
-  static const indigo        = Color(0xFF6366F1);
-  static const indigoLight   = Color(0xFF818CF8);
-  static const cyan          = Color(0xFF22D3EE);
-  static const violet        = Color(0xFF8B5CF6);
-  static const rose          = Color(0xFFF43F5E);
-  static const amber         = Color(0xFFF59E0B);
-  static const emerald       = Color(0xFF10B981);
-  static const textPrimary   = Color(0xFFF1F5F9);
+  static const bg = Color(0xFF0D0E1A);
+  static const surface = Color(0xFF151626);
+  static const card = Color(0xFF1C1E31);
+  static const cardBorder = Color(0xFF252842);
+  static const indigo = Color(0xFF6366F1);
+  static const indigoLight = Color(0xFF818CF8);
+  static const cyan = Color(0xFF22D3EE);
+  static const violet = Color(0xFF8B5CF6);
+  static const rose = Color(0xFFF43F5E);
+  static const amber = Color(0xFFF59E0B);
+  static const emerald = Color(0xFF10B981);
+  static const textPrimary = Color(0xFFF1F5F9);
   static const textSecondary = Color(0xFF94A3B8);
-  static const textMuted     = Color(0xFF475569);
-  static const inputBg       = Color(0xFF13141F);
-  static const inputBorder   = Color(0xFF1E2035);
+  static const textMuted = Color(0xFF475569);
+  static const inputBg = Color(0xFF13141F);
+  static const inputBorder = Color(0xFF1E2035);
 }
 
 class ProfileScreen extends ConsumerStatefulWidget {
@@ -35,44 +35,47 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
   final _formKey = GlobalKey<FormState>();
   TextEditingController? _nameController;
   TextEditingController? _statusController;
-  String  _selectedLanguage      = 'en';
-  bool    _isLoading             = false;
-  bool    _isEditingName         = false;
-  bool    _isEditingStatus       = false;
-  bool    _controllersInitialized = false;
+  String _selectedLanguage = 'en';
+  bool _isLoading = false;
+  bool _isEditingName = false;
+  bool _isEditingStatus = false;
+  bool _controllersInitialized = false;
 
   late final AnimationController _glowCtrl;
   late final AnimationController _onlineCtrl;
 
   // ── Language list ──────────────────────────────────────────────────────────
   static const _languages = [
-    {'code': 'en', 'name': 'English',    'flag': '🇬🇧'},
-    {'code': 'es', 'name': 'Spanish',    'flag': '🇪🇸'},
-    {'code': 'fr', 'name': 'French',     'flag': '🇫🇷'},
-    {'code': 'de', 'name': 'German',     'flag': '🇩🇪'},
-    {'code': 'it', 'name': 'Italian',    'flag': '🇮🇹'},
+    {'code': 'en', 'name': 'English', 'flag': '🇬🇧'},
+    {'code': 'es', 'name': 'Spanish', 'flag': '🇪🇸'},
+    {'code': 'fr', 'name': 'French', 'flag': '🇫🇷'},
+    {'code': 'de', 'name': 'German', 'flag': '🇩🇪'},
+    {'code': 'it', 'name': 'Italian', 'flag': '🇮🇹'},
     {'code': 'pt', 'name': 'Portuguese', 'flag': '🇵🇹'},
-    {'code': 'ru', 'name': 'Russian',    'flag': '🇷🇺'},
-    {'code': 'ja', 'name': 'Japanese',   'flag': '🇯🇵'},
-    {'code': 'ko', 'name': 'Korean',     'flag': '🇰🇷'},
-    {'code': 'zh', 'name': 'Chinese',    'flag': '🇨🇳'},
-    {'code': 'hi', 'name': 'Hindi',      'flag': '🇮🇳'},
-    {'code': 'ar', 'name': 'Arabic',     'flag': '🇸🇦'},
-    {'code': 'ta', 'name': 'Tamil',      'flag': '🇮🇳'},
-    {'code': 'te', 'name': 'Telugu',     'flag': '🇮🇳'},
-    {'code': 'kn', 'name': 'Kannada',    'flag': '🇮🇳'},
-    {'code': 'ml', 'name': 'Malayalam',  'flag': '🇮🇳'},
+    {'code': 'ru', 'name': 'Russian', 'flag': '🇷🇺'},
+    {'code': 'ja', 'name': 'Japanese', 'flag': '🇯🇵'},
+    {'code': 'ko', 'name': 'Korean', 'flag': '🇰🇷'},
+    {'code': 'zh', 'name': 'Chinese', 'flag': '🇨🇳'},
+    {'code': 'hi', 'name': 'Hindi', 'flag': '🇮🇳'},
+    {'code': 'ar', 'name': 'Arabic', 'flag': '🇸🇦'},
+    {'code': 'ta', 'name': 'Tamil', 'flag': '🇮🇳'},
+    {'code': 'te', 'name': 'Telugu', 'flag': '🇮🇳'},
+    {'code': 'kn', 'name': 'Kannada', 'flag': '🇮🇳'},
+    {'code': 'ml', 'name': 'Malayalam', 'flag': '🇮🇳'},
+    {'code': 'si', 'name': 'Sinhala', 'flag': '🇱🇰'},
   ];
 
   @override
   void initState() {
     super.initState();
     _glowCtrl = AnimationController(
-      vsync: this, duration: const Duration(seconds: 3),
+      vsync: this,
+      duration: const Duration(seconds: 3),
     )..repeat(reverse: true);
 
     _onlineCtrl = AnimationController(
-      vsync: this, duration: const Duration(milliseconds: 1500),
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
     )..repeat(reverse: true);
 
     SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
@@ -93,7 +96,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
   void _initControllers(dynamic user) {
     if (_controllersInitialized) return;
     _controllersInitialized = true;
-    _nameController   = TextEditingController(text: user.name ?? '');
+    _nameController = TextEditingController(text: user.name ?? '');
     _statusController = TextEditingController(text: 'Available');
     _selectedLanguage = user.preferredLanguage ?? 'en';
   }
@@ -173,8 +176,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
           return const Scaffold(
             backgroundColor: _N.bg,
             body: Center(
-              child: Text('Not logged in',
-                  style: TextStyle(color: _N.textMuted)),
+              child:
+                  Text('Not logged in', style: TextStyle(color: _N.textMuted)),
             ),
           );
         }
@@ -214,7 +217,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         // Name field
-                        _sectionLabel('Display Name', Icons.person_outline_rounded),
+                        _sectionLabel(
+                            'Display Name', Icons.person_outline_rounded),
                         const SizedBox(height: 8),
                         _editableField(
                           controller: _nameController!,
@@ -273,15 +277,16 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                         const SizedBox(height: 20),
 
                         // Language picker
-                        _sectionLabel('Preferred Language',
-                            Icons.translate_rounded),
+                        _sectionLabel(
+                            'Preferred Language', Icons.translate_rounded),
                         const SizedBox(height: 8),
                         _languageTile(),
 
                         const SizedBox(height: 20),
 
                         // Account info
-                        _sectionLabel('Account', Icons.manage_accounts_outlined),
+                        _sectionLabel(
+                            'Account', Icons.manage_accounts_outlined),
                         const SizedBox(height: 8),
                         _accountCard(user),
 
@@ -338,7 +343,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
         animation: _glowCtrl,
         builder: (_, __) => Center(
           child: Container(
-            width: 180, height: 180,
+            width: 180,
+            height: 180,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               gradient: RadialGradient(
@@ -365,7 +371,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                 AnimatedBuilder(
                   animation: _glowCtrl,
                   builder: (_, __) => Container(
-                    width: 96, height: 96,
+                    width: 96,
+                    height: 96,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(28),
                       gradient: const LinearGradient(
@@ -375,8 +382,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: _N.indigo.withOpacity(
-                              0.45 + _glowCtrl.value * 0.25),
+                          color: _N.indigo
+                              .withOpacity(0.45 + _glowCtrl.value * 0.25),
                           blurRadius: 24 + _glowCtrl.value * 10,
                           spreadRadius: 2,
                         ),
@@ -398,11 +405,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
 
                 // Camera badge
                 Positioned(
-                  bottom: -4, right: -4,
+                  bottom: -4,
+                  right: -4,
                   child: GestureDetector(
                     onTap: () => _snack('Photo upload coming soon', _N.amber),
                     child: Container(
-                      width: 32, height: 32,
+                      width: 32,
+                      height: 32,
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(10),
                         color: _N.card,
@@ -416,21 +425,26 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
 
                 // Online indicator
                 Positioned(
-                  top: -2, right: -2,
+                  top: -2,
+                  right: -2,
                   child: AnimatedBuilder(
                     animation: _onlineCtrl,
                     builder: (_, __) => Container(
-                      width: 16, height: 16,
+                      width: 16,
+                      height: 16,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: user.isOnline ? _N.cyan : _N.textMuted,
                         border: Border.all(color: _N.surface, width: 2.5),
                         boxShadow: user.isOnline
-                            ? [BoxShadow(
-                                color: _N.cyan.withOpacity(
-                                    0.5 + _onlineCtrl.value * 0.5),
-                                blurRadius: 8, spreadRadius: 1,
-                              )]
+                            ? [
+                                BoxShadow(
+                                  color: _N.cyan.withOpacity(
+                                      0.5 + _onlineCtrl.value * 0.5),
+                                  blurRadius: 8,
+                                  spreadRadius: 1,
+                                )
+                              ]
                             : [],
                       ),
                     ),
@@ -456,8 +470,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
             // Email
             Text(
               user.email,
-              style: const TextStyle(
-                  color: _N.textMuted, fontSize: 12.5),
+              style: const TextStyle(color: _N.textMuted, fontSize: 12.5),
             ),
             const SizedBox(height: 8),
 
@@ -491,96 +504,97 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
   }
 
   Widget _buildCollapsedTitle(dynamic user) => Row(
-    children: [
-      Container(
-        width: 32, height: 32,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(10),
-          gradient: const LinearGradient(
-            colors: [_N.indigo, _N.violet],
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(10),
+              gradient: const LinearGradient(
+                colors: [_N.indigo, _N.violet],
+              ),
+            ),
+            child: Center(
+              child: Text(_initials(user.name),
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700)),
+            ),
           ),
-        ),
-        child: Center(
-          child: Text(_initials(user.name),
-              style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700)),
-        ),
-      ),
-      const SizedBox(width: 10),
-      const Text('My Profile',
-          style: TextStyle(
-            color: _N.textPrimary,
-            fontSize: 18,
-            fontWeight: FontWeight.w700,
-          )),
-    ],
-  );
+          const SizedBox(width: 10),
+          const Text('My Profile',
+              style: TextStyle(
+                color: _N.textPrimary,
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+              )),
+        ],
+      );
 
   Widget _buildHeaderMenu() => PopupMenuButton<String>(
-    color: _N.card,
-    elevation: 8,
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(14),
-      side: const BorderSide(color: _N.cardBorder),
-    ),
-    icon: Container(
-      width: 36, height: 36,
-      margin: const EdgeInsets.only(right: 8),
-      decoration: BoxDecoration(
         color: _N.card,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: _N.cardBorder),
-      ),
-      child: const Icon(Icons.more_horiz_rounded,
-          color: _N.textSecondary, size: 18),
-    ),
-    onSelected: (v) {
-      if (v == 'signout') _showSignOutDialog();
-    },
-    itemBuilder: (_) => [
-      _popItem(Icons.share_outlined,        'Share profile'),
-      _popItem(Icons.qr_code_rounded,       'QR Code'),
-      _popItem(Icons.privacy_tip_outlined,  'Privacy'),
-      _popItem(Icons.notifications_outlined,'Notifications'),
-      _popItem(Icons.logout_rounded,        'Sign out', value: 'signout',
-          color: _N.rose),
-    ],
-  );
+        elevation: 8,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: const BorderSide(color: _N.cardBorder),
+        ),
+        icon: Container(
+          width: 36,
+          height: 36,
+          margin: const EdgeInsets.only(right: 8),
+          decoration: BoxDecoration(
+            color: _N.card,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: _N.cardBorder),
+          ),
+          child: const Icon(Icons.more_horiz_rounded,
+              color: _N.textSecondary, size: 18),
+        ),
+        onSelected: (v) {
+          if (v == 'signout') _showSignOutDialog();
+        },
+        itemBuilder: (_) => [
+          _popItem(Icons.share_outlined, 'Share profile'),
+          _popItem(Icons.qr_code_rounded, 'QR Code'),
+          _popItem(Icons.privacy_tip_outlined, 'Privacy'),
+          _popItem(Icons.notifications_outlined, 'Notifications'),
+          _popItem(Icons.logout_rounded, 'Sign out',
+              value: 'signout', color: _N.rose),
+        ],
+      );
 
   PopupMenuItem<String> _popItem(IconData icon, String label,
-      {String? value, Color? color}) =>
-    PopupMenuItem<String>(
-      value: value ?? label,
-      child: Row(children: [
-        Icon(icon, size: 17,
-            color: color ?? _N.indigoLight),
-        const SizedBox(width: 12),
-        Text(label, style: TextStyle(
-            color: color ?? _N.textPrimary, fontSize: 13.5)),
-      ]),
-    );
+          {String? value, Color? color}) =>
+      PopupMenuItem<String>(
+        value: value ?? label,
+        child: Row(children: [
+          Icon(icon, size: 17, color: color ?? _N.indigoLight),
+          const SizedBox(width: 12),
+          Text(label,
+              style: TextStyle(color: color ?? _N.textPrimary, fontSize: 13.5)),
+        ]),
+      );
 
   // ── Section labels ─────────────────────────────────────────────────────────
 
   Widget _sectionLabel(String label, IconData icon) => Row(children: [
-    Icon(icon, size: 14, color: _N.indigoLight),
-    const SizedBox(width: 6),
-    Text(label.toUpperCase(),
-        style: const TextStyle(
-          color: _N.indigoLight,
-          fontSize: 10.5,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 1.2,
-        )),
-  ]);
+        Icon(icon, size: 14, color: _N.indigoLight),
+        const SizedBox(width: 6),
+        Text(label.toUpperCase(),
+            style: const TextStyle(
+              color: _N.indigoLight,
+              fontSize: 10.5,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.2,
+            )),
+      ]);
 
   Widget _sectionNote(String note) => Padding(
-    padding: const EdgeInsets.only(top: 6, left: 2),
-    child: Text(note,
-        style: const TextStyle(color: _N.textMuted, fontSize: 11.5)),
-  );
+        padding: const EdgeInsets.only(top: 6, left: 2),
+        child: Text(note,
+            style: const TextStyle(color: _N.textMuted, fontSize: 11.5)),
+      );
 
   // ── Editable field ─────────────────────────────────────────────────────────
 
@@ -602,9 +616,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
           width: isEditing ? 1.5 : 1,
         ),
         boxShadow: isEditing
-            ? [BoxShadow(
-                color: _N.indigo.withOpacity(0.2),
-                blurRadius: 12, spreadRadius: 0)]
+            ? [
+                BoxShadow(
+                    color: _N.indigo.withOpacity(0.2),
+                    blurRadius: 12,
+                    spreadRadius: 0)
+              ]
             : [],
       ),
       child: Row(children: [
@@ -615,17 +632,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                   controller: controller,
                   autofocus: true,
                   validator: validator,
-                  style: const TextStyle(
-                      color: _N.textPrimary, fontSize: 15),
+                  style: const TextStyle(color: _N.textPrimary, fontSize: 15),
                   cursorColor: _N.indigoLight,
                   decoration: InputDecoration(
                     hintText: hint,
-                    hintStyle: const TextStyle(
-                        color: _N.textMuted, fontSize: 15),
+                    hintStyle:
+                        const TextStyle(color: _N.textMuted, fontSize: 15),
                     border: InputBorder.none,
                     isDense: true,
-                    contentPadding:
-                        const EdgeInsets.symmetric(vertical: 16),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 16),
                   ),
                   onFieldSubmitted: (_) {
                     onSave();
@@ -651,12 +666,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
             onToggle();
           },
           child: Container(
-            width: 42, height: 42,
+            width: 42,
+            height: 42,
             margin: const EdgeInsets.only(right: 6),
             decoration: BoxDecoration(
-              color: isEditing
-                  ? _N.indigo.withOpacity(0.15)
-                  : Colors.transparent,
+              color:
+                  isEditing ? _N.indigo.withOpacity(0.15) : Colors.transparent,
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(
@@ -683,8 +698,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
       child: Row(children: [
         Expanded(
           child: Text(value,
-              style: const TextStyle(
-                  color: _N.textSecondary, fontSize: 15)),
+              style: const TextStyle(color: _N.textSecondary, fontSize: 15)),
         ),
         if (trailing != null) trailing,
       ]),
@@ -694,27 +708,26 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
   // ── Language tile ──────────────────────────────────────────────────────────
 
   Widget _languageTile() => GestureDetector(
-    onTap: _showLanguagePicker,
-    child: Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: _N.card,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _N.cardBorder),
-      ),
-      child: Row(children: [
-        Text(_langFlag, style: const TextStyle(fontSize: 20)),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Text(_langName,
-              style: const TextStyle(
-                  color: _N.textPrimary, fontSize: 15)),
+        onTap: _showLanguagePicker,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: _N.card,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: _N.cardBorder),
+          ),
+          child: Row(children: [
+            Text(_langFlag, style: const TextStyle(fontSize: 20)),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(_langName,
+                  style: const TextStyle(color: _N.textPrimary, fontSize: 15)),
+            ),
+            const Icon(Icons.keyboard_arrow_down_rounded,
+                color: _N.textMuted, size: 20),
+          ]),
         ),
-        const Icon(Icons.keyboard_arrow_down_rounded,
-            color: _N.textMuted, size: 20),
-      ]),
-    ),
-  );
+      );
 
   void _showLanguagePicker() {
     showModalBottomSheet(
@@ -732,7 +745,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
           // Handle
           Center(
             child: Container(
-              width: 36, height: 4,
+              width: 36,
+              height: 4,
               margin: const EdgeInsets.only(top: 12, bottom: 4),
               decoration: BoxDecoration(
                 color: _N.textMuted,
@@ -743,8 +757,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
 
           // Title
           Padding(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
             child: Row(children: [
               const Icon(Icons.translate_rounded,
                   color: _N.indigoLight, size: 18),
@@ -768,25 +781,23 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
               separatorBuilder: (_, __) =>
                   const Divider(height: 1, color: _N.cardBorder, indent: 20),
               itemBuilder: (ctx, i) {
-                final lang    = _languages[i];
+                final lang = _languages[i];
                 final selected = lang['code'] == _selectedLanguage;
 
                 return ListTile(
-                  leading: Text(lang['flag']!,
-                      style: const TextStyle(fontSize: 22)),
+                  leading:
+                      Text(lang['flag']!, style: const TextStyle(fontSize: 22)),
                   title: Text(lang['name']!,
                       style: TextStyle(
-                        color: selected
-                            ? _N.indigoLight
-                            : _N.textPrimary,
-                        fontWeight: selected
-                            ? FontWeight.w700
-                            : FontWeight.w400,
+                        color: selected ? _N.indigoLight : _N.textPrimary,
+                        fontWeight:
+                            selected ? FontWeight.w700 : FontWeight.w400,
                         fontSize: 15,
                       )),
                   trailing: selected
                       ? Container(
-                          width: 24, height: 24,
+                          width: 24,
+                          height: 24,
                           decoration: BoxDecoration(
                             color: _N.indigo.withOpacity(0.2),
                             borderRadius: BorderRadius.circular(8),
@@ -826,9 +837,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
           showDivider: true,
         ),
         _accountRow(
-          icon: user.isOnline
-              ? Icons.circle
-              : Icons.circle_outlined,
+          icon: user.isOnline ? Icons.circle : Icons.circle_outlined,
           iconColor: user.isOnline ? _N.cyan : _N.textMuted,
           label: 'Status',
           value: user.isOnline ? 'Online' : 'Offline',
@@ -858,7 +867,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         child: Row(children: [
           Container(
-            width: 34, height: 34,
+            width: 34,
+            height: 34,
             decoration: BoxDecoration(
               color: iconColor.withOpacity(0.1),
               borderRadius: BorderRadius.circular(10),
@@ -868,8 +878,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
           const SizedBox(width: 14),
           Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(label,
-                style: const TextStyle(
-                    color: _N.textMuted, fontSize: 11)),
+                style: const TextStyle(color: _N.textMuted, fontSize: 11)),
             const SizedBox(height: 2),
             Text(value,
                 style: const TextStyle(
@@ -911,15 +920,19 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
           ),
           boxShadow: isLoading
               ? []
-              : [BoxShadow(
-                  color: glowColor.withOpacity(0.4),
-                  blurRadius: 20, offset: const Offset(0, 6),
-                )],
+              : [
+                  BoxShadow(
+                    color: glowColor.withOpacity(0.4),
+                    blurRadius: 20,
+                    offset: const Offset(0, 6),
+                  )
+                ],
         ),
         child: Center(
           child: isLoading
               ? const SizedBox(
-                  width: 22, height: 22,
+                  width: 22,
+                  height: 22,
                   child: CircularProgressIndicator(
                       strokeWidth: 2, color: Colors.white),
                 )
@@ -928,12 +941,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                   children: [
                     Icon(icon, color: Colors.white, size: 18),
                     const SizedBox(width: 8),
-                    Text(label, style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.2,
-                    )),
+                    Text(label,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.2,
+                        )),
                   ],
                 ),
         ),
@@ -962,11 +976,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
             children: [
               Icon(icon, color: color, size: 18),
               const SizedBox(width: 8),
-              Text(label, style: TextStyle(
-                color: color,
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-              )),
+              Text(label,
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                  )),
             ],
           ),
         ),
@@ -992,15 +1007,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
             children: [
               // Icon
               Container(
-                width: 56, height: 56,
+                width: 56,
+                height: 56,
                 decoration: BoxDecoration(
                   color: _N.rose.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                      color: _N.rose.withOpacity(0.3)),
+                  border: Border.all(color: _N.rose.withOpacity(0.3)),
                 ),
-                child: const Icon(Icons.logout_rounded,
-                    color: _N.rose, size: 26),
+                child:
+                    const Icon(Icons.logout_rounded, color: _N.rose, size: 26),
               ),
               const SizedBox(height: 16),
               const Text('Sign Out?',
@@ -1013,8 +1028,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
               const Text(
                 'You\'ll need to sign back in to\naccess your messages.',
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                    color: _N.textMuted, fontSize: 13.5, height: 1.5),
+                style:
+                    TextStyle(color: _N.textMuted, fontSize: 13.5, height: 1.5),
               ),
               const SizedBox(height: 24),
               Row(children: [
@@ -1050,8 +1065,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                       decoration: BoxDecoration(
                         color: _N.rose.withOpacity(0.12),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                            color: _N.rose.withOpacity(0.4)),
+                        border: Border.all(color: _N.rose.withOpacity(0.4)),
                       ),
                       child: const Center(
                         child: Text('Sign Out',

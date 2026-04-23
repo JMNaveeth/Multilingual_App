@@ -29,6 +29,7 @@ class UserListItem extends StatelessWidget {
       'te': 'Telugu',
       'kn': 'Kannada',
       'ml': 'Malayalam',
+      'si': 'Sinhala',
     };
     return languages[code] ?? code.toUpperCase();
   }
@@ -101,4 +102,3 @@ class UserListItem extends StatelessWidget {
     );
   }
 }
-

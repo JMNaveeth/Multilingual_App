@@ -35,6 +35,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     {'code': 'te', 'name': 'Telugu'},
     {'code': 'kn', 'name': 'Kannada'},
     {'code': 'ml', 'name': 'Malayalam'},
+    {'code': 'si', 'name': 'Sinhala'},
   ];
 
   @override
@@ -53,11 +54,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
     try {
       await ref.read(authProvider.notifier).register(
-        _nameController.text.trim(),
-        _emailController.text.trim(),
-        _passwordController.text,
-        _selectedLanguage,
-      );
+            _nameController.text.trim(),
+            _emailController.text.trim(),
+            _passwordController.text,
+            _selectedLanguage,
+          );
       // Navigation will happen automatically via auth state changes
     } catch (error) {
       if (mounted) {
@@ -125,7 +126,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     if (value == null || value.isEmpty) {
                       return 'Please enter your email';
                     }
-                    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+                    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
+                        .hasMatch(value)) {
                       return 'Please enter a valid email';
                     }
                     return null;
@@ -213,4 +215,3 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     );
   }
 }
-
