@@ -30,8 +30,22 @@ class MultilingualChatApp extends ConsumerWidget {
       home: authState.when(
         data: (user) =>
             user != null ? const HomeScreen() : const RegisterScreen(),
-        loading: () =>
-            const Scaffold(body: Center(child: CircularProgressIndicator())),
+        loading: () => const Scaffold(
+          backgroundColor: Color(0xFF0D0E1A),
+          body: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 12),
+                Text(
+                  'Loading...',
+                  style: TextStyle(color: Colors.white70),
+                ),
+              ],
+            ),
+          ),
+        ),
         error: (e, st) => Scaffold(
           appBar: AppBar(title: const Text('Connection error')),
           body: Center(

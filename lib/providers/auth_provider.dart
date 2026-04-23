@@ -6,7 +6,8 @@ import 'package:multilingual_chat_app/services/auth_service.dart';
 final authServiceProvider = Provider<AuthService>((ref) => AuthService());
 
 // Auth state provider
-final authProvider = StateNotifierProvider<AuthNotifier, AsyncValue<User?>>((ref) {
+final authProvider =
+    StateNotifierProvider<AuthNotifier, AsyncValue<User?>>((ref) {
   final authService = ref.watch(authServiceProvider);
   return AuthNotifier(authService);
 });
@@ -28,24 +29,27 @@ class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
   }
 
   Future<void> login(String email, String password) async {
-    state = const AsyncValue.loading();
+    final previousState = state;
     try {
       await _authService.login(email, password);
       final user = await _authService.getCurrentUser();
       state = AsyncValue.data(user);
     } catch (error, stackTrace) {
-      state = AsyncValue.error(error, stackTrace);
+      state = previousState;
+      Error.throwWithStackTrace(error, stackTrace);
     }
   }
 
-  Future<void> register(String name, String email, String password, String preferredLanguage) async {
-    state = const AsyncValue.loading();
+  Future<void> register(String name, String email, String password,
+      String preferredLanguage) async {
+    final previousState = state;
     try {
       await _authService.register(name, email, password, preferredLanguage);
       final user = await _authService.getCurrentUser();
       state = AsyncValue.data(user);
     } catch (error, stackTrace) {
-      state = AsyncValue.error(error, stackTrace);
+      state = previousState;
+      Error.throwWithStackTrace(error, stackTrace);
     }
   }
 
@@ -81,4 +85,3 @@ class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
     }
   }
 }
-
