@@ -19,8 +19,6 @@ class _N {
   static const textPrimary = Color(0xFFF1F5F9);
   static const textSecondary = Color(0xFF94A3B8);
   static const textMuted = Color(0xFF475569);
-  static const inputBg = Color(0xFF13141F);
-  static const inputBorder = Color(0xFF1E2035);
 }
 
 class ProfileScreen extends ConsumerStatefulWidget {

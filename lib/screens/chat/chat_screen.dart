@@ -25,10 +25,6 @@ class _N {
   static const inputBg = Color(0xFF13141F);
   static const inputBorder = Color(0xFF1E2035);
 
-  // Message bubbles
-  static const bubbleMe = Color(0xFF3730A3); // sent – deep indigo
-  static const bubbleThem = Color(0xFF1C1E31); // received – dark card
-  static const bubbleMeEnd = Color(0xFF6D28D9); // gradient end for sent
 }
 
 // Mock messages (replace with real provider)

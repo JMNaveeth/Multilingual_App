@@ -1,4 +1,3 @@
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -16,7 +15,6 @@ class _N {
   static const violet      = Color(0xFF8B5CF6);
   static const cyan        = Color(0xFF22D3EE);
   static const rose        = Color(0xFFF43F5E);
-  static const emerald     = Color(0xFF10B981);
   static const textPrimary   = Color(0xFFF1F5F9);
   static const textSecondary = Color(0xFF94A3B8);
   static const textMuted     = Color(0xFF475569);
@@ -41,7 +39,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   late final AnimationController _bgCtrl;
   late final AnimationController _entryCtrl;
   late final AnimationController _glowCtrl;
+  late final AnimationController _buttonCtrl;
   late final Animation<double>   _entry;
+  late final Animation<double>   _buttonScale;
 
   final _emailFocus    = FocusNode();
   final _passwordFocus = FocusNode();
@@ -64,6 +64,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
     _entry = CurvedAnimation(parent: _entryCtrl, curve: Curves.easeOutCubic);
 
+    _buttonCtrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 200));
+
+    _buttonScale = Tween<double>(begin: 1.0, end: 0.95).animate(
+        CurvedAnimation(parent: _buttonCtrl, curve: Curves.easeInOut));
+
     _emailFocus.addListener(
         () => setState(() => _emailFocused = _emailFocus.hasFocus));
     _passwordFocus.addListener(
@@ -78,6 +84,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   @override
   void dispose() {
     _bgCtrl.dispose(); _glowCtrl.dispose(); _entryCtrl.dispose();
+    _buttonCtrl.dispose();
     _emailCtrl.dispose(); _passwordCtrl.dispose();
     _emailFocus.dispose(); _passwordFocus.dispose();
     super.dispose();
@@ -261,53 +268,63 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           const SizedBox(height: 28),
 
           // Email
-          _fieldLabel('Email address'),
-          const SizedBox(height: 8),
-          _buildInputField(
-            controller: _emailCtrl,
-            focusNode: _emailFocus,
-            isFocused: _emailFocused,
-            hint: 'you@example.com',
-            icon: Icons.alternate_email_rounded,
-            keyboardType: TextInputType.emailAddress,
-            validator: (v) {
-              if (v == null || v.isEmpty) return 'Email required';
-              if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(v))
-                return 'Enter a valid email';
-              return null;
-            },
-          ),
+          _staggeredField(0, Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _fieldLabel('Email address'),
+              const SizedBox(height: 8),
+              _buildInputField(
+                controller: _emailCtrl,
+                focusNode: _emailFocus,
+                isFocused: _emailFocused,
+                hint: 'you@example.com',
+                icon: Icons.alternate_email_rounded,
+                keyboardType: TextInputType.emailAddress,
+                validator: (v) {
+                  if (v == null || v.isEmpty) return 'Email required';
+                  if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(v))
+                    return 'Enter a valid email';
+                  return null;
+                },
+              ),
+            ],
+          )),
 
           const SizedBox(height: 20),
 
           // Password
-          _fieldLabel('Password'),
-          const SizedBox(height: 8),
-          _buildInputField(
-            controller: _passwordCtrl,
-            focusNode: _passwordFocus,
-            isFocused: _passwordFocused,
-            hint: '••••••••',
-            icon: Icons.lock_outline_rounded,
-            obscure: _obscurePassword,
-            suffix: GestureDetector(
-              onTap: () => setState(() => _obscurePassword = !_obscurePassword),
-              child: Icon(
-                _obscurePassword
-                    ? Icons.visibility_off_outlined
-                    : Icons.visibility_outlined,
-                color: _N.textMuted, size: 18,
+          _staggeredField(1, Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _fieldLabel('Password'),
+              const SizedBox(height: 8),
+              _buildInputField(
+                controller: _passwordCtrl,
+                focusNode: _passwordFocus,
+                isFocused: _passwordFocused,
+                hint: '••••••••',
+                icon: Icons.lock_outline_rounded,
+                obscure: _obscurePassword,
+                suffix: GestureDetector(
+                  onTap: () => setState(() => _obscurePassword = !_obscurePassword),
+                  child: Icon(
+                    _obscurePassword
+                        ? Icons.visibility_off_outlined
+                        : Icons.visibility_outlined,
+                    color: _N.textMuted, size: 18,
+                  ),
+                ),
+                validator: (v) {
+                  if (v == null || v.isEmpty) return 'Password required';
+                  if (v.length < 6) return 'Min 6 characters';
+                  return null;
+                },
               ),
-            ),
-            validator: (v) {
-              if (v == null || v.isEmpty) return 'Password required';
-              if (v.length < 6) return 'Min 6 characters';
-              return null;
-            },
-          ),
+            ],
+          )),
 
           // Forgot password
-          Align(
+          _staggeredField(2, Align(
             alignment: Alignment.centerRight,
             child: TextButton(
               onPressed: () {},
@@ -321,12 +338,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                     fontWeight: FontWeight.w600,
                   )),
             ),
-          ),
+          )),
 
           const SizedBox(height: 8),
 
           // Sign in button
-          _buildSignInBtn(),
+          _staggeredField(3, _buildSignInBtn()),
 
           const SizedBox(height: 20),
 
@@ -370,6 +387,44 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     ),
   );
 
+  /// Wraps a widget with staggered fade-in animation
+  Widget _staggeredField(int index, Widget child) {
+    final delay = Duration(milliseconds: 60 + (index * 50));
+    return FutureBuilder<bool>(
+      future: Future.delayed(delay, () => true),
+      builder: (_, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return Opacity(opacity: 0, child: child);
+        }
+        return FadeTransition(
+          opacity: Tween<double>(begin: 0, end: 1)
+              .animate(CurvedAnimation(
+                parent: _entryCtrl,
+                curve: Interval(
+                  (index * 0.12).clamp(0, 0.9),
+                  ((index + 1) * 0.12).clamp(0.1, 1.0),
+                  curve: Curves.easeOut,
+                ),
+              )),
+          child: SlideTransition(
+            position: Tween<Offset>(
+              begin: Offset(0, 0.08 * (index + 1)),
+              end: Offset.zero,
+            ).animate(CurvedAnimation(
+              parent: _entryCtrl,
+              curve: Interval(
+                (index * 0.12).clamp(0, 0.9),
+                ((index + 1) * 0.12).clamp(0.1, 1.0),
+                curve: Curves.easeOutCubic,
+              ),
+            )),
+            child: child,
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildInputField({
     required TextEditingController controller,
     required FocusNode focusNode,
@@ -382,25 +437,36 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     String? Function(String?)? validator,
   }) {
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
+      duration: const Duration(milliseconds: 280),
       decoration: BoxDecoration(
         color: _N.surface,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: isFocused ? _N.indigo : _N.cardBorder,
-          width: isFocused ? 1.5 : 1,
+          width: isFocused ? 1.8 : 1,
         ),
         boxShadow: isFocused
-            ? [BoxShadow(
-                color: _N.indigo.withOpacity(0.2),
-                blurRadius: 14, spreadRadius: 0)]
+            ? [
+                BoxShadow(
+                    color: _N.indigo.withOpacity(0.25),
+                    blurRadius: 20,
+                    spreadRadius: 1,
+                    offset: const Offset(0, 4)),
+                BoxShadow(
+                    color: _N.indigo.withOpacity(0.12),
+                    blurRadius: 8),
+              ]
             : [],
       ),
       child: Row(children: [
         const SizedBox(width: 14),
-        Icon(icon,
-            color: isFocused ? _N.indigoLight : _N.textMuted,
-            size: 18),
+        AnimatedDefaultTextStyle(
+          duration: const Duration(milliseconds: 200),
+          style: TextStyle(
+              color: isFocused ? _N.indigoLight : _N.textMuted,
+              fontSize: 18),
+          child: Icon(icon, size: 18),
+        ),
         const SizedBox(width: 10),
         Expanded(
           child: TextFormField(
@@ -435,49 +501,71 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
   Widget _buildSignInBtn() {
     return GestureDetector(
-      onTap: _isLoading ? null : _login,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        height: 52,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          gradient: LinearGradient(
-            colors: _isLoading
-                ? [_N.indigo.withOpacity(0.5),
-                   _N.violet.withOpacity(0.5)]
-                : [_N.indigo, _N.violet],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+      onTap: _isLoading ? null : () async {
+        _buttonCtrl.forward();
+        await Future.delayed(const Duration(milliseconds: 100));
+        _buttonCtrl.reverse();
+        _login();
+      },
+      child: ScaleTransition(
+        scale: _buttonScale,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          height: 52,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            gradient: LinearGradient(
+              colors: _isLoading
+                  ? [_N.indigo.withOpacity(0.5),
+                     _N.violet.withOpacity(0.5)]
+                  : [_N.indigo, _N.violet],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            boxShadow: _isLoading
+                ? []
+                : [BoxShadow(
+                    color: _N.indigo.withOpacity(0.45),
+                    blurRadius: 20,
+                    offset: const Offset(0, 6),
+                  )],
           ),
-          boxShadow: _isLoading
-              ? []
-              : [BoxShadow(
-                  color: _N.indigo.withOpacity(0.45),
-                  blurRadius: 20,
-                  offset: const Offset(0, 6),
-                )],
-        ),
-        child: Center(
-          child: _isLoading
-              ? const SizedBox(
-                  width: 22, height: 22,
-                  child: CircularProgressIndicator(
-                      strokeWidth: 2, color: Colors.white))
-              : const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text('Sign In',
+          child: Center(
+            child: _isLoading
+                ? Row(mainAxisSize: MainAxisSize.min, children: [
+                    SizedBox(
+                      width: 22, height: 22,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        color: Colors.white,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                            _N.cyan.withOpacity(0.9)),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Text('Signing in...',
                         style: TextStyle(
                           color: Colors.white,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.3,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
                         )),
-                    SizedBox(width: 8),
-                    Icon(Icons.arrow_forward_rounded,
-                        color: Colors.white, size: 18),
-                  ],
-                ),
+                  ])
+                : Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text('Sign In',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.3,
+                          )),
+                      const SizedBox(width: 8),
+                      Icon(Icons.arrow_forward_rounded,
+                          color: Colors.white, size: 18),
+                    ],
+                  ),
+          ),
         ),
       ),
     );
