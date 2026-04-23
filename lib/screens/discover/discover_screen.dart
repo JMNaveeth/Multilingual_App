@@ -19,10 +19,14 @@ class DiscoverScreen extends StatelessWidget {
   const DiscoverScreen({super.key});
 
   static const _games = [
-    _MiniGame('Word Sprint', 'Type fast. Beat your friend.', Icons.spellcheck_rounded, _D.indigo),
-    _MiniGame('Emoji Match', 'Memory game in 60s.', Icons.emoji_emotions_outlined, _D.violet),
-    _MiniGame('Number Duel', 'Pick bigger number quickly.', Icons.numbers_rounded, _D.cyan),
-    _MiniGame('Tic Tac Toe', 'Classic 1v1 quick game.', Icons.grid_3x3_rounded, _D.emerald),
+    _MiniGame('Word Sprint', 'Type fast. Beat your friend.',
+        Icons.spellcheck_rounded, _D.indigo),
+    _MiniGame('Emoji Match', 'Memory game in 60s.',
+        Icons.emoji_emotions_outlined, _D.violet),
+    _MiniGame('Number Duel', 'Pick bigger number quickly.',
+        Icons.numbers_rounded, _D.cyan),
+    _MiniGame('Tic Tac Toe', 'Classic 1v1 quick game.', Icons.grid_3x3_rounded,
+        _D.emerald),
   ];
 
   static const _friends = [
@@ -50,7 +54,8 @@ class DiscoverScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _sectionTitle('Mini games with friends', 'Quick 1v1 games you can play together'),
+          _sectionTitle('Mini games with friends',
+              'Quick 1v1 games you can play together'),
           const SizedBox(height: 12),
           GridView.builder(
             itemCount: _games.length,
@@ -111,7 +116,8 @@ class DiscoverScreen extends StatelessWidget {
                     borderRadius: BorderRadius.circular(12),
                     color: _D.indigo.withOpacity(0.2),
                   ),
-                  child: const Icon(Icons.groups_2_rounded, color: _D.indigoLight),
+                  child:
+                      const Icon(Icons.groups_2_rounded, color: _D.indigoLight),
                 ),
                 const SizedBox(width: 12),
                 const Expanded(
@@ -126,7 +132,8 @@ class DiscoverScreen extends StatelessWidget {
                           )),
                       SizedBox(height: 2),
                       Text('Invite up to 4 friends and play mini games',
-                          style: TextStyle(color: _D.textSecondary, fontSize: 12)),
+                          style:
+                              TextStyle(color: _D.textSecondary, fontSize: 12)),
                     ],
                   ),
                 ),
@@ -134,9 +141,11 @@ class DiscoverScreen extends StatelessWidget {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: _D.indigo,
                     foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
                   ),
-                  onPressed: () => _showMessage(context, 'Party room coming soon'),
+                  onPressed: () =>
+                      _showMessage(context, 'Party room coming soon'),
                   child: const Text('Create'),
                 ),
               ],
@@ -210,10 +219,12 @@ class DiscoverScreen extends StatelessWidget {
               style: ElevatedButton.styleFrom(
                 backgroundColor: game.color,
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
                 padding: const EdgeInsets.symmetric(vertical: 8),
               ),
-              onPressed: () => _showMessage(context, '${game.name} coming soon'),
+              onPressed: () =>
+                  _showMessage(context, '${game.name} coming soon'),
               child: const Text('Play'),
             ),
           ),
@@ -240,13 +251,15 @@ class DiscoverScreen extends StatelessWidget {
                 radius: 14,
                 backgroundColor: _D.indigo.withOpacity(0.25),
                 child: Text(friend.name.characters.first.toUpperCase(),
-                    style: const TextStyle(color: _D.textPrimary, fontWeight: FontWeight.w700)),
+                    style: const TextStyle(
+                        color: _D.textPrimary, fontWeight: FontWeight.w700)),
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(friend.name,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: _D.textPrimary, fontSize: 13.5)),
+                    style:
+                        const TextStyle(color: _D.textPrimary, fontSize: 13.5)),
               ),
               Container(
                 width: 8,
@@ -265,11 +278,13 @@ class DiscoverScreen extends StatelessWidget {
               style: OutlinedButton.styleFrom(
                 foregroundColor: _D.amber,
                 side: BorderSide(color: _D.amber.withOpacity(0.5)),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
                 padding: const EdgeInsets.symmetric(vertical: 8),
               ),
               onPressed: friend.isOnline
-                  ? () => _showMessage(context, 'Challenge sent to ${friend.name}')
+                  ? () =>
+                      _showMessage(context, 'Challenge sent to ${friend.name}')
                   : null,
               child: const Text('Challenge', style: TextStyle(fontSize: 12)),
             ),
