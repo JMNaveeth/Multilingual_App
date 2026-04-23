@@ -426,38 +426,28 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
   /// Wraps a widget with staggered fade-in animation
   Widget _staggeredField(int index, Widget child) {
-    final delay = Duration(milliseconds: 60 + (index * 50));
-    return FutureBuilder<bool>(
-      future: Future.delayed(delay, () => true),
-      builder: (_, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) {
-          return Opacity(opacity: 0, child: child);
-        }
-        return FadeTransition(
-          opacity: Tween<double>(begin: 0, end: 1).animate(CurvedAnimation(
+    final start = (index * 0.12).clamp(0.0, 0.9);
+    final end = ((index + 1) * 0.12).clamp(0.1, 1.0);
+
+    return FadeTransition(
+      opacity: Tween<double>(begin: 0, end: 1).animate(
+        CurvedAnimation(
+          parent: _entryCtrl,
+          curve: Interval(start, end, curve: Curves.easeOut),
+        ),
+      ),
+      child: SlideTransition(
+        position: Tween<Offset>(
+          begin: Offset(0, 0.08 * (index + 1)),
+          end: Offset.zero,
+        ).animate(
+          CurvedAnimation(
             parent: _entryCtrl,
-            curve: Interval(
-              (index * 0.12).clamp(0, 0.9),
-              ((index + 1) * 0.12).clamp(0.1, 1.0),
-              curve: Curves.easeOut,
-            ),
-          )),
-          child: SlideTransition(
-            position: Tween<Offset>(
-              begin: Offset(0, 0.08 * (index + 1)),
-              end: Offset.zero,
-            ).animate(CurvedAnimation(
-              parent: _entryCtrl,
-              curve: Interval(
-                (index * 0.12).clamp(0, 0.9),
-                ((index + 1) * 0.12).clamp(0.1, 1.0),
-                curve: Curves.easeOutCubic,
-              ),
-            )),
-            child: child,
+            curve: Interval(start, end, curve: Curves.easeOutCubic),
           ),
-        );
-      },
+        ),
+        child: child,
+      ),
     );
   }
 
