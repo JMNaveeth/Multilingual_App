@@ -26,7 +26,8 @@ class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
       final user = await _authService.getCurrentUser();
       state = AsyncValue.data(user);
       if (kDebugMode) {
-        debugPrint('[AuthNotifier] initializeAuth done: hasUser=${user != null}');
+        debugPrint(
+            '[AuthNotifier] initializeAuth done: hasUser=${user != null}');
       }
     } catch (error, stackTrace) {
       state = AsyncValue.error(error, stackTrace);

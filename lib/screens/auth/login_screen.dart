@@ -116,7 +116,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       }
     } catch (e) {
       if (kDebugMode) {
-        debugPrint('[LoginScreen] Sign in failed after ${stopwatch.elapsedMilliseconds}ms: $e');
+        debugPrint(
+            '[LoginScreen] Sign in failed after ${stopwatch.elapsedMilliseconds}ms: $e');
       }
       if (mounted) _snack('Login failed: $e', _N.rose);
     } finally {

@@ -22,7 +22,8 @@ class MultilingualChatApp extends ConsumerWidget {
     final authState = ref.watch(authProvider);
     if (kDebugMode) {
       authState.when(
-        data: (user) => debugPrint('[App] authState=data hasUser=${user != null}'),
+        data: (user) =>
+            debugPrint('[App] authState=data hasUser=${user != null}'),
         loading: () => debugPrint('[App] authState=loading'),
         error: (e, _) => debugPrint('[App] authState=error $e'),
       );
