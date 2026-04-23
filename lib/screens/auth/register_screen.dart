@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:multilingual_chat_app/providers/auth_provider.dart';
+import 'package:multilingual_chat_app/screens/auth/login_screen.dart';
 
 // ── Nexus tokens ─────────────────────────────────────────────────────────────
 class _N {
@@ -179,6 +180,17 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
     ));
   }
 
+  void _openLoginScreen() {
+    final navigator = Navigator.of(context);
+    if (navigator.canPop()) {
+      navigator.pop();
+      return;
+    }
+    navigator.pushReplacement(
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
@@ -256,7 +268,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
     return Row(children: [
       // Back button
       GestureDetector(
-        onTap: () => Navigator.of(context).pop(),
+        onTap: _openLoginScreen,
         child: Container(
           width: 40,
           height: 40,
@@ -828,7 +840,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
           const Text('Already have an account? ',
               style: TextStyle(color: _N.textMuted, fontSize: 13.5)),
           GestureDetector(
-            onTap: () => Navigator.of(context).pop(),
+            onTap: _openLoginScreen,
             child: const Text('Sign In',
                 style: TextStyle(
                   color: _N.indigoLight,
