@@ -24,7 +24,6 @@ class _N {
   static const textMuted = Color(0xFF475569);
   static const inputBg = Color(0xFF13141F);
   static const inputBorder = Color(0xFF1E2035);
-
 }
 
 // Mock messages (replace with real provider)

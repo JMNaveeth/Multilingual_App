@@ -6,18 +6,18 @@ import 'package:multilingual_chat_app/screens/auth/register_screen.dart';
 
 // ── Nexus tokens ─────────────────────────────────────────────────────────────
 class _N {
-  static const bg          = Color(0xFF0D0E1A);
-  static const surface     = Color(0xFF151626);
-  static const card        = Color(0xFF1C1E31);
-  static const cardBorder  = Color(0xFF252842);
-  static const indigo      = Color(0xFF6366F1);
+  static const bg = Color(0xFF0D0E1A);
+  static const surface = Color(0xFF151626);
+  static const card = Color(0xFF1C1E31);
+  static const cardBorder = Color(0xFF252842);
+  static const indigo = Color(0xFF6366F1);
   static const indigoLight = Color(0xFF818CF8);
-  static const violet      = Color(0xFF8B5CF6);
-  static const cyan        = Color(0xFF22D3EE);
-  static const rose        = Color(0xFFF43F5E);
-  static const textPrimary   = Color(0xFFF1F5F9);
+  static const violet = Color(0xFF8B5CF6);
+  static const cyan = Color(0xFF22D3EE);
+  static const rose = Color(0xFFF43F5E);
+  static const textPrimary = Color(0xFFF1F5F9);
   static const textSecondary = Color(0xFF94A3B8);
-  static const textMuted     = Color(0xFF475569);
+  static const textMuted = Color(0xFF475569);
 }
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -28,22 +28,22 @@ class LoginScreen extends ConsumerStatefulWidget {
 
 class _LoginScreenState extends ConsumerState<LoginScreen>
     with TickerProviderStateMixin {
-  final _formKey           = GlobalKey<FormState>();
-  final _emailCtrl         = TextEditingController();
-  final _passwordCtrl      = TextEditingController();
-  bool  _isLoading         = false;
-  bool  _obscurePassword   = true;
-  bool  _emailFocused      = false;
-  bool  _passwordFocused   = false;
+  final _formKey = GlobalKey<FormState>();
+  final _emailCtrl = TextEditingController();
+  final _passwordCtrl = TextEditingController();
+  bool _isLoading = false;
+  bool _obscurePassword = true;
+  bool _emailFocused = false;
+  bool _passwordFocused = false;
 
   late final AnimationController _bgCtrl;
   late final AnimationController _entryCtrl;
   late final AnimationController _glowCtrl;
   late final AnimationController _buttonCtrl;
-  late final Animation<double>   _entry;
-  late final Animation<double>   _buttonScale;
+  late final Animation<double> _entry;
+  late final Animation<double> _buttonScale;
 
-  final _emailFocus    = FocusNode();
+  final _emailFocus = FocusNode();
   final _passwordFocus = FocusNode();
 
   @override
@@ -51,15 +51,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     super.initState();
 
     _bgCtrl = AnimationController(
-      vsync: this, duration: const Duration(seconds: 8),
+      vsync: this,
+      duration: const Duration(seconds: 8),
     )..repeat(reverse: true);
 
     _glowCtrl = AnimationController(
-      vsync: this, duration: const Duration(seconds: 3),
+      vsync: this,
+      duration: const Duration(seconds: 3),
     )..repeat(reverse: true);
 
     _entryCtrl = AnimationController(
-      vsync: this, duration: const Duration(milliseconds: 900),
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
     )..forward();
 
     _entry = CurvedAnimation(parent: _entryCtrl, curve: Curves.easeOutCubic);
@@ -67,8 +70,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     _buttonCtrl = AnimationController(
         vsync: this, duration: const Duration(milliseconds: 200));
 
-    _buttonScale = Tween<double>(begin: 1.0, end: 0.95).animate(
-        CurvedAnimation(parent: _buttonCtrl, curve: Curves.easeInOut));
+    _buttonScale = Tween<double>(begin: 1.0, end: 0.95)
+        .animate(CurvedAnimation(parent: _buttonCtrl, curve: Curves.easeInOut));
 
     _emailFocus.addListener(
         () => setState(() => _emailFocused = _emailFocus.hasFocus));
@@ -83,10 +86,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
   @override
   void dispose() {
-    _bgCtrl.dispose(); _glowCtrl.dispose(); _entryCtrl.dispose();
+    _bgCtrl.dispose();
+    _glowCtrl.dispose();
+    _entryCtrl.dispose();
     _buttonCtrl.dispose();
-    _emailCtrl.dispose(); _passwordCtrl.dispose();
-    _emailFocus.dispose(); _passwordFocus.dispose();
+    _emailCtrl.dispose();
+    _passwordCtrl.dispose();
+    _emailFocus.dispose();
+    _passwordFocus.dispose();
     super.dispose();
   }
 
@@ -94,7 +101,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
     try {
-      await ref.read(authProvider.notifier)
+      await ref
+          .read(authProvider.notifier)
           .login(_emailCtrl.text.trim(), _passwordCtrl.text);
     } catch (e) {
       if (mounted) _snack('Login failed: $e', _N.rose);
@@ -164,23 +172,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           // Top-left violet orb
           Positioned(
             left: -60 + t * 30,
-            top:  -80 + t * 40,
-            child: _orb(260,
-                _N.violet.withOpacity(0.18 + t * 0.06)),
+            top: -80 + t * 40,
+            child: _orb(260, _N.violet.withOpacity(0.18 + t * 0.06)),
           ),
           // Bottom-right indigo orb
           Positioned(
             right: -80 + (1 - t) * 30,
             bottom: -60 + (1 - t) * 30,
-            child: _orb(300,
-                _N.indigo.withOpacity(0.14 + (1 - t) * 0.06)),
+            child: _orb(300, _N.indigo.withOpacity(0.14 + (1 - t) * 0.06)),
           ),
           // Center-top cyan accent
           Positioned(
             right: size.width * 0.2,
-            top:   size.height * 0.15,
-            child: _orb(120,
-                _N.cyan.withOpacity(0.06 + t * 0.04)),
+            top: size.height * 0.15,
+            child: _orb(120, _N.cyan.withOpacity(0.06 + t * 0.04)),
           ),
         ]);
       },
@@ -188,12 +193,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   }
 
   Widget _orb(double size, Color color) => Container(
-    width: size, height: size,
-    decoration: BoxDecoration(
-      shape: BoxShape.circle,
-      gradient: RadialGradient(colors: [color, Colors.transparent]),
-    ),
-  );
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: RadialGradient(colors: [color, Colors.transparent]),
+        ),
+      );
 
   // ── Logo ──────────────────────────────────────────────────────────────────
 
@@ -202,7 +208,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       AnimatedBuilder(
         animation: _glowCtrl,
         builder: (_, __) => Container(
-          width: 72, height: 72,
+          width: 72,
+          height: 72,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(22),
             gradient: const LinearGradient(
@@ -210,11 +217,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
-            boxShadow: [BoxShadow(
-              color: _N.indigo.withOpacity(0.45 + _glowCtrl.value * 0.25),
-              blurRadius: 28 + _glowCtrl.value * 12,
-              spreadRadius: 2,
-            )],
+            boxShadow: [
+              BoxShadow(
+                color: _N.indigo.withOpacity(0.45 + _glowCtrl.value * 0.25),
+                blurRadius: 28 + _glowCtrl.value * 12,
+                spreadRadius: 2,
+              )
+            ],
           ),
           child: const Icon(Icons.bolt_rounded, color: Colors.white, size: 38),
         ),
@@ -246,10 +255,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         color: _N.card.withOpacity(0.85),
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: _N.cardBorder),
-        boxShadow: [BoxShadow(
-          color: Colors.black.withOpacity(0.35),
-          blurRadius: 32, offset: const Offset(0, 12),
-        )],
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.35),
+            blurRadius: 32,
+            offset: const Offset(0, 12),
+          )
+        ],
       ),
       child: Form(
         key: _formKey,
@@ -268,77 +280,85 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           const SizedBox(height: 28),
 
           // Email
-          _staggeredField(0, Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _fieldLabel('Email address'),
-              const SizedBox(height: 8),
-              _buildInputField(
-                controller: _emailCtrl,
-                focusNode: _emailFocus,
-                isFocused: _emailFocused,
-                hint: 'you@example.com',
-                icon: Icons.alternate_email_rounded,
-                keyboardType: TextInputType.emailAddress,
-                validator: (v) {
-                  if (v == null || v.isEmpty) return 'Email required';
-                  if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(v))
-                    return 'Enter a valid email';
-                  return null;
-                },
-              ),
-            ],
-          )),
+          _staggeredField(
+              0,
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _fieldLabel('Email address'),
+                  const SizedBox(height: 8),
+                  _buildInputField(
+                    controller: _emailCtrl,
+                    focusNode: _emailFocus,
+                    isFocused: _emailFocused,
+                    hint: 'you@example.com',
+                    icon: Icons.alternate_email_rounded,
+                    keyboardType: TextInputType.emailAddress,
+                    validator: (v) {
+                      if (v == null || v.isEmpty) return 'Email required';
+                      if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
+                          .hasMatch(v)) return 'Enter a valid email';
+                      return null;
+                    },
+                  ),
+                ],
+              )),
 
           const SizedBox(height: 20),
 
           // Password
-          _staggeredField(1, Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _fieldLabel('Password'),
-              const SizedBox(height: 8),
-              _buildInputField(
-                controller: _passwordCtrl,
-                focusNode: _passwordFocus,
-                isFocused: _passwordFocused,
-                hint: '••••••••',
-                icon: Icons.lock_outline_rounded,
-                obscure: _obscurePassword,
-                suffix: GestureDetector(
-                  onTap: () => setState(() => _obscurePassword = !_obscurePassword),
-                  child: Icon(
-                    _obscurePassword
-                        ? Icons.visibility_off_outlined
-                        : Icons.visibility_outlined,
-                    color: _N.textMuted, size: 18,
+          _staggeredField(
+              1,
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _fieldLabel('Password'),
+                  const SizedBox(height: 8),
+                  _buildInputField(
+                    controller: _passwordCtrl,
+                    focusNode: _passwordFocus,
+                    isFocused: _passwordFocused,
+                    hint: '••••••••',
+                    icon: Icons.lock_outline_rounded,
+                    obscure: _obscurePassword,
+                    suffix: GestureDetector(
+                      onTap: () =>
+                          setState(() => _obscurePassword = !_obscurePassword),
+                      child: Icon(
+                        _obscurePassword
+                            ? Icons.visibility_off_outlined
+                            : Icons.visibility_outlined,
+                        color: _N.textMuted,
+                        size: 18,
+                      ),
+                    ),
+                    validator: (v) {
+                      if (v == null || v.isEmpty) return 'Password required';
+                      if (v.length < 6) return 'Min 6 characters';
+                      return null;
+                    },
                   ),
-                ),
-                validator: (v) {
-                  if (v == null || v.isEmpty) return 'Password required';
-                  if (v.length < 6) return 'Min 6 characters';
-                  return null;
-                },
-              ),
-            ],
-          )),
+                ],
+              )),
 
           // Forgot password
-          _staggeredField(2, Align(
-            alignment: Alignment.centerRight,
-            child: TextButton(
-              onPressed: () {},
-              style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 0, vertical: 8)),
-              child: const Text('Forgot password?',
-                  style: TextStyle(
-                    color: _N.indigoLight,
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w600,
-                  )),
-            ),
-          )),
+          _staggeredField(
+              2,
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: () {},
+                  style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 0, vertical: 8)),
+                  child: const Text('Forgot password?',
+                      style: TextStyle(
+                        color: _N.indigoLight,
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                      )),
+                ),
+              )),
 
           const SizedBox(height: 8),
 
@@ -362,15 +382,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
           // Social row
           Row(children: [
-            Expanded(child: _socialBtn(
-                label: 'Google',
-                icon: Icons.g_mobiledata_rounded,
-                color: const Color(0xFFEA4335))),
+            Expanded(
+                child: _socialBtn(
+                    label: 'Google',
+                    icon: Icons.g_mobiledata_rounded,
+                    color: const Color(0xFFEA4335))),
             const SizedBox(width: 12),
-            Expanded(child: _socialBtn(
-                label: 'Apple',
-                icon: Icons.apple_rounded,
-                color: _N.textSecondary)),
+            Expanded(
+                child: _socialBtn(
+                    label: 'Apple',
+                    icon: Icons.apple_rounded,
+                    color: _N.textSecondary)),
           ]),
         ]),
       ),
@@ -378,14 +400,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   }
 
   Widget _fieldLabel(String label) => Text(
-    label,
-    style: const TextStyle(
-      color: _N.textSecondary,
-      fontSize: 12,
-      fontWeight: FontWeight.w600,
-      letterSpacing: 0.4,
-    ),
-  );
+        label,
+        style: const TextStyle(
+          color: _N.textSecondary,
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.4,
+        ),
+      );
 
   /// Wraps a widget with staggered fade-in animation
   Widget _staggeredField(int index, Widget child) {
@@ -397,15 +419,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           return Opacity(opacity: 0, child: child);
         }
         return FadeTransition(
-          opacity: Tween<double>(begin: 0, end: 1)
-              .animate(CurvedAnimation(
-                parent: _entryCtrl,
-                curve: Interval(
-                  (index * 0.12).clamp(0, 0.9),
-                  ((index + 1) * 0.12).clamp(0.1, 1.0),
-                  curve: Curves.easeOut,
-                ),
-              )),
+          opacity: Tween<double>(begin: 0, end: 1).animate(CurvedAnimation(
+            parent: _entryCtrl,
+            curve: Interval(
+              (index * 0.12).clamp(0, 0.9),
+              ((index + 1) * 0.12).clamp(0.1, 1.0),
+              curve: Curves.easeOut,
+            ),
+          )),
           child: SlideTransition(
             position: Tween<Offset>(
               begin: Offset(0, 0.08 * (index + 1)),
@@ -452,9 +473,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                     blurRadius: 20,
                     spreadRadius: 1,
                     offset: const Offset(0, 4)),
-                BoxShadow(
-                    color: _N.indigo.withOpacity(0.12),
-                    blurRadius: 8),
+                BoxShadow(color: _N.indigo.withOpacity(0.12), blurRadius: 8),
               ]
             : [],
       ),
@@ -463,8 +482,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         AnimatedDefaultTextStyle(
           duration: const Duration(milliseconds: 200),
           style: TextStyle(
-              color: isFocused ? _N.indigoLight : _N.textMuted,
-              fontSize: 18),
+              color: isFocused ? _N.indigoLight : _N.textMuted, fontSize: 18),
           child: Icon(icon, size: 18),
         ),
         const SizedBox(width: 10),
@@ -474,39 +492,35 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             focusNode: focusNode,
             obscureText: obscure,
             keyboardType: keyboardType,
-            style: const TextStyle(
-                color: _N.textPrimary, fontSize: 14.5),
+            style: const TextStyle(color: _N.textPrimary, fontSize: 14.5),
             cursorColor: _N.indigoLight,
             validator: validator,
             decoration: InputDecoration(
               hintText: hint,
-              hintStyle: const TextStyle(
-                  color: _N.textMuted, fontSize: 14.5),
+              hintStyle: const TextStyle(color: _N.textMuted, fontSize: 14.5),
               border: InputBorder.none,
               isDense: true,
-              contentPadding:
-                  const EdgeInsets.symmetric(vertical: 15),
-              errorStyle: const TextStyle(
-                  color: _N.rose, fontSize: 11),
+              contentPadding: const EdgeInsets.symmetric(vertical: 15),
+              errorStyle: const TextStyle(color: _N.rose, fontSize: 11),
             ),
           ),
         ),
         if (suffix != null)
-          Padding(
-              padding: const EdgeInsets.only(right: 12),
-              child: suffix),
+          Padding(padding: const EdgeInsets.only(right: 12), child: suffix),
       ]),
     );
   }
 
   Widget _buildSignInBtn() {
     return GestureDetector(
-      onTap: _isLoading ? null : () async {
-        _buttonCtrl.forward();
-        await Future.delayed(const Duration(milliseconds: 100));
-        _buttonCtrl.reverse();
-        _login();
-      },
+      onTap: _isLoading
+          ? null
+          : () async {
+              _buttonCtrl.forward();
+              await Future.delayed(const Duration(milliseconds: 100));
+              _buttonCtrl.reverse();
+              _login();
+            },
       child: ScaleTransition(
         scale: _buttonScale,
         child: AnimatedContainer(
@@ -516,25 +530,27 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             borderRadius: BorderRadius.circular(16),
             gradient: LinearGradient(
               colors: _isLoading
-                  ? [_N.indigo.withOpacity(0.5),
-                     _N.violet.withOpacity(0.5)]
+                  ? [_N.indigo.withOpacity(0.5), _N.violet.withOpacity(0.5)]
                   : [_N.indigo, _N.violet],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
             boxShadow: _isLoading
                 ? []
-                : [BoxShadow(
-                    color: _N.indigo.withOpacity(0.45),
-                    blurRadius: 20,
-                    offset: const Offset(0, 6),
-                  )],
+                : [
+                    BoxShadow(
+                      color: _N.indigo.withOpacity(0.45),
+                      blurRadius: 20,
+                      offset: const Offset(0, 6),
+                    )
+                  ],
           ),
           child: Center(
             child: _isLoading
                 ? Row(mainAxisSize: MainAxisSize.min, children: [
                     SizedBox(
-                      width: 22, height: 22,
+                      width: 22,
+                      height: 22,
                       child: CircularProgressIndicator(
                         strokeWidth: 2.5,
                         color: Colors.white,
@@ -638,6 +654,7 @@ class _DotGridPainter extends CustomPainter {
       }
     }
   }
+
   @override
   bool shouldRepaint(_DotGridPainter _) => false;
 }
