@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:multilingual_chat_app/providers/auth_provider.dart';
 import 'package:multilingual_chat_app/screens/chat/chat_list_screen.dart';
+import 'package:multilingual_chat_app/screens/discover/discover_screen.dart';
 import 'package:multilingual_chat_app/screens/profile/profile_screen.dart';
 
 // ── Nexus Design Tokens ─────────────────────────────────────────────────────
@@ -95,7 +96,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       case 1:
         return Column(children: [
           _buildHeader(title: 'Discover'),
-          Expanded(child: _buildComingSoon(Icons.explore_outlined, 'Discover')),
+          const Expanded(child: DiscoverScreen()),
         ]);
       case 2:
         return Column(children: [
@@ -189,29 +190,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           ),
         ),
 
-        if (showActions) ...[
-          _headerIconBtn(Icons.notifications_none_rounded, () {}),
-          _headerIconBtn(Icons.search_rounded, () {}),
-          _moreMenu(),
-        ],
+        if (showActions) _moreMenu(),
       ]),
     );
   }
-
-  Widget _headerIconBtn(IconData icon, VoidCallback onTap) => GestureDetector(
-        onTap: onTap,
-        child: Container(
-          width: 38,
-          height: 38,
-          margin: const EdgeInsets.only(left: 4),
-          decoration: BoxDecoration(
-            color: _N.card,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: _N.cardBorder),
-          ),
-          child: Icon(icon, color: _N.textSecondary, size: 20),
-        ),
-      );
 
   Widget _moreMenu() => PopupMenuButton<String>(
         color: _N.card,
@@ -282,19 +264,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 ),
               ),
             ),
-            Container(
-              margin: const EdgeInsets.only(right: 8),
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: _N.indigo.withOpacity(0.15),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Text('⌘ K',
-                  style: TextStyle(
-                      color: _N.indigoLight,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600)),
-            ),
+            const SizedBox(width: 12),
           ]),
         ),
       );
