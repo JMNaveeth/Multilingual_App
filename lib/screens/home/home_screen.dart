@@ -110,7 +110,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   Widget _buildMessagesView() {
     return Column(children: [
-      _buildHeader(title: 'Nexus'),
+      _buildHeader(title: 'ec communication'),
       const SizedBox(height: 6),
       _buildSearchBar(),
       const SizedBox(height: 12),

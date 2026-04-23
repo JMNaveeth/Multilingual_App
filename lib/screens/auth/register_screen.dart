@@ -299,7 +299,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
               fontWeight: FontWeight.w800,
               letterSpacing: -0.4,
             )),
-        const Text('Join Nexus today',
+        const Text('Join ec communication today',
             style: TextStyle(color: _N.textMuted, fontSize: 12.5)),
       ]),
     ]);

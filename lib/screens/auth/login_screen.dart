@@ -244,7 +244,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         ),
       ),
       const SizedBox(height: 18),
-      const Text('Nexus',
+      const Text('ec communication',
           style: TextStyle(
             color: _N.textPrimary,
             fontSize: 34,

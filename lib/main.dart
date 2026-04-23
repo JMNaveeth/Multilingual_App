@@ -30,7 +30,7 @@ class MultilingualChatApp extends ConsumerWidget {
     }
 
     return MaterialApp(
-      title: 'Multilingual Chat App',
+      title: 'ec communication',
       theme: ThemeData(
         primarySwatch: Colors.blue,
         useMaterial3: true,
