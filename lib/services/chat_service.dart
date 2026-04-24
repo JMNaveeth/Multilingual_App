@@ -259,6 +259,14 @@ class ChatService {
       ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
   }
 
+  Future<List<Message>> getAllLocalMessages() async {
+    return _readLocalMessages();
+  }
+
+  Future<void> saveLocalMessage(Message message) async {
+    await _saveLocalMessage(message);
+  }
+
   Future<List<Message>> _readLocalMessages() async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_localMessagesKey);

@@ -165,7 +165,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
           // Check if we already have it to avoid duplicates from local sync
           final exists = _richMessages.any((rm) => rm.message.id == message.id);
           if (!exists) {
-            _addRich(RichMessage(message: message), persist: false);
+            _addRich(RichMessage(message: message), localOnly: true);
           }
         }
       } catch (e) {
@@ -292,11 +292,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     );
   }
 
-  void _addRich(RichMessage rm, {bool persist = true}) {
+  void _addRich(RichMessage rm, {bool persist = true, bool localOnly = false}) {
     setState(() => _richMessages.add(rm));
     _scrollToBottom();
 
     if (!persist) return;
+    if (localOnly) {
+      unawaited(_chatService.saveLocalMessage(rm.message));
+      return;
+    }
+    
     unawaited(_chatService.sendMessage(rm.message).then((persisted) {
       if (!mounted) return;
       final index =
@@ -605,7 +610,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         status: MessageStatus.sent,
         timestamp: DateTime.now(),
       ),
-    ), persist: false); // Persist false because backend handles saving for socket
+    ), localOnly: true); // Save locally, but let socket handle delivery
 
     CallSocketService.instance.sendMessageViaSocket(
       receiverId: widget.user.id,
