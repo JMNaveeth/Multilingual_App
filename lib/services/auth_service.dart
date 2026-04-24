@@ -201,6 +201,14 @@ class AuthService {
     return updated;
   }
 
+  Future<List<User>> getAllUsers() async {
+    final usersData = await _readUsers();
+    return usersData.map((e) {
+      final map = Map<String, dynamic>.from(e)..remove('password');
+      return User.fromJson(map);
+    }).toList();
+  }
+
   // Optional helper for local testing reset.
   Future<void> clearLocalAuthData() async {
     final prefs = await SharedPreferences.getInstance();

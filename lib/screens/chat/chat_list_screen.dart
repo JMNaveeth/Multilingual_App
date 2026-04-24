@@ -5,34 +5,12 @@ import 'package:multilingual_chat_app/providers/auth_provider.dart';
 import 'package:multilingual_chat_app/screens/chat/chat_screen.dart';
 import 'package:multilingual_chat_app/widgets/user_list_item.dart';
 
-// Mock data for demonstration - replace with real data from backend
-final mockUsersProvider = Provider<List<User>>((ref) => [
-  User(
-    id: '1',
-    email: 'john@example.com',
-    name: 'John Doe',
-    preferredLanguage: 'en',
-    isOnline: true,
-    createdAt: DateTime.now().subtract(const Duration(days: 30)),
-  ),
-  User(
-    id: '2',
-    email: 'marie@example.com',
-    name: 'Marie Curie',
-    preferredLanguage: 'fr',
-    isOnline: false,
-    lastSeen: DateTime.now().subtract(const Duration(hours: 2)),
-    createdAt: DateTime.now().subtract(const Duration(days: 15)),
-  ),
-  User(
-    id: '3',
-    email: 'satoshi@example.com',
-    name: 'Satoshi Tanaka',
-    preferredLanguage: 'ja',
-    isOnline: true,
-    createdAt: DateTime.now().subtract(const Duration(days: 7)),
-  ),
-]);
+import 'package:multilingual_chat_app/services/auth_service.dart';
+
+final usersProvider = FutureProvider<List<User>>((ref) async {
+  final authService = AuthService();
+  return authService.getAllUsers();
+});
 
 class ChatListScreen extends ConsumerWidget {
   const ChatListScreen({super.key});
@@ -40,32 +18,38 @@ class ChatListScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final currentUser = ref.watch(authProvider).value;
-    final users = ref.watch(mockUsersProvider);
-
-    // Filter out current user
-    final otherUsers = users.where((user) => user.id != currentUser?.id).toList();
+    final usersAsync = ref.watch(usersProvider);
 
     return Scaffold(
-      body: otherUsers.isEmpty
-          ? const Center(
-              child: Text('No users found'),
-            )
-          : ListView.builder(
-              itemCount: otherUsers.length,
-              itemBuilder: (context, index) {
-                final user = otherUsers[index];
-                return UserListItem(
-                  user: user,
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => ChatScreen(user: user),
-                      ),
-                    );
-                  },
-                );
-              },
-            ),
+      body: usersAsync.when(
+        data: (users) {
+          // Filter out current user
+          final otherUsers = users.where((user) => user.id != currentUser?.id).toList();
+
+          if (otherUsers.isEmpty) {
+            return const Center(child: Text('No users found. Please register other accounts.'));
+          }
+
+          return ListView.builder(
+            itemCount: otherUsers.length,
+            itemBuilder: (context, index) {
+              final user = otherUsers[index];
+              return UserListItem(
+                user: user,
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => ChatScreen(user: user),
+                    ),
+                  );
+                },
+              );
+            },
+          );
+        },
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (err, stack) => Center(child: Text('Error: $err')),
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
           // TODO: Implement search/add new contact functionality

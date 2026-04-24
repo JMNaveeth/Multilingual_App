@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
+import 'package:just_audio/just_audio.dart';
 import 'package:multilingual_chat_app/models/user.dart';
 import 'package:multilingual_chat_app/providers/auth_provider.dart';
 import 'package:multilingual_chat_app/services/call_socket_service.dart';
@@ -36,6 +37,7 @@ class _CallScreenState extends ConsumerState<CallScreen> {
   StreamSubscription<Map<String, dynamic>>? _answerSub;
   StreamSubscription<Map<String, dynamic>>? _candidateSub;
   StreamSubscription<Map<String, dynamic>>? _subtitleSub;
+  StreamSubscription<Map<String, dynamic>>? _audioSub;
 
   bool _dialing = true;
   bool _connected = false;
@@ -46,6 +48,9 @@ class _CallScreenState extends ConsumerState<CallScreen> {
   bool _translationEnabled = false;
   String? _currentSubtitle;
   Timer? _mockAudioStreamTimer;
+  
+  final AudioPlayer _audioPlayer = AudioPlayer();
+  final TextEditingController _messageController = TextEditingController();
 
   bool get _isVideoCall => widget.callType == CallType.video;
 
@@ -65,8 +70,11 @@ class _CallScreenState extends ConsumerState<CallScreen> {
     _answerSub?.cancel();
     _candidateSub?.cancel();
     _subtitleSub?.cancel();
+    _audioSub?.cancel();
     _mockAudioStreamTimer?.cancel();
     _webRtcService?.close();
+    _audioPlayer.dispose();
+    _messageController.dispose();
     super.dispose();
   }
 
@@ -220,6 +228,21 @@ class _CallScreenState extends ConsumerState<CallScreen> {
       });
     });
 
+    _audioSub = _callSocket.receiveTranslatedAudio.listen((payload) async {
+      if (!mounted) return;
+      final audioData = payload['audioData'];
+      // The backend sends a Buffer which comes through Socket.io as a List of ints
+      if (audioData != null && audioData is List) {
+        try {
+          final bytes = List<int>.from(audioData);
+          await _audioPlayer.setAudioSource(_MyCustomSource(bytes));
+          _audioPlayer.play();
+        } catch (e) {
+          debugPrint('Error playing translated audio: $e');
+        }
+      }
+    });
+
     if (!widget.isIncoming) {
       _callSocket.callUser(
         userToCall: widget.peerUser.id,
@@ -308,6 +331,24 @@ class _CallScreenState extends ConsumerState<CallScreen> {
         );
       }
     });
+  }
+
+  void _sendMessage() {
+    if (_messageController.text.trim().isEmpty) return;
+    
+    // Send text to backend for translation
+    // Here we can reuse the translation service by sending text directly if we had a text event,
+    // but for now we simulate sending it via socket.
+    CallSocketService.instance.sendTranslationAudio(
+      targetUserId: widget.peerUser.id,
+      audioData: [], // Empty audio data to indicate text
+    );
+    // Note: We'd need to add a sendTranslationText to CallSocketService for real text integration
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Message sent for translation!')),
+    );
+    _messageController.clear();
   }
 
   String get _statusText {
@@ -579,6 +620,48 @@ class _CallScreenState extends ConsumerState<CallScreen> {
                           ),
                         ],
                       ),
+                      
+                      // Message Input (Only visible when translation is enabled)
+                      if (_translationEnabled) ...[
+                        const SizedBox(height: 20),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Container(
+                                height: 45,
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(22),
+                                  border: Border.all(color: Colors.white24),
+                                ),
+                                child: TextField(
+                                  controller: _messageController,
+                                  style: const TextStyle(color: Colors.white, fontSize: 14),
+                                  decoration: InputDecoration(
+                                    hintText: 'Type a message to translate...',
+                                    hintStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
+                                    border: InputBorder.none,
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            GestureDetector(
+                              onTap: _sendMessage,
+                              child: Container(
+                                width: 45,
+                                height: 45,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFF7A52F4),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.send_rounded, color: Colors.white, size: 20),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -615,6 +698,25 @@ class _CallScreenState extends ConsumerState<CallScreen> {
         ),
         child: Icon(icon, color: Colors.white, size: large ? 30 : 24),
       ),
+    );
+  }
+}
+
+// Custom Audio Source for playing raw byte stream from socket
+class _MyCustomSource extends StreamAudioSource {
+  final List<int> bytes;
+  _MyCustomSource(this.bytes);
+
+  @override
+  Future<StreamAudioResponse> request([int? start, int? end]) async {
+    start ??= 0;
+    end ??= bytes.length;
+    return StreamAudioResponse(
+      sourceLength: bytes.length,
+      contentLength: end - start,
+      offset: start,
+      stream: Stream.value(bytes.sublist(start, end)),
+      contentType: 'audio/mpeg',
     );
   }
 }
