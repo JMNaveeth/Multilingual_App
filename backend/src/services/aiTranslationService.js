@@ -1,118 +1,142 @@
-const axios = require('axios');
-const WebSocket = require('ws');
-
-// In a real application, you would initialize your Deepgram, DeepL, and ElevenLabs/Google TTS clients here.
-// Example: const { Deepgram } = require('@deepgram/sdk');
+const translate = require('google-translate-api-x');
+const gtts = require('gtts');
+const { PassThrough } = require('stream');
 
 class AITranslationService {
   constructor() {
-    this.activeStreams = new Map(); // userId -> { targetUserId, targetLanguage, sourceLanguage, sttSocket }
+    this.activeStreams = new Map(); // userId -> { targetUserId, targetLanguage, sourceLanguage }
   }
 
   /**
-   * Starts a new translation stream session for a user.
+   * Translate text from one language to another using Google Translate.
+   * @param {string} text - The text to translate
+   * @param {string} from - Source language code (e.g., 'en')
+   * @param {string} to - Target language code (e.g., 'ta')
+   * @returns {Promise<string>} Translated text
+   */
+  async translateText(text, from, to) {
+    if (!text || text.trim() === '') return text;
+    if (from === to) return text;
+
+    try {
+      const result = await translate(text, { from, to });
+      console.log(`🌐 Translated: "${text}" → "${result.text}" (${from}→${to})`);
+      return result.text;
+    } catch (error) {
+      console.error('Translation error:', error.message);
+      // Fallback: return original text if translation fails
+      return text;
+    }
+  }
+
+  /**
+   * Convert text to speech audio buffer using Google TTS.
+   * @param {string} text - Text to synthesize
+   * @param {string} lang - Language code (e.g., 'ta', 'en')
+   * @returns {Promise<Buffer>} Audio buffer (MP3)
+   */
+  async textToSpeech(text, lang) {
+    return new Promise((resolve, reject) => {
+      try {
+        const ttsInstance = new gtts(text, lang);
+        const chunks = [];
+        const passThrough = new PassThrough();
+
+        ttsInstance.stream().pipe(passThrough);
+
+        passThrough.on('data', (chunk) => {
+          chunks.push(chunk);
+        });
+
+        passThrough.on('end', () => {
+          const audioBuffer = Buffer.concat(chunks);
+          console.log(`🔊 TTS generated: ${audioBuffer.length} bytes (${lang})`);
+          resolve(audioBuffer);
+        });
+
+        passThrough.on('error', (err) => {
+          console.error('TTS stream error:', err);
+          reject(err);
+        });
+      } catch (error) {
+        console.error('TTS error:', error);
+        reject(error);
+      }
+    });
+  }
+
+  /**
+   * Full pipeline: Translate text + generate TTS audio.
+   * Returns both the translated text and the audio buffer.
+   */
+  async translateAndSpeak(text, sourceLanguage, targetLanguage) {
+    // Step 1: Translate the text
+    const translatedText = await this.translateText(text, sourceLanguage, targetLanguage);
+
+    // Step 2: Convert translated text to speech
+    let audioBuffer = null;
+    try {
+      audioBuffer = await this.textToSpeech(translatedText, targetLanguage);
+    } catch (err) {
+      console.error('TTS failed, sending text only:', err.message);
+    }
+
+    return { translatedText, audioBuffer };
+  }
+
+  /**
+   * Starts a translation stream session for a call.
    */
   startStream(userId, targetUserId, sourceLanguage, targetLanguage, io, socketToUser, activeUsers) {
-    console.log(`🎙️ Starting translation stream from ${userId} to ${targetUserId}`);
-    
-    // TODO: Initialize real streaming STT (e.g., Deepgram WebSocket) here
-    // Example: 
-    // const sttSocket = new WebSocket('wss://api.deepgram.com/v1/listen?language=' + sourceLanguage, {
-    //   headers: { Authorization: `Token ${process.env.DEEPGRAM_API_KEY}` }
-    // });
-    
-    const mockSttSocket = {
-      send: (audioChunk) => {
-        // Mock processing chunk...
-      },
-      close: () => {
-        console.log(`Closing mock STT for ${userId}`);
-      }
-    };
+    console.log(`🎙️ Starting translation stream: ${userId} → ${targetUserId} (${sourceLanguage}→${targetLanguage})`);
 
     this.activeStreams.set(userId, {
       targetUserId,
       sourceLanguage,
       targetLanguage,
-      sttSocket: mockSttSocket,
       io,
       activeUsers
     });
-
-    // In a real implementation, you listen for 'message' from Deepgram
-    // sttSocket.on('message', (message) => {
-    //   const data = JSON.parse(message);
-    //   if (data.is_final) {
-    //      this.processTranslatedSentence(userId, data.channel.alternatives[0].transcript);
-    //   }
-    // });
   }
 
   /**
-   * Feed an audio chunk to the STT engine.
+   * Process a text message during a call and send translated text + audio to the peer.
    */
-  processAudioChunk(userId, audioData) {
-    const stream = this.activeStreams.get(userId);
-    if (!stream) return;
-
-    // Send the raw audio buffer directly to the STT websocket
-    stream.sttSocket.send(audioData);
-
-    // MOCK IMPLEMENTATION FOR DEMO:
-    // We simulate recognizing a sentence after receiving a few chunks
-    if (!stream.chunkCount) stream.chunkCount = 0;
-    stream.chunkCount++;
-    
-    if (stream.chunkCount % 20 === 0) { // Simulate finding a phrase boundary
-      const mockText = "This is a simulated translated sentence.";
-      this.processTranslatedSentence(userId, mockText);
-    }
-  }
-
-  /**
-   * Translates text and triggers TTS.
-   */
-  async processTranslatedSentence(userId, text) {
+  async processCallText(userId, text) {
     if (!text || text.trim() === '') return;
-    
+
     const stream = this.activeStreams.get(userId);
     if (!stream) return;
-
-    console.log(`📝 Translated text for ${userId}: ${text}`);
 
     try {
-      // 1. TRANSLATE TEXT (e.g., DeepL API or Google Translate)
-      // const translatedText = await translateAPI.translate(text, stream.targetLanguage);
-      const translatedText = `[${stream.targetLanguage}] ${text}`; // Mock translation
+      const { translatedText, audioBuffer } = await this.translateAndSpeak(
+        text,
+        stream.sourceLanguage,
+        stream.targetLanguage
+      );
 
-      // Send subtitle text instantly to target user
       const targetSocketId = stream.activeUsers.get(stream.targetUserId);
       if (targetSocketId) {
+        // Send translated subtitle text instantly
         stream.io.to(targetSocketId).emit('receive_subtitle', {
           from: userId,
           text: translatedText,
+          originalText: text,
           originalLanguage: stream.sourceLanguage,
           targetLanguage: stream.targetLanguage
         });
+
+        // Send TTS audio if available
+        if (audioBuffer) {
+          stream.io.to(targetSocketId).emit('receive_translated_audio', {
+            from: userId,
+            audioData: Array.from(audioBuffer), // Convert Buffer to array for Socket.io
+            language: stream.targetLanguage
+          });
+        }
       }
-
-      // 2. TEXT-TO-SPEECH (e.g., ElevenLabs or Google TTS)
-      // const ttsAudioBuffer = await ttsAPI.synthesize(translatedText, stream.targetLanguage);
-      
-      // Mock TTS Audio Buffer (empty 100ms buffer)
-      const mockAudioBuffer = Buffer.alloc(3200); 
-
-      // 3. SEND AUDIO BACK
-      if (targetSocketId) {
-        stream.io.to(targetSocketId).emit('receive_translated_audio', {
-          from: userId,
-          audioData: mockAudioBuffer,
-          language: stream.targetLanguage
-        });
-      }
-
     } catch (error) {
-      console.error('Translation error:', error);
+      console.error('processCallText error:', error);
     }
   }
 
@@ -122,10 +146,8 @@ class AITranslationService {
   stopStream(userId) {
     const stream = this.activeStreams.get(userId);
     if (stream) {
-      if (stream.sttSocket) {
-        stream.sttSocket.close();
-      }
       this.activeStreams.delete(userId);
+      console.log(`🛑 Translation stream stopped for ${userId}`);
     }
   }
 }

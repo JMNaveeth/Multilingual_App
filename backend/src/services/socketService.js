@@ -82,7 +82,7 @@ const initializeSocket = (io) => {
     // Handle private messaging
     socket.on('send_message', async (data) => {
       try {
-        const { receiverId, content, type = 'text', mediaUrl, metadata } = data;
+        const { receiverId, content, type = 'text', mediaUrl, metadata, senderLanguage: senderLang } = data;
         const senderId = socketToUser.get(socket.id);
 
         if (!senderId) {
@@ -98,15 +98,25 @@ const initializeSocket = (io) => {
         
         let translatedContent = null;
         let targetLanguage = 'en';
+        let senderLanguage = senderLang || 'en';
 
         if (receiver && receiver.preferredLanguage) {
           targetLanguage = receiver.preferredLanguage;
-          // Mock translation based on target language
-          translatedContent = `[Translated to ${targetLanguage}] ${content.trim()}`;
         } else {
-          // If receiver is a mock local user, default to Tamil (or just mock it)
-          targetLanguage = 'ta'; 
-          translatedContent = `[Translated to ${targetLanguage}] ${content.trim()}`;
+          // Default for local testing
+          targetLanguage = 'ta';
+        }
+
+        // Perform REAL translation using Google Translate
+        try {
+          translatedContent = await aiTranslationService.translateText(
+            content.trim(),
+            senderLanguage,
+            targetLanguage
+          );
+        } catch (err) {
+          console.error('Translation failed, using original:', err.message);
+          translatedContent = content.trim();
         }
 
         let messageData;
@@ -354,6 +364,56 @@ const initializeSocket = (io) => {
           audioData,
           language
         });
+      }
+    });
+
+    // In-call text message translation
+    socket.on('send_call_text', async (data) => {
+      const { targetUserId, text, sourceLanguage, targetLanguage } = data;
+      const userId = socketToUser.get(socket.id);
+
+      if (!userId || !text || text.trim() === '') return;
+
+      try {
+        // Use the full translate + TTS pipeline
+        const { translatedText, audioBuffer } = await aiTranslationService.translateAndSpeak(
+          text.trim(),
+          sourceLanguage || 'en',
+          targetLanguage || 'ta'
+        );
+
+        const targetSocketId = activeUsers.get(targetUserId);
+        if (targetSocketId) {
+          // Send translated subtitle
+          io.to(targetSocketId).emit('receive_subtitle', {
+            from: userId,
+            text: translatedText,
+            originalText: text.trim(),
+            originalLanguage: sourceLanguage || 'en',
+            targetLanguage: targetLanguage || 'ta'
+          });
+
+          // Send TTS audio
+          if (audioBuffer) {
+            io.to(targetSocketId).emit('receive_translated_audio', {
+              from: userId,
+              audioData: Array.from(audioBuffer),
+              language: targetLanguage || 'ta'
+            });
+          }
+        }
+
+        // Confirm to sender
+        socket.emit('call_text_sent', {
+          originalText: text.trim(),
+          translatedText,
+          targetLanguage: targetLanguage || 'ta'
+        });
+
+        console.log(`💬 Call text translated: "${text}" → "${translatedText}"`);
+      } catch (error) {
+        console.error('send_call_text error:', error);
+        socket.emit('error', { message: 'Translation failed' });
       }
     });
 

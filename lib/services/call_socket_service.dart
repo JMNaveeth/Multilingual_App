@@ -314,6 +314,20 @@ class CallSocketService {
     });
   }
 
+  void sendCallText({
+    required String targetUserId,
+    required String text,
+    required String sourceLanguage,
+    required String targetLanguage,
+  }) {
+    _socket?.emit('send_call_text', {
+      'targetUserId': targetUserId,
+      'text': text,
+      'sourceLanguage': sourceLanguage,
+      'targetLanguage': targetLanguage,
+    });
+  }
+
   // --- Real-time Chat Emitters ---
   
   void sendMessageViaSocket({
@@ -321,6 +335,7 @@ class CallSocketService {
     required String content,
     String type = 'text',
     String? mediaUrl,
+    String senderLanguage = 'en',
     Map<String, dynamic>? metadata,
   }) {
     _socket?.emit('send_message', {
@@ -328,6 +343,7 @@ class CallSocketService {
       'content': content,
       'type': type,
       'mediaUrl': mediaUrl,
+      'senderLanguage': senderLanguage,
       'metadata': metadata ?? {},
     });
   }

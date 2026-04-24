@@ -302,27 +302,21 @@ class _CallScreenState extends ConsumerState<CallScreen> {
   }
 
   void _toggleTranslation() {
+    final currentUser = ref.read(authProvider).value;
+    final myLanguage = currentUser?.preferredLanguage ?? 'en';
+    final peerLanguage = widget.peerUser.preferredLanguage;
+
     setState(() {
       _translationEnabled = !_translationEnabled;
       if (_translationEnabled) {
         _callSocket.startTranslation(
           targetUserId: widget.peerUser.id,
-          sourceLanguage: 'en', // Hardcoded for demo
-          targetLanguage: 'ta', // Hardcoded for demo
+          sourceLanguage: myLanguage,
+          targetLanguage: peerLanguage,
         );
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('AI Translation Enabled (English → Tamil)')),
+          SnackBar(content: Text('AI Translation Enabled ($myLanguage → $peerLanguage)')),
         );
-        
-        // Mock streaming audio chunks to backend
-        _mockAudioStreamTimer = Timer.periodic(const Duration(milliseconds: 250), (timer) {
-          if (!_muted && mounted) {
-            _callSocket.sendTranslationAudio(
-              targetUserId: widget.peerUser.id,
-              audioData: [0, 1, 2, 3], // Mock byte data
-            );
-          }
-        });
       } else {
         _mockAudioStreamTimer?.cancel();
         _currentSubtitle = null;
@@ -334,19 +328,26 @@ class _CallScreenState extends ConsumerState<CallScreen> {
   }
 
   void _sendMessage() {
-    if (_messageController.text.trim().isEmpty) return;
-    
-    // Send text to backend for translation
-    // Here we can reuse the translation service by sending text directly if we had a text event,
-    // but for now we simulate sending it via socket.
-    CallSocketService.instance.sendTranslationAudio(
+    final text = _messageController.text.trim();
+    if (text.isEmpty) return;
+
+    final currentUser = ref.read(authProvider).value;
+    final myLanguage = currentUser?.preferredLanguage ?? 'en';
+    final peerLanguage = widget.peerUser.preferredLanguage;
+
+    // Send text to backend for real translation + TTS
+    _callSocket.sendCallText(
       targetUserId: widget.peerUser.id,
-      audioData: [], // Empty audio data to indicate text
+      text: text,
+      sourceLanguage: myLanguage,
+      targetLanguage: peerLanguage,
     );
-    // Note: We'd need to add a sendTranslationText to CallSocketService for real text integration
-    
+
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Message sent for translation!')),
+      SnackBar(
+        content: Text('Translating: "$text" → $peerLanguage'),
+        duration: const Duration(seconds: 1),
+      ),
     );
     _messageController.clear();
   }

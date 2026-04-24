@@ -620,6 +620,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       receiverId: widget.user.id,
       content: text,
       type: 'text',
+      senderLanguage: currentUser.preferredLanguage,
     );
 
     _messageController.clear();
@@ -1034,23 +1035,47 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   Widget _buildTextBubble(RichMessage rm, bool isMe, String time) {
     final meta = rm.message.metadata ?? const <String, dynamic>{};
     final translated = meta['translatedContent']?.toString();
+    final hasTranslation = !isMe && translated != null && translated.isNotEmpty && translated != rm.message.content;
     
     // Display translated text for receiver if available, otherwise original text
-    final displayContent = (!isMe && translated != null && translated.isNotEmpty)
-        ? translated
-        : rm.message.content;
+    final displayContent = hasTranslation ? translated! : rm.message.content;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(displayContent,
             style: TextStyle(
               color: isMe ? Colors.white : const Color(0xFFE9F0F4),
               fontSize: 14.5,
               height: 1.4,
             )),
+        if (hasTranslation) ...[
+          const SizedBox(height: 4),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              const Icon(Icons.translate_rounded, size: 11, color: _N.cyan),
+              const SizedBox(width: 4),
+              Flexible(
+                child: Text(rm.message.content,
+                    style: TextStyle(
+                      color: _N.textSecondary.withOpacity(0.7),
+                      fontSize: 11.5,
+                      fontStyle: FontStyle.italic,
+                    )),
+              ),
+            ]),
+          ),
+        ],
         const SizedBox(height: 4),
-        _timeRow(isMe, time, rm.message.status),
+        Align(
+          alignment: Alignment.centerRight,
+          child: _timeRow(isMe, time, rm.message.status),
+        ),
       ]),
     );
   }
