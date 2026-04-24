@@ -144,7 +144,8 @@ class ChatService {
 
     return decoded
         .whereType<Map>()
-        .map((e) => Message.fromJson(e.map((k, v) => MapEntry(k.toString(), v))))
+        .map(
+            (e) => Message.fromJson(e.map((k, v) => MapEntry(k.toString(), v))))
         .toList();
   }
 

@@ -72,12 +72,11 @@ class Message {
         (e) => e.toString().split('.').last == (json['status'] ?? 'sent'),
         orElse: () => MessageStatus.sent,
       ),
-      timestamp: DateTime.tryParse((timestampRaw ?? '').toString()) ??
-          DateTime.now(),
+      timestamp:
+          DateTime.tryParse((timestampRaw ?? '').toString()) ?? DateTime.now(),
       mediaUrl: json['mediaUrl']?.toString(),
       metadata: json['metadata'] is Map
-          ? (json['metadata'] as Map)
-              .map((k, v) => MapEntry(k.toString(), v))
+          ? (json['metadata'] as Map).map((k, v) => MapEntry(k.toString(), v))
           : null,
     );
   }

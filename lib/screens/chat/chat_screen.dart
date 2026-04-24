@@ -271,7 +271,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     if (!persist) return;
     unawaited(_chatService.sendMessage(rm.message).then((persisted) {
       if (!mounted) return;
-      final index = _richMessages.indexWhere((m) => m.message.id == rm.message.id);
+      final index =
+          _richMessages.indexWhere((m) => m.message.id == rm.message.id);
       if (index < 0) return;
       setState(() {
         _richMessages[index] = RichMessage(
@@ -644,23 +645,24 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                       child: CircularProgressIndicator(color: _N.indigoLight),
                     )
                   : conversation.isEmpty
-                  ? _buildEmptyState()
-                  : ListView.builder(
-                      controller: _scrollController,
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                      itemCount: conversation.length,
-                      itemBuilder: (ctx, i) {
-                        final rm = conversation[i];
-                        final isMe = rm.message.senderId == currentUser?.id;
-                        final showDate = i == 0 ||
-                            !_sameDay(conversation[i - 1].message.timestamp,
-                                rm.message.timestamp);
-                        return Column(children: [
-                          if (showDate) _buildDateChip(rm.message.timestamp),
-                          _buildMessageRow(rm, isMe),
-                        ]);
-                      },
-                    ),
+                      ? _buildEmptyState()
+                      : ListView.builder(
+                          controller: _scrollController,
+                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                          itemCount: conversation.length,
+                          itemBuilder: (ctx, i) {
+                            final rm = conversation[i];
+                            final isMe = rm.message.senderId == currentUser?.id;
+                            final showDate = i == 0 ||
+                                !_sameDay(conversation[i - 1].message.timestamp,
+                                    rm.message.timestamp);
+                            return Column(children: [
+                              if (showDate)
+                                _buildDateChip(rm.message.timestamp),
+                              _buildMessageRow(rm, isMe),
+                            ]);
+                          },
+                        ),
             ),
           ),
           SizeTransition(
