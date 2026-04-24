@@ -621,6 +621,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       content: text,
       type: 'text',
       senderLanguage: currentUser.preferredLanguage,
+      receiverLanguage: widget.user.preferredLanguage,
     );
 
     _messageController.clear();
@@ -1058,12 +1059,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
               borderRadius: BorderRadius.circular(6),
             ),
             child: Row(mainAxisSize: MainAxisSize.min, children: [
-              const Icon(Icons.translate_rounded, size: 11, color: _N.cyan),
+              Icon(Icons.translate_rounded, size: 11, color: Colors.tealAccent.shade200),
               const SizedBox(width: 4),
               Flexible(
                 child: Text(rm.message.content,
                     style: TextStyle(
-                      color: _N.textSecondary.withOpacity(0.7),
+                      color: Colors.grey.shade400.withOpacity(0.7),
                       fontSize: 11.5,
                       fontStyle: FontStyle.italic,
                     )),

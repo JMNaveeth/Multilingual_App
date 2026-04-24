@@ -82,7 +82,7 @@ const initializeSocket = (io) => {
     // Handle private messaging
     socket.on('send_message', async (data) => {
       try {
-        const { receiverId, content, type = 'text', mediaUrl, metadata, senderLanguage: senderLang } = data;
+        const { receiverId, content, type = 'text', mediaUrl, metadata, senderLanguage: senderLang, receiverLanguage: receiverLang } = data;
         const senderId = socketToUser.get(socket.id);
 
         if (!senderId) {
@@ -90,33 +90,24 @@ const initializeSocket = (io) => {
           return;
         }
 
-        // Fetch receiver to get preferred language
-        let receiver = null;
-        if (isValidObjectId(receiverId)) {
-          receiver = await User.findById(receiverId);
-        }
+        // Use languages directly from frontend payload (most reliable)
+        const senderLanguage = senderLang || 'en';
+        const targetLanguage = receiverLang || 'en';
         
         let translatedContent = null;
-        let targetLanguage = 'en';
-        let senderLanguage = senderLang || 'en';
-
-        if (receiver && receiver.preferredLanguage) {
-          targetLanguage = receiver.preferredLanguage;
-        } else {
-          // Default for local testing
-          targetLanguage = 'ta';
-        }
 
         // Perform REAL translation using Google Translate
-        try {
-          translatedContent = await aiTranslationService.translateText(
-            content.trim(),
-            senderLanguage,
-            targetLanguage
-          );
-        } catch (err) {
-          console.error('Translation failed, using original:', err.message);
-          translatedContent = content.trim();
+        if (senderLanguage !== targetLanguage) {
+          try {
+            translatedContent = await aiTranslationService.translateText(
+              content.trim(),
+              senderLanguage,
+              targetLanguage
+            );
+          } catch (err) {
+            console.error('Translation failed, using original:', err.message);
+            translatedContent = content.trim();
+          }
         }
 
         let messageData;

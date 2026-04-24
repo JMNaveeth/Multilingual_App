@@ -336,6 +336,7 @@ class CallSocketService {
     String type = 'text',
     String? mediaUrl,
     String senderLanguage = 'en',
+    String receiverLanguage = 'en',
     Map<String, dynamic>? metadata,
   }) {
     _socket?.emit('send_message', {
@@ -344,6 +345,7 @@ class CallSocketService {
       'type': type,
       'mediaUrl': mediaUrl,
       'senderLanguage': senderLanguage,
+      'receiverLanguage': receiverLanguage,
       'metadata': metadata ?? {},
     });
   }
