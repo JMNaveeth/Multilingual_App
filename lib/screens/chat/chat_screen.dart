@@ -91,6 +91,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   bool _isLoadingHistory = true;
   bool _historyFetchStarted = false;
   StreamSubscription<IncomingCall>? _incomingCallSub;
+  StreamSubscription<Map<String, dynamic>>? _newMessageSub;
   int _localIdCounter = 0;
 
   final _chatService = ChatService();
@@ -136,6 +137,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   @override
   void dispose() {
     _incomingCallSub?.cancel();
+    _newMessageSub?.cancel();
     _messageController.dispose();
     _scrollController.dispose();
     _onlineGlowCtrl.dispose();
@@ -149,6 +151,27 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     if (currentUser == null || _socketReady) return;
     _socketReady = true;
     await CallSocketService.instance.connect(userId: currentUser.id);
+
+    _newMessageSub ??= CallSocketService.instance.newMessages.listen((payload) {
+      if (!mounted) return;
+      try {
+        final messageJson = payload.map((k, v) => MapEntry(k.toString(), v));
+        final message = Message.fromJson(messageJson);
+        
+        // Only add if it belongs to this conversation
+        if ((message.senderId == widget.user.id && message.receiverId == currentUser.id) ||
+            (message.senderId == currentUser.id && message.receiverId == widget.user.id)) {
+          
+          // Check if we already have it to avoid duplicates from local sync
+          final exists = _richMessages.any((rm) => rm.message.id == message.id);
+          if (!exists) {
+            _addRich(RichMessage(message: message), persist: false);
+          }
+        }
+      } catch (e) {
+        debugPrint('Error parsing new_message: $e');
+      }
+    });
 
     _incomingCallSub ??= CallSocketService.instance.incomingCalls.listen(
       (incomingCall) {
@@ -582,7 +605,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         status: MessageStatus.sent,
         timestamp: DateTime.now(),
       ),
-    ));
+    ), persist: false); // Persist false because backend handles saving for socket
+
+    CallSocketService.instance.sendMessageViaSocket(
+      receiverId: widget.user.id,
+      content: text,
+      type: 'text',
+    );
 
     _messageController.clear();
   }
@@ -994,10 +1023,18 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   // ── Text bubble ───────────────────────────────────────────────────────────
 
   Widget _buildTextBubble(RichMessage rm, bool isMe, String time) {
+    final meta = rm.message.metadata ?? const <String, dynamic>{};
+    final translated = meta['translatedContent']?.toString();
+    
+    // Display translated text for receiver if available, otherwise original text
+    final displayContent = (!isMe && translated != null && translated.isNotEmpty)
+        ? translated
+        : rm.message.content;
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
       child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-        Text(rm.message.content,
+        Text(displayContent,
             style: TextStyle(
               color: isMe ? Colors.white : const Color(0xFFE9F0F4),
               fontSize: 14.5,

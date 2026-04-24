@@ -61,6 +61,10 @@ class CallSocketService {
   final StreamController<Map<String, dynamic>> _receiveTranslatedAudioController =
       StreamController<Map<String, dynamic>>.broadcast();
 
+  // Chat StreamControllers
+  final StreamController<Map<String, dynamic>> _newMessageController =
+      StreamController<Map<String, dynamic>>.broadcast();
+
   Stream<IncomingCall> get incomingCalls => _incomingCallController.stream;
   Stream<Map<String, dynamic>> get callAccepted =>
       _callAcceptedController.stream;
@@ -73,6 +77,9 @@ class CallSocketService {
   Stream<Map<String, dynamic>> get translationStarted => _translationStartedController.stream;
   Stream<Map<String, dynamic>> get receiveSubtitle => _receiveSubtitleController.stream;
   Stream<Map<String, dynamic>> get receiveTranslatedAudio => _receiveTranslatedAudioController.stream;
+
+  // Chat Streams
+  Stream<Map<String, dynamic>> get newMessages => _newMessageController.stream;
 
   bool get isConnected => _socket?.connected ?? false;
 
@@ -197,6 +204,14 @@ class CallSocketService {
         _receiveTranslatedAudioController.add(payload);
       });
 
+      // Real-time Chat Listeners
+      _socket!.on('new_message', (data) {
+        final payload = data is Map<String, dynamic>
+            ? data
+            : data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{};
+        _newMessageController.add(payload);
+      });
+
       _socket!.connect();
     } finally {
       _connecting = false;
@@ -296,6 +311,24 @@ class CallSocketService {
     _socket?.emit('translation_audio', {
       'targetUserId': targetUserId,
       'audioData': audioData,
+    });
+  }
+
+  // --- Real-time Chat Emitters ---
+  
+  void sendMessageViaSocket({
+    required String receiverId,
+    required String content,
+    String type = 'text',
+    String? mediaUrl,
+    Map<String, dynamic>? metadata,
+  }) {
+    _socket?.emit('send_message', {
+      'receiverId': receiverId,
+      'content': content,
+      'type': type,
+      'mediaUrl': mediaUrl,
+      'metadata': metadata ?? {},
     });
   }
 
