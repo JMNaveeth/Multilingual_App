@@ -298,11 +298,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
 
     if (!persist) return;
     if (localOnly) {
-      unawaited(_chatService.saveLocalMessage(rm.message));
+      _chatService.saveLocalMessage(rm.message).catchError((e) {
+        debugPrint('[ChatScreen] saveLocalMessage error: $e');
+      });
       return;
     }
     
-    unawaited(_chatService.sendMessage(rm.message).then((persisted) {
+    _chatService.sendMessage(rm.message).then((persisted) {
       if (!mounted) return;
       final index =
           _richMessages.indexWhere((m) => m.message.id == rm.message.id);
@@ -321,7 +323,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
           contactPhone: rm.contactPhone,
         );
       });
-    }));
+    }).catchError((e) {
+      debugPrint('[ChatScreen] sendMessage error: $e');
+    });
   }
 
   void _scrollToBottom() {
