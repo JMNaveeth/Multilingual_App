@@ -6,6 +6,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:just_audio/just_audio.dart';
+import 'package:record/record.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
@@ -46,6 +48,7 @@ class RichMessage {
   final String? fileName;
   final String? filePath;
   final int? fileSizeBytes;
+  final String? audioPath;
 
   /// For location messages
   final double? latitude;
@@ -62,6 +65,7 @@ class RichMessage {
     this.fileName,
     this.filePath,
     this.fileSizeBytes,
+    this.audioPath,
     this.latitude,
     this.longitude,
     this.locationLabel,
@@ -96,6 +100,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
 
   final _chatService = ChatService();
   final _imagePicker = ImagePicker();
+  final _audioRecorder = AudioRecorder();
+  final _audioPlayer = AudioPlayer();
+  bool _isRecording = false;
+  bool _isAudioPlaying = false;
+  String? _activeAudioPath;
 
   late final AnimationController _onlineGlowCtrl;
   late final AnimationController _attachMenuCtrl;
@@ -127,6 +136,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       final typing = _messageController.text.isNotEmpty;
       if (typing != _isTyping) setState(() => _isTyping = typing);
     });
+    _audioPlayer.playerStateStream.listen((state) {
+      if (!mounted) return;
+      final playing = state.playing;
+      final done = state.processingState == ProcessingState.completed;
+      if (done) {
+        _audioPlayer.seek(Duration.zero);
+      }
+      if (_isAudioPlaying != (playing && !done)) {
+        setState(() => _isAudioPlaying = playing && !done);
+      }
+    });
 
     SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -138,6 +158,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   void dispose() {
     _incomingCallSub?.cancel();
     _newMessageSub?.cancel();
+    unawaited(_audioRecorder.dispose());
+    unawaited(_audioPlayer.dispose());
     _messageController.dispose();
     _scrollController.dispose();
     _onlineGlowCtrl.dispose();
@@ -277,6 +299,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       imagePath: (meta['imagePath'] ?? message.mediaUrl)?.toString(),
       fileName: meta['fileName']?.toString(),
       filePath: meta['filePath']?.toString(),
+      audioPath: (meta['audioPath'] ?? message.mediaUrl)?.toString(),
       fileSizeBytes: meta['fileSizeBytes'] is int
           ? meta['fileSizeBytes'] as int
           : int.tryParse('${meta['fileSizeBytes'] ?? ''}'),
@@ -316,6 +339,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
           fileName: rm.fileName,
           filePath: rm.filePath,
           fileSizeBytes: rm.fileSizeBytes,
+          audioPath: rm.audioPath,
           latitude: rm.latitude,
           longitude: rm.longitude,
           locationLabel: rm.locationLabel,
@@ -625,6 +649,119 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     );
 
     _messageController.clear();
+  }
+
+  Future<void> _handleMicTap() async {
+    if (_isRecording) {
+      await _stopAndSendVoiceMessage();
+      return;
+    }
+    await _startVoiceRecording();
+  }
+
+  Future<void> _startVoiceRecording() async {
+    final senderId = _requireCurrentUserId();
+    if (senderId == null) return;
+
+    final hasPermission = await _audioRecorder.hasPermission();
+    if (!hasPermission) {
+      _showError('Microphone permission denied.');
+      return;
+    }
+
+    final ext = Platform.isIOS ? 'm4a' : 'm4a';
+    final path =
+        '${Directory.systemTemp.path}/voice_${DateTime.now().microsecondsSinceEpoch}.$ext';
+
+    try {
+      await _audioRecorder.start(
+        const RecordConfig(encoder: AudioEncoder.aacLc),
+        path: path,
+      );
+      if (!mounted) return;
+      setState(() => _isRecording = true);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Recording started. Tap mic again to send.')),
+      );
+    } catch (e) {
+      _showError('Could not start recording: $e');
+    }
+  }
+
+  Future<void> _stopAndSendVoiceMessage() async {
+    final currentUser = ref.read(authProvider).value;
+    if (currentUser == null) {
+      _showError('Please sign in.');
+      return;
+    }
+
+    try {
+      final path = await _audioRecorder.stop();
+      if (!mounted) return;
+      setState(() => _isRecording = false);
+      if (path == null || path.isEmpty) {
+        _showError('Recording failed. Please try again.');
+        return;
+      }
+
+      final rm = RichMessage(
+        message: Message(
+          id: _newId(),
+          senderId: currentUser.id,
+          receiverId: widget.user.id,
+          content: '[Voice note]',
+          type: MessageType.audio,
+          status: MessageStatus.sent,
+          timestamp: DateTime.now(),
+          mediaUrl: path,
+          metadata: {'audioPath': path},
+        ),
+        audioPath: path,
+      );
+
+      _addRich(rm, localOnly: true);
+      CallSocketService.instance.sendMessageViaSocket(
+        receiverId: widget.user.id,
+        content: '[Voice note]',
+        type: 'audio',
+        mediaUrl: path,
+        senderLanguage: currentUser.preferredLanguage,
+        receiverLanguage: widget.user.preferredLanguage,
+        metadata: {'audioPath': path},
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isRecording = false);
+      _showError('Could not stop recording: $e');
+    }
+  }
+
+  Future<void> _toggleAudioPlayback(String path) async {
+    try {
+      if (_activeAudioPath == path && _isAudioPlaying) {
+        await _audioPlayer.pause();
+        if (!mounted) return;
+        setState(() => _isAudioPlaying = false);
+        return;
+      }
+
+      if (_activeAudioPath != path) {
+        if (path.startsWith('http://') || path.startsWith('https://')) {
+          await _audioPlayer.setUrl(path);
+        } else {
+          await _audioPlayer.setFilePath(path);
+        }
+      }
+
+      await _audioPlayer.play();
+      if (!mounted) return;
+      setState(() {
+        _activeAudioPath = path;
+        _isAudioPlaying = true;
+      });
+    } catch (e) {
+      _showError('Could not play audio: $e');
+    }
   }
 
   void _startVideoCall() => _startCall(CallType.video);
@@ -1020,6 +1157,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     switch (rm.message.type) {
       case MessageType.image:
         return _buildImageBubble(rm, isMe, time);
+      case MessageType.audio:
+        return _buildAudioBubble(rm, isMe, time);
       case MessageType.file:
         return _buildFileBubble(rm, isMe, time);
       case MessageType.location:
@@ -1039,7 +1178,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     final hasTranslation = !isMe && translated != null && translated.isNotEmpty && translated != rm.message.content;
     
     // Display translated text for receiver if available, otherwise original text
-    final displayContent = hasTranslation ? translated! : rm.message.content;
+    final displayContent = hasTranslation ? translated : rm.message.content;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
@@ -1111,6 +1250,59 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         child: _timeRow(isMe, time, rm.message.status),
       ),
     ]);
+  }
+
+  Widget _buildAudioBubble(RichMessage rm, bool isMe, String time) {
+    final path = rm.audioPath;
+    final isPlaying = path != null && _isAudioPlaying && _activeAudioPath == path;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+        GestureDetector(
+          onTap: path == null ? null : () => _toggleAudioPlayback(path),
+          child: Row(children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: _N.indigo.withOpacity(0.2),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                color: _N.indigoLight,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Voice message',
+                      style: TextStyle(
+                        color: isMe ? Colors.white : const Color(0xFFE9F0F4),
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Container(
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.white24,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ]),
+            ),
+          ]),
+        ),
+        const SizedBox(height: 6),
+        _timeRow(isMe, time, rm.message.status),
+      ]),
+    );
   }
 
   void _openImageFullscreen(String path) {
@@ -1594,13 +1786,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         ),
         const SizedBox(width: 8),
         GestureDetector(
-          onTap: _isTyping
-              ? _sendMessage
-              : () => ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                        content:
-                            Text('Hold to record voice notes — coming soon.')),
-                  ),
+          onTap: _isTyping ? _sendMessage : _handleMicTap,
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 200),
             width: 42,
@@ -1625,7 +1811,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                   : [],
             ),
             child: Icon(
-              _isTyping ? Icons.send_rounded : Icons.mic_none_rounded,
+              _isTyping
+                  ? Icons.send_rounded
+                  : (_isRecording ? Icons.stop_rounded : Icons.mic_none_rounded),
               color: _isTyping ? Colors.white : _N.textSecondary,
               size: 20,
             ),
