@@ -3,6 +3,9 @@ enum MessageType {
   image,
   audio,
   video,
+  file,
+  location,
+  contact,
 }
 
 enum MessageStatus {

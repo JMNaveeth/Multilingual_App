@@ -27,15 +27,11 @@ abstract class _D {
   static const surface = Color(0xFF111320);
   static const card = Color(0xFF181B2E);
   static const cardBorder = Color(0xFF242742);
-  static const cardHover = Color(0xFF1E2238);
 
   static const indigo = Color(0xFF6366F1);
-  static const indigoDeep = Color(0xFF4F52D4);
   static const indigoLight = Color(0xFF818CF8);
   static const violet = Color(0xFF8B5CF6);
-  static const violetLight = Color(0xFFA78BFA);
   static const cyan = Color(0xFF22D3EE);
-  static const cyanLight = Color(0xFF67E8F9);
   static const emerald = Color(0xFF10B981);
   static const emeraldGlow = Color(0xFF34D399);
   static const amber = Color(0xFFF59E0B);
@@ -45,19 +41,15 @@ abstract class _D {
   static const textPrimary = Color(0xFFF1F5F9);
   static const textSecondary = Color(0xFF94A3B8);
   static const textMuted = Color(0xFF475569);
-  static const textDim = Color(0xFF2D3748);
 
   static const shimmerBase = Color(0xFF1C2030);
   static const shimmerHighlight = Color(0xFF252A40);
 
-  static const Duration fast = Duration(milliseconds: 150);
   static const Duration normal = Duration(milliseconds: 280);
-  static const Duration slow = Duration(milliseconds: 480);
 
   static const BorderRadius radiusSm = BorderRadius.all(Radius.circular(10));
   static const BorderRadius radiusMd = BorderRadius.all(Radius.circular(14));
   static const BorderRadius radiusLg = BorderRadius.all(Radius.circular(18));
-  static const BorderRadius radiusXl = BorderRadius.all(Radius.circular(24));
 }
 
 // ---------------------------------------------------------------------------
