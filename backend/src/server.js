@@ -96,11 +96,14 @@ initializeSocket(io);
 // Connect to database and start server
 const PORT = process.env.PORT || 3000;
 
-connectDB().then(() => {
+connectDB().then((dbConnection) => {
   server.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`);
     console.log(`📱 Client URL: ${process.env.CLIENT_URL || 'http://localhost:3000'}`);
     console.log(`🔧 Environment: ${process.env.NODE_ENV || 'development'}`);
+    if (!dbConnection) {
+      console.log('🧪 Running in fallback mode: DB-backed API features may be limited.');
+    }
   });
 }).catch((error) => {
   console.error('Failed to connect to database:', error);

@@ -4,6 +4,26 @@ const aiTranslationService = require('./aiTranslationService');
 const mongoose = require('mongoose');
 
 const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id) && String(id).length === 24;
+const SUPPORTED_LANGUAGE_CODES = new Set([
+  'en', 'es', 'fr', 'de', 'it', 'pt', 'ru', 'ja', 'ko', 'zh', 'hi', 'ar', 'ta', 'te', 'kn', 'ml'
+]);
+
+const normalizeLanguage = (language, fallback = 'en') => {
+  if (!language || typeof language !== 'string') return fallback;
+  const normalized = language.toLowerCase().trim();
+  return SUPPORTED_LANGUAGE_CODES.has(normalized) ? normalized : fallback;
+};
+
+const resolveUserPreferredLanguage = async (userId, fallback = 'en') => {
+  if (!isValidObjectId(userId)) return fallback;
+  try {
+    const user = await User.findById(userId).select('preferredLanguage').lean();
+    return normalizeLanguage(user?.preferredLanguage, fallback);
+  } catch (error) {
+    console.error(`Language lookup failed for user ${userId}:`, error.message);
+    return fallback;
+  }
+};
 
 // Store active users and their socket connections
 const activeUsers = new Map(); // userId -> socketId
@@ -90,14 +110,20 @@ const initializeSocket = (io) => {
           return;
         }
 
-        // Use languages directly from frontend payload (most reliable)
-        const senderLanguage = senderLang || 'en';
-        const targetLanguage = receiverLang || 'en';
+        // Resolve languages server-side for reliable two-way translation.
+        const senderLanguage = normalizeLanguage(
+          senderLang,
+          await resolveUserPreferredLanguage(senderId, 'en')
+        );
+        const targetLanguage = normalizeLanguage(
+          receiverLang,
+          await resolveUserPreferredLanguage(receiverId, 'en')
+        );
         
         let translatedContent = null;
 
-        // Perform REAL translation using Google Translate
-        if (senderLanguage !== targetLanguage) {
+        // Translate only text payloads and only when languages differ.
+        if (type === 'text' && senderLanguage !== targetLanguage) {
           try {
             translatedContent = await aiTranslationService.translateText(
               content.trim(),
@@ -123,6 +149,7 @@ const initializeSocket = (io) => {
             metadata: {
               ...(metadata || {}),
               translatedContent,
+              originalLanguage: senderLanguage,
               targetLanguage
             }
           });
@@ -155,6 +182,7 @@ const initializeSocket = (io) => {
             metadata: {
               ...(metadata || {}),
               translatedContent,
+              originalLanguage: senderLanguage,
               targetLanguage
             },
             createdAt: new Date()
