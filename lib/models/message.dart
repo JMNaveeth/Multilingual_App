@@ -39,22 +39,46 @@ class Message {
   });
 
   factory Message.fromJson(Map<String, dynamic> json) {
+    final sender = json['sender'];
+    final receiver = json['receiver'];
+    final timestampRaw = json['timestamp'] ?? json['createdAt'];
+
+    String _asStringOrEmpty(dynamic value) {
+      if (value == null) return '';
+      if (value is String) return value;
+      return value.toString();
+    }
+
+    String _extractId(dynamic value) {
+      if (value is String) return value;
+      if (value is Map) {
+        final map = value.map((k, v) => MapEntry(k.toString(), v));
+        final raw = map['_id'] ?? map['id'];
+        if (raw != null) return raw.toString();
+      }
+      return '';
+    }
+
     return Message(
-      id: json['_id'] ?? json['id'],
-      senderId: json['senderId'],
-      receiverId: json['receiverId'],
-      content: json['content'],
+      id: _asStringOrEmpty(json['_id'] ?? json['id']),
+      senderId: _asStringOrEmpty(json['senderId'] ?? _extractId(sender)),
+      receiverId: _asStringOrEmpty(json['receiverId'] ?? _extractId(receiver)),
+      content: (json['content'] ?? '').toString(),
       type: MessageType.values.firstWhere(
-        (e) => e.toString().split('.').last == json['type'],
+        (e) => e.toString().split('.').last == (json['type'] ?? 'text'),
         orElse: () => MessageType.text,
       ),
       status: MessageStatus.values.firstWhere(
-        (e) => e.toString().split('.').last == json['status'],
+        (e) => e.toString().split('.').last == (json['status'] ?? 'sent'),
         orElse: () => MessageStatus.sent,
       ),
-      timestamp: DateTime.parse(json['timestamp']),
-      mediaUrl: json['mediaUrl'],
-      metadata: json['metadata'],
+      timestamp: DateTime.tryParse((timestampRaw ?? '').toString()) ??
+          DateTime.now(),
+      mediaUrl: json['mediaUrl']?.toString(),
+      metadata: json['metadata'] is Map
+          ? (json['metadata'] as Map)
+              .map((k, v) => MapEntry(k.toString(), v))
+          : null,
     );
   }
 

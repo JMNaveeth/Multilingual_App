@@ -15,6 +15,7 @@ import 'package:multilingual_chat_app/models/user.dart';
 import 'package:multilingual_chat_app/providers/auth_provider.dart';
 import 'package:multilingual_chat_app/screens/chat/call_screen.dart';
 import 'package:multilingual_chat_app/services/call_socket_service.dart';
+import 'package:multilingual_chat_app/services/chat_service.dart';
 
 // ── Nexus Design Tokens ──────────────────────────────────────────────────────
 class _N {
@@ -69,37 +70,6 @@ class RichMessage {
   });
 }
 
-// ── Mock messages ─────────────────────────────────────────────────────────────
-final mockMessagesProvider = Provider<List<Message>>((ref) => [
-      Message(
-        id: '1',
-        senderId: '1',
-        receiverId: 'current_user',
-        content: 'Hello! How are you?',
-        type: MessageType.text,
-        status: MessageStatus.read,
-        timestamp: DateTime.now().subtract(const Duration(minutes: 5)),
-      ),
-      Message(
-        id: '2',
-        senderId: 'current_user',
-        receiverId: '1',
-        content: 'Hi! I\'m doing well, thank you. How about you?',
-        type: MessageType.text,
-        status: MessageStatus.read,
-        timestamp: DateTime.now().subtract(const Duration(minutes: 4)),
-      ),
-      Message(
-        id: '3',
-        senderId: '1',
-        receiverId: 'current_user',
-        content: 'I\'m great! Ready to test the translation feature?',
-        type: MessageType.text,
-        status: MessageStatus.read,
-        timestamp: DateTime.now().subtract(const Duration(minutes: 2)),
-      ),
-    ]);
-
 // ── ChatScreen ────────────────────────────────────────────────────────────────
 class ChatScreen extends ConsumerStatefulWidget {
   final User user;
@@ -118,8 +88,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   bool _isTyping = false;
   bool _socketReady = false;
   bool _incomingDialogOpen = false;
+  bool _isLoadingHistory = true;
+  bool _historyFetchStarted = false;
   StreamSubscription<IncomingCall>? _incomingCallSub;
+  int _localIdCounter = 0;
 
+  final _chatService = ChatService();
   final _imagePicker = ImagePicker();
 
   late final AnimationController _onlineGlowCtrl;
@@ -147,9 +121,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       curve: Curves.easeOutBack,
       reverseCurve: Curves.easeIn,
     );
-
-    final seed = ref.read(mockMessagesProvider);
-    _richMessages.addAll(seed.map((m) => RichMessage(message: m)));
 
     _messageController.addListener(() {
       final typing = _messageController.text.isNotEmpty;
@@ -236,14 +207,87 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
 
   // ── Helpers ───────────────────────────────────────────────────────────────
 
-  String get _currentUserId =>
-      ref.read(authProvider).value?.id ?? 'current_user';
+  String _newId() =>
+      '${DateTime.now().microsecondsSinceEpoch}_${_localIdCounter++}';
 
-  String _newId() => DateTime.now().microsecondsSinceEpoch.toString();
+  String? _requireCurrentUserId() {
+    final userId = ref.read(authProvider).value?.id;
+    if (userId == null || userId.isEmpty) {
+      _showError('Please sign in.');
+      return null;
+    }
+    return userId;
+  }
 
-  void _addRich(RichMessage rm) {
+  Future<void> _loadConversation(String currentUserId) async {
+    try {
+      final messages = await _chatService.getConversation(
+        currentUserId: currentUserId,
+        otherUserId: widget.user.id,
+      );
+      if (!mounted) return;
+      setState(() {
+        _richMessages
+          ..clear()
+          ..addAll(messages.map(_fromMessage));
+        _isLoadingHistory = false;
+      });
+      _scrollToBottom();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoadingHistory = false;
+      });
+      _showError('Could not load conversation: $e');
+    }
+  }
+
+  RichMessage _fromMessage(Message message) {
+    final meta = message.metadata ?? const <String, dynamic>{};
+    return RichMessage(
+      message: message,
+      imagePath: (meta['imagePath'] ?? message.mediaUrl)?.toString(),
+      fileName: meta['fileName']?.toString(),
+      filePath: meta['filePath']?.toString(),
+      fileSizeBytes: meta['fileSizeBytes'] is int
+          ? meta['fileSizeBytes'] as int
+          : int.tryParse('${meta['fileSizeBytes'] ?? ''}'),
+      latitude: meta['latitude'] is num
+          ? (meta['latitude'] as num).toDouble()
+          : double.tryParse('${meta['latitude'] ?? ''}'),
+      longitude: meta['longitude'] is num
+          ? (meta['longitude'] as num).toDouble()
+          : double.tryParse('${meta['longitude'] ?? ''}'),
+      locationLabel: meta['locationLabel']?.toString(),
+      contactName: meta['contactName']?.toString(),
+      contactPhone: meta['contactPhone']?.toString(),
+    );
+  }
+
+  void _addRich(RichMessage rm, {bool persist = true}) {
     setState(() => _richMessages.add(rm));
     _scrollToBottom();
+
+    if (!persist) return;
+    unawaited(_chatService.sendMessage(rm.message).then((persisted) {
+      if (!mounted) return;
+      final index = _richMessages.indexWhere((m) => m.message.id == rm.message.id);
+      if (index < 0) return;
+      setState(() {
+        _richMessages[index] = RichMessage(
+          message: persisted,
+          imagePath: rm.imagePath,
+          fileName: rm.fileName,
+          filePath: rm.filePath,
+          fileSizeBytes: rm.fileSizeBytes,
+          latitude: rm.latitude,
+          longitude: rm.longitude,
+          locationLabel: rm.locationLabel,
+          contactName: rm.contactName,
+          contactPhone: rm.contactPhone,
+        );
+      });
+    }));
   }
 
   void _scrollToBottom() {
@@ -275,6 +319,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
 
   Future<void> _pickFromGallery() async {
     _closeAttachMenu();
+    final senderId = _requireCurrentUserId();
+    if (senderId == null) return;
     try {
       final List<XFile> files = await _imagePicker.pickMultiImage(
         imageQuality: 85,
@@ -285,12 +331,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         _addRich(RichMessage(
           message: Message(
             id: _newId(),
-            senderId: _currentUserId,
+            senderId: senderId,
             receiverId: widget.user.id,
             content: '[Image]',
             type: MessageType.image,
             status: MessageStatus.sent,
             timestamp: DateTime.now(),
+            mediaUrl: file.path,
+            metadata: {'imagePath': file.path},
           ),
           imagePath: file.path,
         ));
@@ -304,6 +352,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
 
   Future<void> _pickDocument() async {
     _closeAttachMenu();
+    final senderId = _requireCurrentUserId();
+    if (senderId == null) return;
     try {
       final result = await FilePicker.platform.pickFiles(
         allowMultiple: false,
@@ -316,12 +366,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       _addRich(RichMessage(
         message: Message(
           id: _newId(),
-          senderId: _currentUserId,
+          senderId: senderId,
           receiverId: widget.user.id,
           content: '[Document: ${pf.name}]',
           type: MessageType.file,
           status: MessageStatus.sent,
           timestamp: DateTime.now(),
+          metadata: {
+            'fileName': pf.name,
+            'filePath': pf.path,
+            'fileSizeBytes': pf.size,
+          },
         ),
         fileName: pf.name,
         filePath: pf.path,
@@ -336,6 +391,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
 
   Future<void> _openCamera() async {
     _closeAttachMenu();
+    final senderId = _requireCurrentUserId();
+    if (senderId == null) return;
     try {
       final XFile? file = await _imagePicker.pickImage(
         source: ImageSource.camera,
@@ -347,12 +404,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       _addRich(RichMessage(
         message: Message(
           id: _newId(),
-          senderId: _currentUserId,
+          senderId: senderId,
           receiverId: widget.user.id,
           content: '[Photo]',
           type: MessageType.image,
           status: MessageStatus.sent,
           timestamp: DateTime.now(),
+          mediaUrl: file.path,
+          metadata: {'imagePath': file.path},
         ),
         imagePath: file.path,
       ));
@@ -365,6 +424,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
 
   Future<void> _shareLocation() async {
     _closeAttachMenu();
+    final senderId = _requireCurrentUserId();
+    if (senderId == null) return;
 
     // Check & request permission
     LocationPermission perm = await Geolocator.checkPermission();
@@ -429,12 +490,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       _addRich(RichMessage(
         message: Message(
           id: _newId(),
-          senderId: _currentUserId,
+          senderId: senderId,
           receiverId: widget.user.id,
           content: '[Location]',
           type: MessageType.location,
           status: MessageStatus.sent,
           timestamp: DateTime.now(),
+          metadata: {
+            'latitude': pos.latitude,
+            'longitude': pos.longitude,
+            'locationLabel': label,
+          },
         ),
         latitude: pos.latitude,
         longitude: pos.longitude,
@@ -449,6 +515,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
 
   Future<void> _pickContact() async {
     _closeAttachMenu();
+    final senderId = _requireCurrentUserId();
+    if (senderId == null) return;
 
     final bool granted = await FlutterContacts.requestPermission();
     if (!granted) {
@@ -466,12 +534,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       _addRich(RichMessage(
         message: Message(
           id: _newId(),
-          senderId: _currentUserId,
+          senderId: senderId,
           receiverId: widget.user.id,
           content: '[Contact: ${contact.displayName}]',
           type: MessageType.contact,
           status: MessageStatus.sent,
           timestamp: DateTime.now(),
+          metadata: {
+            'contactName': contact.displayName,
+            'contactPhone': phone,
+          },
         ),
         contactName: contact.displayName,
         contactPhone: phone,
@@ -542,6 +614,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     final currentUser = ref.watch(authProvider).value;
     _ensureSocket(currentUser);
 
+    if (currentUser != null && !_historyFetchStarted) {
+      _historyFetchStarted = true;
+      unawaited(_loadConversation(currentUser.id));
+    }
+
     final conversation = _richMessages
         .where((rm) =>
             (rm.message.senderId == widget.user.id &&
@@ -562,7 +639,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                 _closeAttachMenu();
                 FocusScope.of(context).unfocus();
               },
-              child: conversation.isEmpty
+              child: _isLoadingHistory
+                  ? const Center(
+                      child: CircularProgressIndicator(color: _N.indigoLight),
+                    )
+                  : conversation.isEmpty
                   ? _buildEmptyState()
                   : ListView.builder(
                       controller: _scrollController,
