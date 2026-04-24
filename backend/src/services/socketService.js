@@ -1,5 +1,6 @@
 const User = require('../models/User');
 const Message = require('../models/Message');
+const aiTranslationService = require('./aiTranslationService');
 
 // Store active users and their socket connections
 const activeUsers = new Map(); // userId -> socketId
@@ -169,6 +170,15 @@ const initializeSocket = (io) => {
     socket.on('end_call', (data) => {
       const { to } = data;
       const receiverSocketId = activeUsers.get(to);
+      const userId = socketToUser.get(socket.id);
+
+      // Clean up any active translation streams
+      if (userId) {
+        aiTranslationService.stopStream(userId);
+      }
+      if (to) {
+        aiTranslationService.stopStream(to);
+      }
 
       if (receiverSocketId) {
         io.to(receiverSocketId).emit('call_ended');
@@ -216,36 +226,41 @@ const initializeSocket = (io) => {
       }
     });
 
-    // AI Translation signaling
+    // AI Translation signaling & Audio Streaming Hook
     socket.on('start_translation', (data) => {
-      const { targetUserId, language } = data;
+      const { targetUserId, sourceLanguage, targetLanguage } = data;
       const userId = socketToUser.get(socket.id);
 
       if (!userId) return;
+
+      // Start the translation pipeline in the backend
+      aiTranslationService.startStream(
+        userId, 
+        targetUserId, 
+        sourceLanguage, 
+        targetLanguage, 
+        io, 
+        socketToUser, 
+        activeUsers
+      );
 
       const targetSocketId = activeUsers.get(targetUserId);
       if (targetSocketId) {
         io.to(targetSocketId).emit('translation_started', {
           from: userId,
-          language
+          language: targetLanguage
         });
       }
     });
 
     socket.on('translation_audio', (data) => {
-      const { targetUserId, audioData, language } = data;
+      const { targetUserId, audioData } = data;
       const userId = socketToUser.get(socket.id);
 
       if (!userId) return;
 
-      const targetSocketId = activeUsers.get(targetUserId);
-      if (targetSocketId) {
-        io.to(targetSocketId).emit('receive_audio_chunk', {
-          from: userId,
-          audioData,
-          language
-        });
-      }
+      // Pipe the audio chunk into the translation service instead of relaying it directly
+      aiTranslationService.processAudioChunk(userId, audioData);
     });
 
     socket.on('translated_text', (data) => {
@@ -318,6 +333,9 @@ const initializeSocket = (io) => {
 
       const userId = socketToUser.get(socket.id);
       if (userId) {
+        // Clean up translation streams
+        aiTranslationService.stopStream(userId);
+
         // Remove from active users
         activeUsers.delete(userId);
         socketToUser.delete(socket.id);

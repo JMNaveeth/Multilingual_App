@@ -53,6 +53,14 @@ class CallSocketService {
   final StreamController<Map<String, dynamic>> _candidateController =
       StreamController<Map<String, dynamic>>.broadcast();
 
+  // Translation StreamControllers
+  final StreamController<Map<String, dynamic>> _translationStartedController =
+      StreamController<Map<String, dynamic>>.broadcast();
+  final StreamController<Map<String, dynamic>> _receiveSubtitleController =
+      StreamController<Map<String, dynamic>>.broadcast();
+  final StreamController<Map<String, dynamic>> _receiveTranslatedAudioController =
+      StreamController<Map<String, dynamic>>.broadcast();
+
   Stream<IncomingCall> get incomingCalls => _incomingCallController.stream;
   Stream<Map<String, dynamic>> get callAccepted =>
       _callAcceptedController.stream;
@@ -60,6 +68,11 @@ class CallSocketService {
   Stream<Map<String, dynamic>> get offers => _offerController.stream;
   Stream<Map<String, dynamic>> get answers => _answerController.stream;
   Stream<Map<String, dynamic>> get candidates => _candidateController.stream;
+
+  // Translation Streams
+  Stream<Map<String, dynamic>> get translationStarted => _translationStartedController.stream;
+  Stream<Map<String, dynamic>> get receiveSubtitle => _receiveSubtitleController.stream;
+  Stream<Map<String, dynamic>> get receiveTranslatedAudio => _receiveTranslatedAudioController.stream;
 
   bool get isConnected => _socket?.connected ?? false;
 
@@ -162,6 +175,28 @@ class CallSocketService {
         _candidateController.add(payload);
       });
 
+      // AI Translation Listeners
+      _socket!.on('translation_started', (data) {
+        final payload = data is Map<String, dynamic>
+            ? data
+            : data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{};
+        _translationStartedController.add(payload);
+      });
+
+      _socket!.on('receive_subtitle', (data) {
+        final payload = data is Map<String, dynamic>
+            ? data
+            : data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{};
+        _receiveSubtitleController.add(payload);
+      });
+
+      _socket!.on('receive_translated_audio', (data) {
+        final payload = data is Map<String, dynamic>
+            ? data
+            : data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{};
+        _receiveTranslatedAudioController.add(payload);
+      });
+
       _socket!.connect();
     } finally {
       _connecting = false;
@@ -237,6 +272,30 @@ class CallSocketService {
     _socket?.emit('webrtc_ice_candidate', {
       'to': to,
       'candidate': candidate,
+    });
+  }
+
+  // --- AI Translation Emitters ---
+
+  void startTranslation({
+    required String targetUserId,
+    required String sourceLanguage,
+    required String targetLanguage,
+  }) {
+    _socket?.emit('start_translation', {
+      'targetUserId': targetUserId,
+      'sourceLanguage': sourceLanguage,
+      'targetLanguage': targetLanguage,
+    });
+  }
+
+  void sendTranslationAudio({
+    required String targetUserId,
+    required List<int> audioData,
+  }) {
+    _socket?.emit('translation_audio', {
+      'targetUserId': targetUserId,
+      'audioData': audioData,
     });
   }
 

@@ -35,12 +35,17 @@ class _CallScreenState extends ConsumerState<CallScreen> {
   StreamSubscription<Map<String, dynamic>>? _offerSub;
   StreamSubscription<Map<String, dynamic>>? _answerSub;
   StreamSubscription<Map<String, dynamic>>? _candidateSub;
+  StreamSubscription<Map<String, dynamic>>? _subtitleSub;
 
   bool _dialing = true;
   bool _connected = false;
   bool _muted = false;
   bool _cameraEnabled = true;
   bool _ending = false;
+
+  bool _translationEnabled = false;
+  String? _currentSubtitle;
+  Timer? _mockAudioStreamTimer;
 
   bool get _isVideoCall => widget.callType == CallType.video;
 
@@ -59,6 +64,8 @@ class _CallScreenState extends ConsumerState<CallScreen> {
     _offerSub?.cancel();
     _answerSub?.cancel();
     _candidateSub?.cancel();
+    _subtitleSub?.cancel();
+    _mockAudioStreamTimer?.cancel();
     _webRtcService?.close();
     super.dispose();
   }
@@ -198,6 +205,21 @@ class _CallScreenState extends ConsumerState<CallScreen> {
       _finishCall(showSnack: true);
     });
 
+    _subtitleSub = _callSocket.receiveSubtitle.listen((payload) {
+      if (!mounted) return;
+      setState(() {
+        _currentSubtitle = payload['text']?.toString();
+      });
+      // Clear subtitle after 4 seconds
+      Future.delayed(const Duration(seconds: 4), () {
+        if (mounted && _currentSubtitle == payload['text']?.toString()) {
+          setState(() {
+            _currentSubtitle = null;
+          });
+        }
+      });
+    });
+
     if (!widget.isIncoming) {
       _callSocket.callUser(
         userToCall: widget.peerUser.id,
@@ -254,6 +276,38 @@ class _CallScreenState extends ConsumerState<CallScreen> {
         _cameraEnabled = !_cameraEnabled;
       });
     }
+  }
+
+  void _toggleTranslation() {
+    setState(() {
+      _translationEnabled = !_translationEnabled;
+      if (_translationEnabled) {
+        _callSocket.startTranslation(
+          targetUserId: widget.peerUser.id,
+          sourceLanguage: 'en', // Hardcoded for demo
+          targetLanguage: 'ta', // Hardcoded for demo
+        );
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('AI Translation Enabled (English → Tamil)')),
+        );
+        
+        // Mock streaming audio chunks to backend
+        _mockAudioStreamTimer = Timer.periodic(const Duration(milliseconds: 250), (timer) {
+          if (!_muted && mounted) {
+            _callSocket.sendTranslationAudio(
+              targetUserId: widget.peerUser.id,
+              audioData: [0, 1, 2, 3], // Mock byte data
+            );
+          }
+        });
+      } else {
+        _mockAudioStreamTimer?.cancel();
+        _currentSubtitle = null;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('AI Translation Disabled')),
+        );
+      }
+    });
   }
 
   String get _statusText {
@@ -415,6 +469,34 @@ class _CallScreenState extends ConsumerState<CallScreen> {
                   ),
                 ),
               ),
+
+              // Subtitle Overlay
+              if (_currentSubtitle != null)
+                Positioned(
+                  left: 20,
+                  right: 20,
+                  bottom: 220,
+                  child: Center(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.7),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFF7A52F4).withOpacity(0.5)),
+                      ),
+                      child: Text(
+                        _currentSubtitle!,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+
               Positioned(
                 left: 0,
                 right: 0,
@@ -478,7 +560,17 @@ class _CallScreenState extends ConsumerState<CallScreen> {
                               color: const Color(0xFF2B2D55),
                               onTap: _toggleCamera,
                             ),
-                          if (_isVideoCall) const SizedBox(width: 16),
+                          const SizedBox(width: 16),
+                          _callButton(
+                            icon: _translationEnabled
+                                ? Icons.translate_rounded
+                                : Icons.g_translate_rounded,
+                            color: _translationEnabled
+                                ? const Color(0xFF7A52F4)
+                                : const Color(0xFF2B2D55),
+                            onTap: _toggleTranslation,
+                          ),
+                          const SizedBox(width: 16),
                           _callButton(
                             icon: Icons.call_end_rounded,
                             color: const Color(0xFFE23B4F),
