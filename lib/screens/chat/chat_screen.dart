@@ -221,6 +221,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
 
   Future<void> _loadConversation(String currentUserId) async {
     try {
+      await _chatService.migrateLegacyLocalMessages(
+        currentUserId: currentUserId,
+        knownPeerIds: [widget.user.id],
+      );
+
       final messages = await _chatService.getConversation(
         currentUserId: currentUserId,
         otherUserId: widget.user.id,
