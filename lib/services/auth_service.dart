@@ -68,7 +68,8 @@ class AuthService {
     };
   }
 
-  String _extractApiError(http.Response response, {String fallback = 'Request failed'}) {
+  String _extractApiError(http.Response response,
+      {String fallback = 'Request failed'}) {
     try {
       final body = jsonDecode(response.body);
       if (body is Map<String, dynamic>) {
@@ -150,7 +151,8 @@ class AuthService {
         throw _mobileHostHint(error);
       }
       if (kDebugMode) {
-        debugPrint('[AuthService] backend login failed, using local fallback: $error');
+        debugPrint(
+            '[AuthService] backend login failed, using local fallback: $error');
       }
     }
 
@@ -214,7 +216,8 @@ class AuthService {
         await saveToken(token);
         await _saveCurrentUserId(user.id);
         if (kDebugMode) {
-          debugPrint('[AuthService] backend register success for ${email.trim()}');
+          debugPrint(
+              '[AuthService] backend register success for ${email.trim()}');
         }
         return {
           'token': token,
@@ -228,7 +231,8 @@ class AuthService {
         throw _mobileHostHint(error);
       }
       if (kDebugMode) {
-        debugPrint('[AuthService] backend register failed, using local fallback: $error');
+        debugPrint(
+            '[AuthService] backend register failed, using local fallback: $error');
       }
     }
 
@@ -305,7 +309,8 @@ class AuthService {
         throw _mobileHostHint(error);
       }
       if (kDebugMode) {
-        debugPrint('[AuthService] backend getCurrentUser failed, local fallback: $error');
+        debugPrint(
+            '[AuthService] backend getCurrentUser failed, local fallback: $error');
       }
     }
 
@@ -371,13 +376,15 @@ class AuthService {
         return updated;
       }
 
-      throw Exception(_extractApiError(response, fallback: 'Update profile failed'));
+      throw Exception(
+          _extractApiError(response, fallback: 'Update profile failed'));
     } catch (error) {
       if (!_enableLocalAuthFallback) {
         throw _mobileHostHint(error);
       }
       if (kDebugMode) {
-        debugPrint('[AuthService] backend updateProfile failed, local fallback: $error');
+        debugPrint(
+            '[AuthService] backend updateProfile failed, local fallback: $error');
       }
     }
 
@@ -421,17 +428,20 @@ class AuthService {
         if (usersRaw is! List) return [];
         return usersRaw
             .whereType<Map>()
-            .map((e) => User.fromJson(e.map((k, v) => MapEntry(k.toString(), v))))
+            .map((e) =>
+                User.fromJson(e.map((k, v) => MapEntry(k.toString(), v))))
             .toList();
       }
 
-      throw Exception(_extractApiError(response, fallback: 'Failed to load users'));
+      throw Exception(
+          _extractApiError(response, fallback: 'Failed to load users'));
     } catch (error) {
       if (!_enableLocalAuthFallback) {
         throw _mobileHostHint(error);
       }
       if (kDebugMode) {
-        debugPrint('[AuthService] backend getAllUsers failed, local fallback: $error');
+        debugPrint(
+            '[AuthService] backend getAllUsers failed, local fallback: $error');
       }
     }
 
