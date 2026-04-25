@@ -64,6 +64,8 @@ class CallSocketService {
   // Chat StreamControllers
   final StreamController<Map<String, dynamic>> _newMessageController =
       StreamController<Map<String, dynamic>>.broadcast();
+  final StreamController<Map<String, dynamic>> _callTextSentController =
+      StreamController<Map<String, dynamic>>.broadcast();
 
   Stream<IncomingCall> get incomingCalls => _incomingCallController.stream;
   Stream<Map<String, dynamic>> get callAccepted =>
@@ -80,6 +82,7 @@ class CallSocketService {
 
   // Chat Streams
   Stream<Map<String, dynamic>> get newMessages => _newMessageController.stream;
+  Stream<Map<String, dynamic>> get callTextSent => _callTextSentController.stream;
 
   bool get isConnected => _socket?.connected ?? false;
 
@@ -210,6 +213,13 @@ class CallSocketService {
             ? data
             : data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{};
         _newMessageController.add(payload);
+      });
+
+      _socket!.on('call_text_sent', (data) {
+        final payload = data is Map<String, dynamic>
+            ? data
+            : data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{};
+        _callTextSentController.add(payload);
       });
 
       _socket!.connect();

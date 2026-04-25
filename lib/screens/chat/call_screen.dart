@@ -8,6 +8,9 @@ import 'package:multilingual_chat_app/models/user.dart';
 import 'package:multilingual_chat_app/providers/auth_provider.dart';
 import 'package:multilingual_chat_app/services/call_socket_service.dart';
 import 'package:multilingual_chat_app/services/webrtc_call_service.dart';
+import 'package:speech_to_text/speech_to_text.dart';
+import 'package:speech_to_text/speech_recognition_error.dart';
+import 'package:speech_to_text/speech_recognition_result.dart';
 
 enum CallType { voice, video }
 
@@ -38,6 +41,8 @@ class _CallScreenState extends ConsumerState<CallScreen> {
   StreamSubscription<Map<String, dynamic>>? _candidateSub;
   StreamSubscription<Map<String, dynamic>>? _subtitleSub;
   StreamSubscription<Map<String, dynamic>>? _audioSub;
+  StreamSubscription<Map<String, dynamic>>? _translationStartedSub;
+  StreamSubscription<Map<String, dynamic>>? _callTextSentSub;
 
   bool _dialing = true;
   bool _connected = false;
@@ -47,10 +52,19 @@ class _CallScreenState extends ConsumerState<CallScreen> {
 
   bool _translationEnabled = false;
   String? _currentSubtitle;
+  String? _translationBanner;
+  int? _lastLatencyMs;
   Timer? _mockAudioStreamTimer;
+  Timer? _speechRestartTimer;
   
   final AudioPlayer _audioPlayer = AudioPlayer();
   final TextEditingController _messageController = TextEditingController();
+  final SpeechToText _speechToText = SpeechToText();
+
+  bool _speechReady = false;
+  bool _isSpeechListening = false;
+  String _lastInterimTranscript = '';
+  DateTime _lastSpeechSentAt = DateTime.fromMillisecondsSinceEpoch(0);
 
   bool get _isVideoCall => widget.callType == CallType.video;
 
@@ -71,7 +85,11 @@ class _CallScreenState extends ConsumerState<CallScreen> {
     _candidateSub?.cancel();
     _subtitleSub?.cancel();
     _audioSub?.cancel();
+    _translationStartedSub?.cancel();
+    _callTextSentSub?.cancel();
     _mockAudioStreamTimer?.cancel();
+    _speechRestartTimer?.cancel();
+    _stopSpeechRecognition();
     _webRtcService?.close();
     _audioPlayer.dispose();
     _messageController.dispose();
@@ -91,6 +109,7 @@ class _CallScreenState extends ConsumerState<CallScreen> {
     }
 
     await _callSocket.connect(userId: currentUser.id);
+    await _initializeSpeechRecognition();
 
     _webRtcService = WebRtcCallService(
       isVideoCall: _isVideoCall,
@@ -159,6 +178,7 @@ class _CallScreenState extends ConsumerState<CallScreen> {
           _dialing = false;
         });
       }
+      _maybeStartSpeechRecognition();
     });
 
     _answerSub = _callSocket.answers.listen((payload) async {
@@ -185,6 +205,7 @@ class _CallScreenState extends ConsumerState<CallScreen> {
           _dialing = false;
         });
       }
+      _maybeStartSpeechRecognition();
     });
 
     _candidateSub = _callSocket.candidates.listen((payload) async {
@@ -215,8 +236,10 @@ class _CallScreenState extends ConsumerState<CallScreen> {
 
     _subtitleSub = _callSocket.receiveSubtitle.listen((payload) {
       if (!mounted) return;
+      final latency = payload['latencyMs'];
       setState(() {
         _currentSubtitle = payload['text']?.toString();
+        _lastLatencyMs = latency is num ? latency.toInt() : _lastLatencyMs;
       });
       // Clear subtitle after 4 seconds
       Future.delayed(const Duration(seconds: 4), () {
@@ -243,6 +266,26 @@ class _CallScreenState extends ConsumerState<CallScreen> {
       }
     });
 
+    _translationStartedSub = _callSocket.translationStarted.listen((payload) {
+      if (!mounted) return;
+      final sourceLanguage = payload['sourceLanguage']?.toString() ?? 'en';
+      final targetLanguage = payload['targetLanguage']?.toString() ?? 'ta';
+      setState(() {
+        _translationEnabled = true;
+        _translationBanner = 'Live AI translation: $sourceLanguage -> $targetLanguage';
+      });
+    });
+
+    _callTextSentSub = _callSocket.callTextSent.listen((payload) {
+      if (!mounted) return;
+      final latency = payload['latencyMs'];
+      if (latency is num) {
+        setState(() {
+          _lastLatencyMs = latency.toInt();
+        });
+      }
+    });
+
     if (!widget.isIncoming) {
       _callSocket.callUser(
         userToCall: widget.peerUser.id,
@@ -265,6 +308,7 @@ class _CallScreenState extends ConsumerState<CallScreen> {
     }
 
     _ending = true;
+    _stopSpeechRecognition();
     await _webRtcService?.close();
     _webRtcService = null;
 
@@ -290,6 +334,11 @@ class _CallScreenState extends ConsumerState<CallScreen> {
         _muted = !_muted;
       });
     }
+    if (_muted) {
+      _stopSpeechRecognition();
+    } else {
+      _maybeStartSpeechRecognition();
+    }
   }
 
   Future<void> _toggleCamera() async {
@@ -309,6 +358,7 @@ class _CallScreenState extends ConsumerState<CallScreen> {
     setState(() {
       _translationEnabled = !_translationEnabled;
       if (_translationEnabled) {
+        _translationBanner = 'Live AI translation: $myLanguage -> $peerLanguage';
         _callSocket.startTranslation(
           targetUserId: widget.peerUser.id,
           sourceLanguage: myLanguage,
@@ -317,14 +367,168 @@ class _CallScreenState extends ConsumerState<CallScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('AI Translation Enabled ($myLanguage → $peerLanguage)')),
         );
+        _maybeStartSpeechRecognition();
       } else {
         _mockAudioStreamTimer?.cancel();
         _currentSubtitle = null;
+        _translationBanner = null;
+        _lastLatencyMs = null;
+        _stopSpeechRecognition();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('AI Translation Disabled')),
         );
       }
     });
+  }
+
+  Future<void> _initializeSpeechRecognition() async {
+    if (_speechReady) {
+      return;
+    }
+    try {
+      _speechReady = await _speechToText.initialize(
+        onError: _onSpeechError,
+        onStatus: _onSpeechStatus,
+      );
+    } catch (_) {
+      _speechReady = false;
+    }
+  }
+
+  void _onSpeechStatus(String status) {
+    final listening = status == 'listening';
+    if (mounted && _isSpeechListening != listening) {
+      setState(() {
+        _isSpeechListening = listening;
+      });
+    }
+    if (!listening && _shouldKeepListening()) {
+      _scheduleSpeechRestart();
+    }
+  }
+
+  void _onSpeechError(SpeechRecognitionError error) {
+    if (_shouldKeepListening()) {
+      _scheduleSpeechRestart();
+    }
+  }
+
+  bool _shouldKeepListening() {
+    return mounted && _translationEnabled && _connected && !_muted;
+  }
+
+  Future<void> _maybeStartSpeechRecognition() async {
+    if (!_shouldKeepListening()) {
+      return;
+    }
+    if (!_speechReady) {
+      await _initializeSpeechRecognition();
+    }
+    if (!_speechReady || _speechToText.isListening) {
+      return;
+    }
+
+    final currentUser = ref.read(authProvider).value;
+    final localeId = _languageToLocale(currentUser?.preferredLanguage ?? 'en');
+
+    try {
+      await _speechToText.listen(
+        onResult: _onSpeechResult,
+        localeId: localeId,
+        listenOptions: SpeechListenOptions(
+          partialResults: true,
+          cancelOnError: false,
+        ),
+        listenFor: const Duration(seconds: 50),
+        pauseFor: const Duration(seconds: 3),
+      );
+      if (mounted) {
+        setState(() {
+          _isSpeechListening = true;
+          _translationBanner ??= 'Live AI translation running (on-device speech)';
+        });
+      }
+    } catch (_) {
+      _scheduleSpeechRestart();
+    }
+  }
+
+  void _scheduleSpeechRestart() {
+    _speechRestartTimer?.cancel();
+    _speechRestartTimer = Timer(const Duration(milliseconds: 450), () {
+      _maybeStartSpeechRecognition();
+    });
+  }
+
+  Future<void> _stopSpeechRecognition() async {
+    _speechRestartTimer?.cancel();
+    _lastInterimTranscript = '';
+    if (_speechToText.isListening) {
+      await _speechToText.stop();
+    }
+    if (mounted && _isSpeechListening) {
+      setState(() {
+        _isSpeechListening = false;
+      });
+    }
+  }
+
+  void _onSpeechResult(SpeechRecognitionResult result) {
+    if (!_translationEnabled || !_connected || _muted) {
+      return;
+    }
+    final fullText = result.recognizedWords.trim();
+    if (fullText.isEmpty) {
+      return;
+    }
+
+    String deltaText = fullText;
+    if (_lastInterimTranscript.isNotEmpty &&
+        fullText.startsWith(_lastInterimTranscript)) {
+      deltaText = fullText.substring(_lastInterimTranscript.length).trim();
+    }
+
+    final now = DateTime.now();
+    final msSinceLast = now.difference(_lastSpeechSentAt).inMilliseconds;
+    final shouldSend = result.finalResult || deltaText.length >= 18 || msSinceLast >= 1300;
+
+    if (shouldSend && deltaText.isNotEmpty) {
+      _sendLiveSpeechText(deltaText);
+      _lastSpeechSentAt = now;
+    }
+
+    _lastInterimTranscript = result.finalResult ? '' : fullText;
+  }
+
+  void _sendLiveSpeechText(String text) {
+    final currentUser = ref.read(authProvider).value;
+    final myLanguage = currentUser?.preferredLanguage ?? 'en';
+    final peerLanguage = widget.peerUser.preferredLanguage;
+    _callSocket.sendCallText(
+      targetUserId: widget.peerUser.id,
+      text: text,
+      sourceLanguage: myLanguage,
+      targetLanguage: peerLanguage,
+    );
+  }
+
+  String _languageToLocale(String languageCode) {
+    switch (languageCode.toLowerCase()) {
+      case 'ta':
+        return 'ta_IN';
+      case 'en':
+        return 'en_US';
+      case 'hi':
+        return 'hi_IN';
+      case 'te':
+        return 'te_IN';
+      case 'kn':
+        return 'kn_IN';
+      case 'ml':
+        return 'ml_IN';
+      default:
+        return 'en_US';
+    }
   }
 
   void _sendMessage() {
@@ -535,6 +739,55 @@ class _CallScreenState extends ConsumerState<CallScreen> {
                           fontWeight: FontWeight.w500,
                         ),
                       ),
+                    ),
+                  ),
+                ),
+
+              if (_translationEnabled)
+                Positioned(
+                  left: 20,
+                  right: 20,
+                  bottom: 270,
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1B1D39).withOpacity(0.9),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: const Color(0xFF7A52F4).withOpacity(0.55),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.auto_awesome_rounded,
+                          color: Color(0xFFB9A6FF),
+                          size: 16,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _isSpeechListening
+                                ? '${_translationBanner ?? 'Live AI translation enabled'} | Listening'
+                                : '${_translationBanner ?? 'Live AI translation enabled'} | Waiting mic',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        if (_lastLatencyMs != null)
+                          Text(
+                            '${_lastLatencyMs}ms',
+                            style: const TextStyle(
+                              color: Color(0xFF8EF7B5),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                 ),

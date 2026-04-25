@@ -317,18 +317,27 @@ const initializeSocket = (io) => {
     });
 
     // AI Translation signaling & Audio Streaming Hook
-    socket.on('start_translation', (data) => {
+    socket.on('start_translation', async (data) => {
       const { targetUserId, sourceLanguage, targetLanguage } = data;
       const userId = socketToUser.get(socket.id);
 
       if (!userId) return;
 
+      const resolvedSourceLanguage = normalizeLanguage(
+        sourceLanguage,
+        await resolveUserPreferredLanguage(userId, 'en')
+      );
+      const resolvedTargetLanguage = normalizeLanguage(
+        targetLanguage,
+        await resolveUserPreferredLanguage(targetUserId, 'en')
+      );
+
       // Start the translation pipeline in the backend
       aiTranslationService.startStream(
         userId, 
         targetUserId, 
-        sourceLanguage, 
-        targetLanguage, 
+        resolvedSourceLanguage, 
+        resolvedTargetLanguage, 
         io, 
         socketToUser, 
         activeUsers
@@ -338,7 +347,8 @@ const initializeSocket = (io) => {
       if (targetSocketId) {
         io.to(targetSocketId).emit('translation_started', {
           from: userId,
-          language: targetLanguage
+          sourceLanguage: resolvedSourceLanguage,
+          targetLanguage: resolvedTargetLanguage
         });
       }
     });
@@ -394,12 +404,23 @@ const initializeSocket = (io) => {
       if (!userId || !text || text.trim() === '') return;
 
       try {
+        const startedAt = Date.now();
+        const resolvedSourceLanguage = normalizeLanguage(
+          sourceLanguage,
+          await resolveUserPreferredLanguage(userId, 'en')
+        );
+        const resolvedTargetLanguage = normalizeLanguage(
+          targetLanguage,
+          await resolveUserPreferredLanguage(targetUserId, 'en')
+        );
+
         // Use the full translate + TTS pipeline
         const { translatedText, audioBuffer } = await aiTranslationService.translateAndSpeak(
           text.trim(),
-          sourceLanguage || 'en',
-          targetLanguage || 'ta'
+          resolvedSourceLanguage,
+          resolvedTargetLanguage
         );
+        const latencyMs = Date.now() - startedAt;
 
         const targetSocketId = activeUsers.get(targetUserId);
         if (targetSocketId) {
@@ -408,8 +429,9 @@ const initializeSocket = (io) => {
             from: userId,
             text: translatedText,
             originalText: text.trim(),
-            originalLanguage: sourceLanguage || 'en',
-            targetLanguage: targetLanguage || 'ta'
+            originalLanguage: resolvedSourceLanguage,
+            targetLanguage: resolvedTargetLanguage,
+            latencyMs
           });
 
           // Send TTS audio
@@ -417,7 +439,7 @@ const initializeSocket = (io) => {
             io.to(targetSocketId).emit('receive_translated_audio', {
               from: userId,
               audioData: Array.from(audioBuffer),
-              language: targetLanguage || 'ta'
+              language: resolvedTargetLanguage
             });
           }
         }
@@ -426,10 +448,11 @@ const initializeSocket = (io) => {
         socket.emit('call_text_sent', {
           originalText: text.trim(),
           translatedText,
-          targetLanguage: targetLanguage || 'ta'
+          targetLanguage: resolvedTargetLanguage,
+          latencyMs
         });
 
-        console.log(`💬 Call text translated: "${text}" → "${translatedText}"`);
+        console.log(`💬 Call text translated in ${latencyMs}ms: "${text}" → "${translatedText}"`);
       } catch (error) {
         console.error('send_call_text error:', error);
         socket.emit('error', { message: 'Translation failed' });
