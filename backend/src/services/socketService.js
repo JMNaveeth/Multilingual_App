@@ -121,18 +121,32 @@ const initializeSocket = (io) => {
         );
         
         let translatedContent = null;
+        let translatedAudioData = null;
+        let voiceTranscript = typeof metadata?.voiceTranscript === 'string'
+          ? metadata.voiceTranscript.trim()
+          : '';
 
-        // Translate only text payloads and only when languages differ.
-        if (type === 'text' && senderLanguage !== targetLanguage) {
+        // Translate text payloads and transcribed voice notes.
+        if ((type === 'text' || (type === 'audio' && voiceTranscript)) && senderLanguage !== targetLanguage) {
+          const sourceText = type === 'audio' ? voiceTranscript : content.trim();
           try {
             translatedContent = await aiTranslationService.translateText(
-              content.trim(),
+              sourceText,
               senderLanguage,
               targetLanguage
             );
+            if (type === 'audio' && translatedContent && translatedContent.trim()) {
+              const ttsAudioBuffer = await aiTranslationService.textToSpeech(
+                translatedContent,
+                targetLanguage
+              );
+              if (ttsAudioBuffer) {
+                translatedAudioData = Array.from(ttsAudioBuffer);
+              }
+            }
           } catch (err) {
             console.error('Translation failed, using original:', err.message);
-            translatedContent = content.trim();
+            translatedContent = sourceText;
           }
         }
 
@@ -148,7 +162,9 @@ const initializeSocket = (io) => {
             mediaUrl,
             metadata: {
               ...(metadata || {}),
+              voiceTranscript: voiceTranscript || undefined,
               translatedContent,
+              translatedAudioData,
               originalLanguage: senderLanguage,
               targetLanguage
             }
@@ -181,7 +197,9 @@ const initializeSocket = (io) => {
             mediaUrl,
             metadata: {
               ...(metadata || {}),
+              voiceTranscript: voiceTranscript || undefined,
               translatedContent,
+              translatedAudioData,
               originalLanguage: senderLanguage,
               targetLanguage
             },

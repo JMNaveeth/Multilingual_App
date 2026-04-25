@@ -7,10 +7,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:just_audio/just_audio.dart';
-import 'package:record/record.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
+import 'package:speech_to_text/speech_recognition_error.dart';
+import 'package:speech_to_text/speech_recognition_result.dart';
+import 'package:speech_to_text/speech_to_text.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:multilingual_chat_app/models/message.dart';
 import 'package:multilingual_chat_app/models/user.dart';
@@ -100,11 +102,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
 
   final _chatService = ChatService();
   final _imagePicker = ImagePicker();
-  final _audioRecorder = AudioRecorder();
   final _audioPlayer = AudioPlayer();
+  final SpeechToText _speechToText = SpeechToText();
   bool _isRecording = false;
   bool _isAudioPlaying = false;
   String? _activeAudioPath;
+  bool _speechReady = false;
+  String _currentVoiceTranscript = '';
 
   late final AnimationController _onlineGlowCtrl;
   late final AnimationController _attachMenuCtrl;
@@ -152,13 +156,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       statusBarColor: Colors.transparent,
       statusBarIconBrightness: Brightness.light,
     ));
+    unawaited(_initializeSpeechToText());
   }
 
   @override
   void dispose() {
     _incomingCallSub?.cancel();
     _newMessageSub?.cancel();
-    unawaited(_audioRecorder.dispose());
+    if (_speechToText.isListening) {
+      unawaited(_speechToText.stop());
+    }
     unawaited(_audioPlayer.dispose());
     _messageController.dispose();
     _scrollController.dispose();
@@ -174,7 +181,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     _socketReady = true;
     await CallSocketService.instance.connect(userId: currentUser.id);
 
-    _newMessageSub ??= CallSocketService.instance.newMessages.listen((payload) {
+    _newMessageSub ??= CallSocketService.instance.newMessages.listen((payload) async {
       if (!mounted) return;
       try {
         final messageJson = payload.map((k, v) => MapEntry(k.toString(), v));
@@ -187,7 +194,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
           // Check if we already have it to avoid duplicates from local sync
           final exists = _richMessages.any((rm) => rm.message.id == message.id);
           if (!exists) {
-            _addRich(RichMessage(message: message), localOnly: true);
+            final richMessage = await _fromIncomingMessage(message);
+            _addRich(richMessage, localOnly: true);
           }
         }
       } catch (e) {
@@ -313,6 +321,33 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       contactName: meta['contactName']?.toString(),
       contactPhone: meta['contactPhone']?.toString(),
     );
+  }
+
+  Future<RichMessage> _fromIncomingMessage(Message message) async {
+    final meta = message.metadata ?? const <String, dynamic>{};
+    final translatedAudio = meta['translatedAudioData'];
+    if (message.type == MessageType.audio &&
+        translatedAudio is List &&
+        translatedAudio.isNotEmpty) {
+      try {
+        final bytes = List<int>.from(translatedAudio);
+        final path =
+            '${Directory.systemTemp.path}/translated_voice_${DateTime.now().microsecondsSinceEpoch}.mp3';
+        await File(path).writeAsBytes(bytes, flush: true);
+        return RichMessage(
+          message: message.copyWith(
+            metadata: {
+              ...meta,
+              'audioPath': path,
+            },
+          ),
+          audioPath: path,
+        );
+      } catch (e) {
+        debugPrint('Failed to save translated voice audio: $e');
+      }
+    }
+    return _fromMessage(message);
   }
 
   void _addRich(RichMessage rm, {bool persist = true, bool localOnly = false}) {
@@ -659,32 +694,57 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     await _startVoiceRecording();
   }
 
-  Future<void> _startVoiceRecording() async {
-    final senderId = _requireCurrentUserId();
-    if (senderId == null) return;
+  Future<void> _initializeSpeechToText() async {
+    if (_speechReady) return;
+    try {
+      _speechReady = await _speechToText.initialize(
+        onError: _onSpeechError,
+        onStatus: (_) {},
+      );
+    } catch (_) {
+      _speechReady = false;
+    }
+  }
 
-    final hasPermission = await _audioRecorder.hasPermission();
-    if (!hasPermission) {
-      _showError('Microphone permission denied.');
+  void _onSpeechError(SpeechRecognitionError error) {
+    if (!mounted) return;
+    if (_isRecording) {
+      setState(() => _isRecording = false);
+    }
+  }
+
+  void _onSpeechResult(SpeechRecognitionResult result) {
+    _currentVoiceTranscript = result.recognizedWords.trim();
+  }
+
+  Future<void> _startVoiceRecording() async {
+    if (_requireCurrentUserId() == null) return;
+    await _initializeSpeechToText();
+    if (!_speechReady) {
+      _showError('Speech recognition is not available on this device.');
       return;
     }
 
-    final ext = Platform.isIOS ? 'm4a' : 'm4a';
-    final path =
-        '${Directory.systemTemp.path}/voice_${DateTime.now().microsecondsSinceEpoch}.$ext';
-
     try {
-      await _audioRecorder.start(
-        const RecordConfig(encoder: AudioEncoder.aacLc),
-        path: path,
+      _currentVoiceTranscript = '';
+      final currentUser = ref.read(authProvider).value;
+      await _speechToText.listen(
+        onResult: _onSpeechResult,
+        localeId: _languageToLocale(currentUser?.preferredLanguage ?? 'en'),
+        listenOptions: SpeechListenOptions(
+          partialResults: true,
+          cancelOnError: false,
+        ),
+        listenFor: const Duration(seconds: 40),
+        pauseFor: const Duration(seconds: 2),
       );
       if (!mounted) return;
       setState(() => _isRecording = true);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Recording started. Tap mic again to send.')),
+        const SnackBar(content: Text('Listening... tap mic again to send translated voice.')),
       );
     } catch (e) {
-      _showError('Could not start recording: $e');
+      _showError('Could not start voice capture: $e');
     }
   }
 
@@ -696,11 +756,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     }
 
     try {
-      final path = await _audioRecorder.stop();
+      if (_speechToText.isListening) {
+        await _speechToText.stop();
+      }
       if (!mounted) return;
       setState(() => _isRecording = false);
-      if (path == null || path.isEmpty) {
-        _showError('Recording failed. Please try again.');
+      final transcript = _currentVoiceTranscript.trim();
+      if (transcript.isEmpty) {
+        _showError('Could not detect speech. Please try again.');
         return;
       }
 
@@ -709,30 +772,50 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
           id: _newId(),
           senderId: currentUser.id,
           receiverId: widget.user.id,
-          content: '[Voice note]',
+          content: transcript,
           type: MessageType.audio,
           status: MessageStatus.sent,
           timestamp: DateTime.now(),
-          mediaUrl: path,
-          metadata: {'audioPath': path},
+          metadata: {
+            'voiceTranscript': transcript,
+            'originalLanguage': currentUser.preferredLanguage,
+            'targetLanguage': widget.user.preferredLanguage,
+          },
         ),
-        audioPath: path,
       );
 
       _addRich(rm, localOnly: true);
       CallSocketService.instance.sendMessageViaSocket(
         receiverId: widget.user.id,
-        content: '[Voice note]',
+        content: transcript,
         type: 'audio',
-        mediaUrl: path,
         senderLanguage: currentUser.preferredLanguage,
         receiverLanguage: widget.user.preferredLanguage,
-        metadata: {'audioPath': path},
+        metadata: {
+          'voiceTranscript': transcript,
+        },
       );
     } catch (e) {
       if (!mounted) return;
       setState(() => _isRecording = false);
-      _showError('Could not stop recording: $e');
+      _showError('Could not send voice message: $e');
+    }
+  }
+
+  String _languageToLocale(String languageCode) {
+    switch (languageCode.toLowerCase()) {
+      case 'ta':
+        return 'ta_IN';
+      case 'hi':
+        return 'hi_IN';
+      case 'te':
+        return 'te_IN';
+      case 'kn':
+        return 'kn_IN';
+      case 'ml':
+        return 'ml_IN';
+      default:
+        return 'en_US';
     }
   }
 
@@ -1255,6 +1338,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   Widget _buildAudioBubble(RichMessage rm, bool isMe, String time) {
     final path = rm.audioPath;
     final isPlaying = path != null && _isAudioPlaying && _activeAudioPath == path;
+    final meta = rm.message.metadata ?? const <String, dynamic>{};
+    final translatedText = meta['translatedContent']?.toString();
+    final transcript = (meta['voiceTranscript'] ?? rm.message.content).toString();
+    final displayText = !isMe &&
+            translatedText != null &&
+            translatedText.isNotEmpty
+        ? translatedText
+        : transcript;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
@@ -1270,7 +1361,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                 shape: BoxShape.circle,
               ),
               child: Icon(
-                isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                path == null
+                    ? Icons.graphic_eq_rounded
+                    : isPlaying
+                        ? Icons.pause_rounded
+                        : Icons.play_arrow_rounded,
                 color: _N.indigoLight,
               ),
             ),
@@ -1280,13 +1375,25 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Voice message',
+                      path == null ? 'Voice is processing...' : 'Voice message',
                       style: TextStyle(
                         color: isMe ? Colors.white : const Color(0xFFE9F0F4),
                         fontSize: 13.5,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
+                    if (displayText.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        displayText,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: isMe ? Colors.white70 : Colors.white70,
+                          fontSize: 11.5,
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 4),
                     Container(
                       height: 4,
