@@ -5,8 +5,19 @@ import 'package:multilingual_chat_app/providers/auth_provider.dart';
 import 'package:multilingual_chat_app/screens/auth/login_screen.dart';
 import 'package:multilingual_chat_app/screens/auth/register_screen.dart';
 import 'package:multilingual_chat_app/screens/home/home_screen.dart';
+import 'package:multilingual_chat_app/services/supabase_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  if (SupabaseService.isConfigured) {
+    await Supabase.initialize(
+      url: SupabaseService.supabaseUrl,
+      anonKey: SupabaseService.supabaseAnonKey,
+    );
+  }
+
   runApp(
     const ProviderScope(
       child: MultilingualChatApp(),
@@ -65,7 +76,7 @@ class MultilingualChatApp extends ConsumerWidget {
                   const Icon(Icons.wifi_off, size: 64, color: Colors.redAccent),
                   const SizedBox(height: 12),
                   const Text(
-                    'Unable to reach backend server',
+                    'Unable to connect to Supabase',
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                     textAlign: TextAlign.center,
                   ),
@@ -90,9 +101,9 @@ class MultilingualChatApp extends ConsumerWidget {
                       showDialog<void>(
                         context: context,
                         builder: (context) => AlertDialog(
-                          title: const Text('Start backend server'),
+                          title: const Text('Configure Supabase'),
                           content: const SelectableText(
-                            '1) Open a terminal\n2) cd backend\n3) npm install\n4) npm run dev\n\nThe backend listens on port 3000 by default. Start it and then press Retry.',
+                            'Run app with:\n\nflutter run --dart-define=SUPABASE_URL=https://YOUR_PROJECT.supabase.co --dart-define=SUPABASE_ANON_KEY=YOUR_ANON_KEY\n\nThen press Retry.',
                           ),
                           actions: [
                             TextButton(
@@ -102,7 +113,7 @@ class MultilingualChatApp extends ConsumerWidget {
                         ),
                       );
                     },
-                    child: const Text('How to start backend'),
+                    child: const Text('How to configure Supabase'),
                   ),
                 ],
               ),

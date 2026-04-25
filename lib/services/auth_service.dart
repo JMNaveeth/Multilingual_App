@@ -1,465 +1,277 @@
-import 'dart:convert';
 import 'package:flutter/foundation.dart' show kDebugMode, debugPrint;
-import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:multilingual_chat_app/models/user.dart';
+import 'package:multilingual_chat_app/models/user.dart' as app_model;
+import 'package:multilingual_chat_app/services/supabase_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' hide User;
 
 class AuthService {
-  static const String baseUrl = String.fromEnvironment(
-    'API_BASE_URL',
-    defaultValue: 'http://localhost:3000/api',
-  );
-  static const bool _enableLocalAuthFallback = bool.fromEnvironment(
-    'ENABLE_LOCAL_AUTH_FALLBACK',
-    defaultValue: false,
-  );
+  // Kept for compatibility with existing call/socket code paths.
+  static const String baseUrl = '';
 
-  // Local mode for now. You can swap these methods to Supabase later.
-  static const String tokenKey = 'auth_token';
-  static const String _usersKey = 'local_users_v1';
-  static const String _currentUserIdKey = 'local_current_user_id_v1';
-
-  Future<List<Map<String, dynamic>>> _readUsers() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_usersKey);
-    if (raw == null || raw.isEmpty) return [];
-
-    final decoded = jsonDecode(raw);
-    if (decoded is! List) return [];
-
-    return decoded
-        .whereType<Map>()
-        .map((e) => e.map((k, v) => MapEntry(k.toString(), v)))
-        .toList();
-  }
-
-  Future<void> _writeUsers(List<Map<String, dynamic>> users) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_usersKey, jsonEncode(users));
-  }
-
-  Future<void> _saveCurrentUserId(String userId) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_currentUserIdKey, userId);
-  }
-
-  Future<String?> _getCurrentUserId() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_currentUserIdKey);
-  }
-
-  Future<void> _clearCurrentUserId() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_currentUserIdKey);
-  }
-
-  String _newUserId() => DateTime.now().microsecondsSinceEpoch.toString();
-
-  String _normalizeBaseUrl(String value) =>
-      value.endsWith('/') ? value.substring(0, value.length - 1) : value;
-
-  Uri _apiUri(String path) => Uri.parse('${_normalizeBaseUrl(baseUrl)}$path');
-
-  Future<Map<String, String>> _authHeaders() async {
-    final token = await getToken();
-    return {
-      'Content-Type': 'application/json',
-      if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
-    };
-  }
-
-  String _extractApiError(http.Response response,
-      {String fallback = 'Request failed'}) {
-    try {
-      final body = jsonDecode(response.body);
-      if (body is Map<String, dynamic>) {
-        final message = body['message']?.toString();
-        if (message != null && message.isNotEmpty) {
-          return message;
-        }
-      }
-    } catch (_) {}
-    return '$fallback (${response.statusCode})';
-  }
-
-  Exception _mobileHostHint(Object error) {
-    final lower = error.toString().toLowerCase();
-    if (baseUrl.contains('localhost') &&
-        (lower.contains('socket') ||
-            lower.contains('connection') ||
-            lower.contains('failed host lookup') ||
-            lower.contains('connection refused'))) {
-      return Exception(
-        'Cannot reach $baseUrl from this device. For phone testing, run with '
-        '--dart-define=API_BASE_URL=http://<YOUR-LAPTOP-LAN-IP>:3000/api',
-      );
-    }
-    return Exception(error.toString());
-  }
+  SupabaseClient get _client => SupabaseService.client;
 
   Future<String?> getToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(tokenKey);
+    return _client.auth.currentSession?.accessToken;
   }
 
   Future<void> saveToken(String token) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(tokenKey, token);
+    // Token persistence is handled by supabase_flutter.
   }
 
   Future<void> removeToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(tokenKey);
+    await _client.auth.signOut();
+  }
+
+  DateTime _toDateTime(dynamic value) {
+    if (value is DateTime) return value;
+    if (value is String && value.isNotEmpty) {
+      return DateTime.tryParse(value) ?? DateTime.now();
+    }
+    return DateTime.now();
+  }
+
+  Map<String, dynamic> _userToProfileMap(app_model.User user) {
+    return {
+      'id': user.id,
+      'email': user.email,
+      'name': user.name,
+      'profileImageUrl': user.profileImageUrl,
+      'preferredLanguage': user.preferredLanguage,
+      'isOnline': user.isOnline,
+      'lastSeen': user.lastSeen?.toIso8601String(),
+      'createdAt': user.createdAt.toIso8601String(),
+    };
+  }
+
+  app_model.User _profileToUser(Map<String, dynamic> row,
+      {String? fallbackEmail}) {
+    final mapped = <String, dynamic>{
+      '_id': (row['id'] ?? '').toString(),
+      'email': (row['email'] ?? fallbackEmail ?? '').toString(),
+      'name': (row['name'] ?? 'User').toString(),
+      'profileImageUrl': row['profileImageUrl'] ?? row['profile_image_url'],
+      'preferredLanguage':
+          row['preferredLanguage'] ?? row['preferred_language'] ?? 'en',
+      'isOnline': row['isOnline'] ?? row['is_online'] ?? false,
+      'lastSeen': row['lastSeen'] ?? row['last_seen'],
+      'createdAt': row['createdAt'] ??
+          row['created_at'] ??
+          DateTime.now().toIso8601String(),
+    };
+    return app_model.User.fromJson(mapped);
+  }
+
+  Future<app_model.User> _ensureProfile(app_model.User authUser) async {
+    final rows =
+        await _client.from('profiles').select().eq('id', authUser.id).limit(1);
+
+    if (rows.isNotEmpty) {
+      return _profileToUser(
+        Map<String, dynamic>.from(rows.first),
+        fallbackEmail: authUser.email,
+      );
+    }
+
+    final payload = {
+      'id': authUser.id,
+      'email': authUser.email,
+      'name': authUser.name,
+      'preferred_language': authUser.preferredLanguage,
+      'profile_image_url': authUser.profileImageUrl,
+      'is_online': true,
+      'last_seen': DateTime.now().toIso8601String(),
+    };
+
+    final inserted =
+        await _client.from('profiles').upsert(payload).select().single();
+
+    return _profileToUser(Map<String, dynamic>.from(inserted),
+        fallbackEmail: authUser.email);
   }
 
   Future<Map<String, dynamic>> login(String email, String password) async {
-    // Backend-first auth enables the same account across laptop and phone.
-    try {
-      final response = await http.post(
-        _apiUri('/auth/login'),
-        headers: const {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'email': email.trim(),
-          'password': password,
-        }),
-      );
-
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        final decoded = jsonDecode(response.body) as Map<String, dynamic>;
-        final data = decoded['data'] as Map<String, dynamic>?;
-        final token = data?['token']?.toString();
-        final userMap = data?['user'] as Map<String, dynamic>?;
-        if (token == null || userMap == null) {
-          throw Exception('Invalid login response from server');
-        }
-
-        final user = User.fromJson(userMap);
-        await saveToken(token);
-        await _saveCurrentUserId(user.id);
-        if (kDebugMode) {
-          debugPrint('[AuthService] backend login success for ${email.trim()}');
-        }
-        return {
-          'token': token,
-          'user': user.toJson(),
-        };
-      }
-
-      throw Exception(_extractApiError(response, fallback: 'Login failed'));
-    } catch (error) {
-      if (!_enableLocalAuthFallback) {
-        throw _mobileHostHint(error);
-      }
-      if (kDebugMode) {
-        debugPrint(
-            '[AuthService] backend login failed, using local fallback: $error');
-      }
+    if (!SupabaseService.isConfigured) {
+      throw Exception(
+          'Supabase is not configured. Run with --dart-define=SUPABASE_URL=... --dart-define=SUPABASE_ANON_KEY=...');
     }
 
-    final normalizedEmail = email.trim().toLowerCase();
-    final users = await _readUsers();
-
-    final match = users.firstWhere(
-      (u) =>
-          (u['email']?.toString().toLowerCase() ?? '') == normalizedEmail &&
-          (u['password']?.toString() ?? '') == password,
-      orElse: () => <String, dynamic>{},
+    final result = await _client.auth.signInWithPassword(
+      email: email.trim(),
+      password: password,
     );
 
-    if (match.isEmpty) {
-      throw Exception('Invalid email or password');
+    final authUser = result.user;
+    final session = result.session;
+
+    if (authUser == null || session == null) {
+      throw Exception('Login failed. Please check your credentials.');
     }
 
-    final userId = match['id']?.toString();
-    if (userId == null || userId.isEmpty) {
-      throw Exception('Corrupted local user data');
-    }
-
-    final token = 'local-token-$userId';
-    await saveToken(token);
-    await _saveCurrentUserId(userId);
+    final appUser = await _ensureProfile(
+      app_model.User(
+        id: authUser.id,
+        email: authUser.email ?? email.trim(),
+        name: (authUser.userMetadata?['name'] ?? authUser.email ?? 'User')
+            .toString(),
+        preferredLanguage:
+            (authUser.userMetadata?['preferred_language'] ?? 'en').toString(),
+        isOnline: true,
+        createdAt: _toDateTime(authUser.createdAt),
+      ),
+    );
 
     if (kDebugMode) {
-      debugPrint('[AuthService] local login success for $normalizedEmail');
+      debugPrint('[AuthService] Supabase login success for ${email.trim()}');
     }
 
     return {
-      'token': token,
-      'user': Map<String, dynamic>.from(match)..remove('password'),
+      'token': session.accessToken,
+      'user': _userToProfileMap(appUser),
     };
   }
 
-  Future<Map<String, dynamic>> register(String name, String email,
-      String password, String preferredLanguage) async {
-    try {
-      final response = await http.post(
-        _apiUri('/auth/register'),
-        headers: const {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'name': name.trim(),
-          'email': email.trim().toLowerCase(),
-          'password': password,
-          'preferredLanguage': preferredLanguage,
-        }),
-      );
-
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        final decoded = jsonDecode(response.body) as Map<String, dynamic>;
-        final data = decoded['data'] as Map<String, dynamic>?;
-        final token = data?['token']?.toString();
-        final userMap = data?['user'] as Map<String, dynamic>?;
-        if (token == null || userMap == null) {
-          throw Exception('Invalid register response from server');
-        }
-
-        final user = User.fromJson(userMap);
-        await saveToken(token);
-        await _saveCurrentUserId(user.id);
-        if (kDebugMode) {
-          debugPrint(
-              '[AuthService] backend register success for ${email.trim()}');
-        }
-        return {
-          'token': token,
-          'user': user.toJson(),
-        };
-      }
-
-      throw Exception(_extractApiError(response, fallback: 'Register failed'));
-    } catch (error) {
-      if (!_enableLocalAuthFallback) {
-        throw _mobileHostHint(error);
-      }
-      if (kDebugMode) {
-        debugPrint(
-            '[AuthService] backend register failed, using local fallback: $error');
-      }
+  Future<Map<String, dynamic>> register(
+    String name,
+    String email,
+    String password,
+    String preferredLanguage,
+  ) async {
+    if (!SupabaseService.isConfigured) {
+      throw Exception(
+          'Supabase is not configured. Run with --dart-define=SUPABASE_URL=... --dart-define=SUPABASE_ANON_KEY=...');
     }
 
-    final trimmedName = name.trim();
-    final normalizedEmail = email.trim().toLowerCase();
-    final users = await _readUsers();
-
-    final exists = users.any(
-      (u) => (u['email']?.toString().toLowerCase() ?? '') == normalizedEmail,
+    final signUp = await _client.auth.signUp(
+      email: email.trim().toLowerCase(),
+      password: password,
+      data: {
+        'name': name.trim(),
+        'preferred_language': preferredLanguage,
+      },
     );
-    if (exists) {
-      throw Exception('Email already registered');
+
+    var authUser = signUp.user;
+    var session = signUp.session;
+
+    if (authUser == null) {
+      throw Exception('Registration failed.');
     }
 
-    final newUser = User(
-      id: _newUserId(),
-      email: normalizedEmail,
-      name: trimmedName,
-      preferredLanguage: preferredLanguage,
+    // If email confirmation is enabled, signUp may not return a session immediately.
+    if (session == null) {
+      final signIn = await _client.auth.signInWithPassword(
+        email: email.trim().toLowerCase(),
+        password: password,
+      );
+      authUser = signIn.user ?? authUser;
+      session = signIn.session;
+    }
+
+    if (session == null) {
+      throw Exception(
+          'Registration completed. Please confirm your email, then log in.');
+    }
+
+    final appUser = await _ensureProfile(
+      app_model.User(
+        id: authUser.id,
+        email: authUser.email ?? email.trim().toLowerCase(),
+        name: name.trim(),
+        preferredLanguage: preferredLanguage,
+        isOnline: true,
+        createdAt: _toDateTime(authUser.createdAt),
+      ),
+    );
+
+    if (kDebugMode) {
+      debugPrint('[AuthService] Supabase register success for ${email.trim()}');
+    }
+
+    return {
+      'token': session.accessToken,
+      'user': _userToProfileMap(appUser),
+    };
+  }
+
+  Future<app_model.User?> getCurrentUser() async {
+    if (!SupabaseService.isConfigured) {
+      return null;
+    }
+
+    final current = _client.auth.currentUser;
+    if (current == null) {
+      return null;
+    }
+
+    final fallback = app_model.User(
+      id: current.id,
+      email: current.email ?? '',
+      name:
+          (current.userMetadata?['name'] ?? current.email ?? 'User').toString(),
+      preferredLanguage:
+          (current.userMetadata?['preferred_language'] ?? 'en').toString(),
       isOnline: true,
-      createdAt: DateTime.now(),
+      createdAt: _toDateTime(current.createdAt),
     );
-
-    final record = <String, dynamic>{
-      ...newUser.toJson(),
-      'password': password,
-    };
-    users.add(record);
-    await _writeUsers(users);
-
-    final token = 'local-token-${newUser.id}';
-    await saveToken(token);
-    await _saveCurrentUserId(newUser.id);
-
-    if (kDebugMode) {
-      debugPrint('[AuthService] local register success for $normalizedEmail');
-    }
-
-    return {
-      'token': token,
-      'user': newUser.toJson(),
-    };
-  }
-
-  Future<User?> getCurrentUser() async {
-    final token = await getToken();
-    if (token == null) return null;
 
     try {
-      final response = await http.get(
-        _apiUri('/auth/me'),
-        headers: await _authHeaders(),
-      );
-
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        final decoded = jsonDecode(response.body) as Map<String, dynamic>;
-        final data = decoded['data'] as Map<String, dynamic>?;
-        final userMap = data?['user'] as Map<String, dynamic>?;
-        if (userMap == null) {
-          throw Exception('Invalid profile response from server');
-        }
-        final user = User.fromJson(userMap);
-        await _saveCurrentUserId(user.id);
-        return user;
-      }
-
-      if (!_enableLocalAuthFallback) {
-        await removeToken();
-        await _clearCurrentUserId();
-        return null;
-      }
-    } catch (error) {
-      if (!_enableLocalAuthFallback) {
-        throw _mobileHostHint(error);
-      }
-      if (kDebugMode) {
-        debugPrint(
-            '[AuthService] backend getCurrentUser failed, local fallback: $error');
-      }
+      return await _ensureProfile(fallback);
+    } catch (_) {
+      return fallback;
     }
-
-    final currentUserId = await _getCurrentUserId();
-    if (currentUserId == null) {
-      await removeToken();
-      return null;
-    }
-
-    final users = await _readUsers();
-    final match = users.firstWhere(
-      (u) => (u['id']?.toString() ?? '') == currentUserId,
-      orElse: () => <String, dynamic>{},
-    );
-
-    if (match.isEmpty) {
-      await removeToken();
-      await _clearCurrentUserId();
-      return null;
-    }
-
-    final userJson = Map<String, dynamic>.from(match)..remove('password');
-    return User.fromJson(userJson);
   }
 
   Future<void> logout() async {
-    try {
-      await http.post(
-        _apiUri('/auth/logout'),
-        headers: await _authHeaders(),
-      );
-    } catch (_) {}
-
-    await removeToken();
-    await _clearCurrentUserId();
+    await _client.auth.signOut();
   }
 
-  Future<User> updateProfile({
+  Future<app_model.User> updateProfile({
     String? name,
     String? preferredLanguage,
     String? profileImageUrl,
   }) async {
-    try {
-      final response = await http.put(
-        _apiUri('/auth/profile'),
-        headers: await _authHeaders(),
-        body: jsonEncode({
-          if (name != null) 'name': name,
-          if (preferredLanguage != null) 'preferredLanguage': preferredLanguage,
-          if (profileImageUrl != null) 'profileImageUrl': profileImageUrl,
-        }),
-      );
-
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        final decoded = jsonDecode(response.body) as Map<String, dynamic>;
-        final data = decoded['data'] as Map<String, dynamic>?;
-        final userMap = data?['user'] as Map<String, dynamic>?;
-        if (userMap == null) {
-          throw Exception('Invalid update profile response from server');
-        }
-        final updated = User.fromJson(userMap);
-        await _saveCurrentUserId(updated.id);
-        return updated;
-      }
-
-      throw Exception(
-          _extractApiError(response, fallback: 'Update profile failed'));
-    } catch (error) {
-      if (!_enableLocalAuthFallback) {
-        throw _mobileHostHint(error);
-      }
-      if (kDebugMode) {
-        debugPrint(
-            '[AuthService] backend updateProfile failed, local fallback: $error');
-      }
+    final current = await getCurrentUser();
+    if (current == null) {
+      throw Exception('Not authenticated');
     }
 
-    final currentUser = await getCurrentUser();
-    if (currentUser == null) throw Exception('Not authenticated');
-
-    final users = await _readUsers();
-    final idx = users.indexWhere(
-      (u) => (u['id']?.toString() ?? '') == currentUser.id,
-    );
-
-    if (idx < 0) throw Exception('Current user not found');
-
-    final updated = currentUser.copyWith(
-      name: name,
-      preferredLanguage: preferredLanguage,
-      profileImageUrl: profileImageUrl,
-    );
-
-    final password = users[idx]['password'];
-    users[idx] = {
-      ...updated.toJson(),
-      'password': password,
+    final payload = {
+      'id': current.id,
+      if (name != null) 'name': name,
+      if (preferredLanguage != null) 'preferred_language': preferredLanguage,
+      if (profileImageUrl != null) 'profile_image_url': profileImageUrl,
+      'last_seen': DateTime.now().toIso8601String(),
     };
 
-    await _writeUsers(users);
-    return updated;
+    final updated =
+        await _client.from('profiles').upsert(payload).select().single();
+
+    return _profileToUser(Map<String, dynamic>.from(updated),
+        fallbackEmail: current.email);
   }
 
-  Future<List<User>> getAllUsers() async {
-    try {
-      final response = await http.get(
-        _apiUri('/users'),
-        headers: await _authHeaders(),
-      );
-
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        final decoded = jsonDecode(response.body) as Map<String, dynamic>;
-        final data = decoded['data'] as Map<String, dynamic>?;
-        final usersRaw = data?['users'];
-        if (usersRaw is! List) return [];
-        return usersRaw
-            .whereType<Map>()
-            .map((e) =>
-                User.fromJson(e.map((k, v) => MapEntry(k.toString(), v))))
-            .toList();
-      }
-
-      throw Exception(
-          _extractApiError(response, fallback: 'Failed to load users'));
-    } catch (error) {
-      if (!_enableLocalAuthFallback) {
-        throw _mobileHostHint(error);
-      }
-      if (kDebugMode) {
-        debugPrint(
-            '[AuthService] backend getAllUsers failed, local fallback: $error');
-      }
+  Future<List<app_model.User>> getAllUsers() async {
+    final current = await getCurrentUser();
+    if (current == null) {
+      return <app_model.User>[];
     }
 
-    final usersData = await _readUsers();
-    return usersData.map((e) {
-      final map = Map<String, dynamic>.from(e)..remove('password');
-      return User.fromJson(map);
-    }).toList();
+    final rows = await _client
+        .from('profiles')
+        .select()
+        .neq('id', current.id)
+        .order('is_online', ascending: false)
+        .order('last_seen', ascending: false);
+
+    return rows
+        .whereType<Map>()
+        .map((e) => _profileToUser(e.map((k, v) => MapEntry(k.toString(), v))))
+        .toList();
   }
 
-  // Optional helper for local testing reset.
   Future<void> clearLocalAuthData() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_usersKey);
-    await prefs.remove(_currentUserIdKey);
-    await prefs.remove(tokenKey);
+    await _client.auth.signOut();
     if (kDebugMode) {
-      debugPrint('[AuthService] local auth data cleared');
+      debugPrint('[AuthService] Supabase auth session cleared');
     }
   }
 }
