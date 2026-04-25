@@ -1,6 +1,8 @@
 const User = require('../models/User');
 const { generateToken } = require('../middleware/auth');
 
+const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 // @desc    Register user
 // @route   POST /api/auth/register
 // @access  Public
@@ -68,8 +70,16 @@ const login = async (req, res, next) => {
       });
     }
 
-    // Check if user exists and get password
-    const user = await User.findOne({ email: email.toLowerCase() }).select('+password');
+    const identifier = email.toLowerCase().trim();
+    const safeIdentifier = escapeRegex(identifier);
+
+    // Check if user exists by email or name and get password
+    const user = await User.findOne({
+      $or: [
+        { email: identifier },
+        { name: { $regex: `^${safeIdentifier}$`, $options: 'i' } }
+      ]
+    }).select('+password');
     if (!user) {
       return res.status(401).json({
         success: false,

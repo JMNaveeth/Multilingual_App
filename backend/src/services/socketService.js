@@ -26,8 +26,43 @@ const resolveUserPreferredLanguage = async (userId, fallback = 'en') => {
 };
 
 // Store active users and their socket connections
-const activeUsers = new Map(); // userId -> socketId
+const activeUsers = new Map(); // userId -> Set<socketId>
 const socketToUser = new Map(); // socketId -> userId
+
+const addUserSocket = (userId, socketId) => {
+  const sockets = activeUsers.get(userId) || new Set();
+  const wasOffline = sockets.size === 0;
+  sockets.add(socketId);
+  activeUsers.set(userId, sockets);
+  return { wasOffline, count: sockets.size };
+};
+
+const removeUserSocket = (userId, socketId) => {
+  const sockets = activeUsers.get(userId);
+  if (!sockets) {
+    return { isNowOffline: true, count: 0 };
+  }
+  sockets.delete(socketId);
+  if (sockets.size === 0) {
+    activeUsers.delete(userId);
+    return { isNowOffline: true, count: 0 };
+  }
+  activeUsers.set(userId, sockets);
+  return { isNowOffline: false, count: sockets.size };
+};
+
+const hasActiveSockets = (userId) => {
+  const sockets = activeUsers.get(userId);
+  return !!sockets && sockets.size > 0;
+};
+
+const emitToUser = (io, userId, event, payload) => {
+  if (!hasActiveSockets(userId)) {
+    return false;
+  }
+  io.to(userId).emit(event, payload);
+  return true;
+};
 
 const initializeSocket = (io) => {
   io.on('connection', (socket) => {
@@ -67,8 +102,8 @@ const initializeSocket = (io) => {
           };
         }
 
-        // Store user connection
-        activeUsers.set(userId, socket.id);
+        // Store user connection (supports multiple active devices per user)
+        const connectionState = addUserSocket(userId, socket.id);
         socketToUser.set(socket.id, userId);
 
         // Join user to their own room
@@ -85,11 +120,13 @@ const initializeSocket = (io) => {
           message: 'Authentication successful'
         });
 
-        // Notify friends about online status
-        socket.broadcast.emit('user_online', {
-          userId,
-          user: user.toPublicProfile()
-        });
+        // Notify friends only when transitioning from offline to online.
+        if (connectionState.wasOffline) {
+          socket.broadcast.emit('user_online', {
+            userId,
+            user: user.toPublicProfile()
+          });
+        }
 
         console.log(`✅ User ${user.name} authenticated: ${socket.id}`);
 
@@ -208,10 +245,7 @@ const initializeSocket = (io) => {
         }
 
         // Send to receiver if online
-        const receiverSocketId = activeUsers.get(receiverId);
-        if (receiverSocketId) {
-          io.to(receiverSocketId).emit('new_message', messageData);
-        }
+        emitToUser(io, receiverId, 'new_message', messageData);
 
         // Send confirmation to sender
         socket.emit('message_sent', messageData);
@@ -238,13 +272,10 @@ const initializeSocket = (io) => {
         await Message.markAsRead(senderId, userId);
 
         // Notify sender that messages were read
-        const senderSocketId = activeUsers.get(senderId);
-        if (senderSocketId) {
-          io.to(senderSocketId).emit('messages_read', {
-            readerId: userId,
-            timestamp: new Date()
-          });
-        }
+        emitToUser(io, senderId, 'messages_read', {
+          readerId: userId,
+          timestamp: new Date()
+        });
 
       } catch (error) {
         console.error('Mark read error:', error);
@@ -255,10 +286,8 @@ const initializeSocket = (io) => {
     // WebRTC Signaling for video calls
     socket.on('call_user', (data) => {
       const { userToCall, signalData, from, name } = data;
-      const receiverSocketId = activeUsers.get(userToCall);
-
-      if (receiverSocketId) {
-        io.to(receiverSocketId).emit('call_user', {
+      if (hasActiveSockets(userToCall)) {
+        io.to(userToCall).emit('call_user', {
           signal: signalData,
           from,
           name
@@ -268,16 +297,11 @@ const initializeSocket = (io) => {
 
     socket.on('answer_call', (data) => {
       const { to, signal } = data;
-      const receiverSocketId = activeUsers.get(to);
-
-      if (receiverSocketId) {
-        io.to(receiverSocketId).emit('call_accepted', signal);
-      }
+      emitToUser(io, to, 'call_accepted', signal);
     });
 
     socket.on('end_call', (data) => {
       const { to } = data;
-      const receiverSocketId = activeUsers.get(to);
       const userId = socketToUser.get(socket.id);
 
       // Clean up any active translation streams
@@ -288,18 +312,14 @@ const initializeSocket = (io) => {
         aiTranslationService.stopStream(to);
       }
 
-      if (receiverSocketId) {
-        io.to(receiverSocketId).emit('call_ended');
-      }
+      emitToUser(io, to, 'call_ended');
     });
 
     socket.on('webrtc_offer', (data) => {
       const { to, offer, callType } = data;
       const from = socketToUser.get(socket.id);
-      const receiverSocketId = activeUsers.get(to);
-
-      if (receiverSocketId) {
-        io.to(receiverSocketId).emit('webrtc_offer', {
+      if (hasActiveSockets(to)) {
+        io.to(to).emit('webrtc_offer', {
           from,
           offer,
           callType
@@ -310,10 +330,8 @@ const initializeSocket = (io) => {
     socket.on('webrtc_answer', (data) => {
       const { to, answer, callType } = data;
       const from = socketToUser.get(socket.id);
-      const receiverSocketId = activeUsers.get(to);
-
-      if (receiverSocketId) {
-        io.to(receiverSocketId).emit('webrtc_answer', {
+      if (hasActiveSockets(to)) {
+        io.to(to).emit('webrtc_answer', {
           from,
           answer,
           callType
@@ -324,10 +342,8 @@ const initializeSocket = (io) => {
     socket.on('webrtc_ice_candidate', (data) => {
       const { to, candidate } = data;
       const from = socketToUser.get(socket.id);
-      const receiverSocketId = activeUsers.get(to);
-
-      if (receiverSocketId) {
-        io.to(receiverSocketId).emit('webrtc_ice_candidate', {
+      if (hasActiveSockets(to)) {
+        io.to(to).emit('webrtc_ice_candidate', {
           from,
           candidate
         });
@@ -361,9 +377,8 @@ const initializeSocket = (io) => {
         activeUsers
       );
 
-      const targetSocketId = activeUsers.get(targetUserId);
-      if (targetSocketId) {
-        io.to(targetSocketId).emit('translation_started', {
+      if (hasActiveSockets(targetUserId)) {
+        io.to(targetUserId).emit('translation_started', {
           from: userId,
           sourceLanguage: resolvedSourceLanguage,
           targetLanguage: resolvedTargetLanguage
@@ -387,9 +402,8 @@ const initializeSocket = (io) => {
 
       if (!userId) return;
 
-      const targetSocketId = activeUsers.get(targetUserId);
-      if (targetSocketId) {
-        io.to(targetSocketId).emit('receive_subtitle', {
+      if (hasActiveSockets(targetUserId)) {
+        io.to(targetUserId).emit('receive_subtitle', {
           from: userId,
           text,
           originalLanguage,
@@ -404,9 +418,8 @@ const initializeSocket = (io) => {
 
       if (!userId) return;
 
-      const targetSocketId = activeUsers.get(targetUserId);
-      if (targetSocketId) {
-        io.to(targetSocketId).emit('receive_translated_audio', {
+      if (hasActiveSockets(targetUserId)) {
+        io.to(targetUserId).emit('receive_translated_audio', {
           from: userId,
           audioData,
           language
@@ -440,10 +453,9 @@ const initializeSocket = (io) => {
         );
         const latencyMs = Date.now() - startedAt;
 
-        const targetSocketId = activeUsers.get(targetUserId);
-        if (targetSocketId) {
+        if (hasActiveSockets(targetUserId)) {
           // Send translated subtitle
-          io.to(targetSocketId).emit('receive_subtitle', {
+          io.to(targetUserId).emit('receive_subtitle', {
             from: userId,
             text: translatedText,
             originalText: text.trim(),
@@ -454,7 +466,7 @@ const initializeSocket = (io) => {
 
           // Send TTS audio
           if (audioBuffer) {
-            io.to(targetSocketId).emit('receive_translated_audio', {
+            io.to(targetUserId).emit('receive_translated_audio', {
               from: userId,
               audioData: Array.from(audioBuffer),
               language: resolvedTargetLanguage
@@ -484,9 +496,8 @@ const initializeSocket = (io) => {
 
       if (!userId) return;
 
-      const receiverSocketId = activeUsers.get(receiverId);
-      if (receiverSocketId) {
-        io.to(receiverSocketId).emit('user_typing', {
+      if (hasActiveSockets(receiverId)) {
+        io.to(receiverId).emit('user_typing', {
           userId,
           isTyping: true
         });
@@ -499,9 +510,8 @@ const initializeSocket = (io) => {
 
       if (!userId) return;
 
-      const receiverSocketId = activeUsers.get(receiverId);
-      if (receiverSocketId) {
-        io.to(receiverSocketId).emit('user_typing', {
+      if (hasActiveSockets(receiverId)) {
+        io.to(receiverId).emit('user_typing', {
           userId,
           isTyping: false
         });
@@ -517,24 +527,32 @@ const initializeSocket = (io) => {
         // Clean up translation streams
         aiTranslationService.stopStream(userId);
 
-        // Remove from active users
-        activeUsers.delete(userId);
+        // Remove only this socket; keep user online if other devices are connected.
+        const socketState = removeUserSocket(userId, socket.id);
         socketToUser.delete(socket.id);
 
-        // Update user offline status
+        // Update user status based on remaining active sockets.
         try {
           const user = await User.findById(userId);
           if (user) {
-            user.isOnline = false;
-            user.lastSeen = new Date();
-            user.socketId = null;
-            await user.save();
+            if (socketState.isNowOffline) {
+              user.isOnline = false;
+              user.lastSeen = new Date();
+              user.socketId = null;
+              await user.save();
 
-            // Notify other users
-            socket.broadcast.emit('user_offline', {
-              userId,
-              lastSeen: user.lastSeen
-            });
+              // Notify other users only when all sockets are offline.
+              socket.broadcast.emit('user_offline', {
+                userId,
+                lastSeen: user.lastSeen
+              });
+            } else {
+              const remainingSocketId = Array.from(activeUsers.get(userId) || [])[0] || null;
+              user.isOnline = true;
+              user.socketId = remainingSocketId;
+              user.lastSeen = new Date();
+              await user.save();
+            }
           }
         } catch (error) {
           console.error('Error updating user offline status:', error);
@@ -546,15 +564,17 @@ const initializeSocket = (io) => {
     socket.on('logout', async () => {
       const userId = socketToUser.get(socket.id);
       if (userId) {
-        activeUsers.delete(userId);
+        const socketState = removeUserSocket(userId, socket.id);
         socketToUser.delete(socket.id);
 
         try {
           const user = await User.findById(userId);
           if (user) {
-            user.isOnline = false;
+            user.isOnline = !socketState.isNowOffline;
             user.lastSeen = new Date();
-            user.socketId = null;
+            user.socketId = socketState.isNowOffline
+              ? null
+              : (Array.from(activeUsers.get(userId) || [])[0] || null);
             await user.save();
           }
         } catch (error) {

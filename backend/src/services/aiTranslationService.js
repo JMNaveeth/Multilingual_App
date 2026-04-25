@@ -147,10 +147,10 @@ class AITranslationService {
         stream.targetLanguage
       );
 
-      const targetSocketId = stream.activeUsers.get(stream.targetUserId);
-      if (targetSocketId) {
+      const targetSockets = stream.activeUsers.get(stream.targetUserId);
+      if (targetSockets && targetSockets.size > 0) {
         // Send translated subtitle text instantly
-        stream.io.to(targetSocketId).emit('receive_subtitle', {
+        stream.io.to(stream.targetUserId).emit('receive_subtitle', {
           from: userId,
           text: translatedText,
           originalText: text,
@@ -160,7 +160,7 @@ class AITranslationService {
 
         // Send TTS audio if available
         if (audioBuffer) {
-          stream.io.to(targetSocketId).emit('receive_translated_audio', {
+          stream.io.to(stream.targetUserId).emit('receive_translated_audio', {
             from: userId,
             audioData: Array.from(audioBuffer), // Convert Buffer to array for Socket.io
             language: stream.targetLanguage
