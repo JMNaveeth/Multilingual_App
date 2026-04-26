@@ -138,6 +138,13 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
     setState(() => _passwordStrength = (score).clamp(0, 4));
   }
 
+  String _normalizeEmailInput(String value) {
+    final noInvisible = value
+        .replaceAll(RegExp(r'[\u200B-\u200D\uFEFF]'), '')
+        .replaceAll(RegExp(r'[\u0000-\u001F\u007F]'), '');
+    return noInvisible.replaceAll(RegExp(r'\s+'), '').trim().toLowerCase();
+  }
+
   @override
   void dispose() {
     _bgCtrl.dispose();
@@ -160,7 +167,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
     try {
       final result = await ref.read(authProvider.notifier).register(
             _nameCtrl.text.trim(),
-            _emailCtrl.text.trim(),
+        _normalizeEmailInput(_emailCtrl.text),
             _passwordCtrl.text,
             _selectedLanguage,
           );
@@ -382,10 +389,15 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
                       hint: 'you@example.com',
                       icon: Icons.alternate_email_rounded,
                       keyboard: TextInputType.emailAddress,
+                      autocorrect: false,
+                      enableSuggestions: false,
                       validator: (v) {
                         if (v == null || v.isEmpty) return 'Email required';
-                        if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
-                            .hasMatch(v)) return 'Enter a valid email';
+                        final normalized = _normalizeEmailInput(v);
+                        if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
+                            .hasMatch(normalized)) {
+                          return 'Enter a valid email';
+                        }
                         return null;
                       },
                     ),
@@ -761,6 +773,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
     required String hint,
     required IconData icon,
     TextInputType? keyboard,
+    bool autocorrect = true,
+    bool enableSuggestions = true,
     bool obscure = false,
     Widget? suffix,
     String? Function(String?)? validator,
@@ -800,6 +814,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
             focusNode: focus,
             obscureText: obscure,
             keyboardType: keyboard,
+            autocorrect: autocorrect,
+            enableSuggestions: enableSuggestions,
             style: const TextStyle(color: _N.textPrimary, fontSize: 14.5),
             cursorColor: _N.indigoLight,
             validator: validator,

@@ -1455,47 +1455,49 @@ class _LoadingShimmerState extends State<_LoadingShimmer>
             _D.shimmerBase, _D.shimmerHighlight, math.sin(t * math.pi))!;
         return Padding(
           padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _ShimmerBox(width: 160, height: 14, color: highlight),
-              const SizedBox(height: 16),
-              GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: 4,
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  mainAxisSpacing: 10,
-                  crossAxisSpacing: 10,
-                  childAspectRatio: 0.98,
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _ShimmerBox(width: 160, height: 14, color: highlight),
+                const SizedBox(height: 16),
+                GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: 4,
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    mainAxisSpacing: 10,
+                    crossAxisSpacing: 10,
+                    childAspectRatio: 0.98,
+                  ),
+                  itemBuilder: (_, __) => _ShimmerBox(
+                    width: double.infinity,
+                    height: double.infinity,
+                    color: highlight,
+                    radius: 18,
+                  ),
                 ),
-                itemBuilder: (_, __) => _ShimmerBox(
-                  width: double.infinity,
-                  height: double.infinity,
-                  color: highlight,
-                  radius: 18,
-                ),
-              ),
-              const SizedBox(height: 24),
-              _ShimmerBox(width: 120, height: 14, color: highlight),
-              const SizedBox(height: 12),
-              Row(
-                children: List.generate(
-                    3,
-                    (_) => Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.only(right: 10),
-                            child: _ShimmerBox(
-                              width: double.infinity,
-                              height: 118,
-                              color: highlight,
-                              radius: 14,
+                const SizedBox(height: 24),
+                _ShimmerBox(width: 120, height: 14, color: highlight),
+                const SizedBox(height: 12),
+                Row(
+                  children: List.generate(
+                      3,
+                      (_) => Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.only(right: 10),
+                              child: _ShimmerBox(
+                                width: double.infinity,
+                                height: 118,
+                                color: highlight,
+                                radius: 14,
+                              ),
                             ),
-                          ),
-                        )),
-              ),
-            ],
+                          )),
+                ),
+              ],
+            ),
           ),
         );
       },

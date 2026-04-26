@@ -30,7 +30,10 @@ class AuthService {
   }
 
   String _normalizedEmail(String email) {
-    return email.replaceAll(RegExp(r'\s+'), '').trim().toLowerCase();
+    final noInvisible = email
+        .replaceAll(RegExp(r'[\u200B-\u200D\uFEFF]'), '')
+        .replaceAll(RegExp(r'[\u0000-\u001F\u007F]'), '');
+    return noInvisible.replaceAll(RegExp(r'\s+'), '').trim().toLowerCase();
   }
 
   bool _looksLikeEmail(String email) {
