@@ -71,5 +71,64 @@ create policy "messages_insert_sender_only"
   to authenticated
   with check (auth.uid() = sender_id);
 
--- Optional realtime for messages table
-alter publication supabase_realtime add table public.messages;
+-- Auto-create profile row whenever a new auth user signs up.
+create or replace function public.handle_new_user()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  insert into public.profiles (
+    id,
+    email,
+    name,
+    preferred_language,
+    is_online,
+    created_at,
+    updated_at
+  )
+  values (
+    new.id,
+    coalesce(new.email, ''),
+    coalesce(new.raw_user_meta_data->>'name', split_part(coalesce(new.email, 'User'), '@', 1), 'User'),
+    coalesce(new.raw_user_meta_data->>'preferred_language', 'en'),
+    false,
+    now(),
+    now()
+  )
+  on conflict (id) do update set
+    email = excluded.email,
+    name = excluded.name,
+    preferred_language = excluded.preferred_language,
+    updated_at = now();
+
+  return new;
+end;
+$$;
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute procedure public.handle_new_user();
+
+-- Optional realtime for messages table (safe to rerun)
+do $$
+begin
+  if exists (
+    select 1
+    from pg_publication
+    where pubname = 'supabase_realtime'
+  ) then
+    if not exists (
+      select 1
+      from pg_publication_tables
+      where pubname = 'supabase_realtime'
+        and schemaname = 'public'
+        and tablename = 'messages'
+    ) then
+      alter publication supabase_realtime add table public.messages;
+    end if;
+  end if;
+end
+$$;

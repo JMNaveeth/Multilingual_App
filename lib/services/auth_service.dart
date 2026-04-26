@@ -140,35 +140,59 @@ class AuthService {
           'Supabase is not configured. Run with --dart-define=SUPABASE_URL=... --dart-define=SUPABASE_ANON_KEY=...');
     }
 
-    final signUp = await _client.auth.signUp(
-      email: email.trim().toLowerCase(),
-      password: password,
-      data: {
-        'name': name.trim(),
-        'preferred_language': preferredLanguage,
-      },
-    );
+    late final AuthResponse signUp;
+    try {
+      signUp = await _client.auth.signUp(
+        email: email.trim().toLowerCase(),
+        password: password,
+        data: {
+          'name': name.trim(),
+          'preferred_language': preferredLanguage,
+        },
+      );
+    } on AuthException catch (e) {
+      final msg = (e.message).toLowerCase();
+      if (e.statusCode == '429' ||
+          msg.contains('over_email_send_rate_limit') ||
+          msg.contains('rate limit')) {
+        throw Exception(
+            'Too many signup attempts in a short time. Please wait a few minutes and try again, or create the user in Supabase Dashboard -> Authentication -> Users.');
+      }
+      if (msg.contains('already') || msg.contains('registered')) {
+        throw Exception(
+            'This email is already registered. Please use Log In instead of Create Account.');
+      }
+      throw Exception('Registration failed: ${e.message}');
+    }
 
-    var authUser = signUp.user;
-    var session = signUp.session;
+    final authUser = signUp.user;
+    final session = signUp.session;
 
     if (authUser == null) {
       throw Exception('Registration failed.');
     }
 
     // If email confirmation is enabled, signUp may not return a session immediately.
+    // In this case, the user is still created in Supabase Auth (auth.users).
     if (session == null) {
-      final signIn = await _client.auth.signInWithPassword(
-        email: email.trim().toLowerCase(),
-        password: password,
-      );
-      authUser = signIn.user ?? authUser;
-      session = signIn.session;
-    }
+      if (kDebugMode) {
+        debugPrint(
+            '[AuthService] Supabase register created auth user without session for ${email.trim()}');
+      }
 
-    if (session == null) {
-      throw Exception(
-          'Registration completed. Please confirm your email, then log in.');
+      return {
+        'token': null,
+        'user': {
+          'id': authUser.id,
+          'email': authUser.email ?? email.trim().toLowerCase(),
+          'name': name.trim(),
+          'preferredLanguage': preferredLanguage,
+          'isOnline': false,
+        },
+        'requiresEmailConfirmation': true,
+        'message':
+            'Account created in Supabase. Please confirm your email, then log in.',
+      };
     }
 
     final appUser = await _ensureProfile(
@@ -189,6 +213,7 @@ class AuthService {
     return {
       'token': session.accessToken,
       'user': _userToProfileMap(appUser),
+      'requiresEmailConfirmation': false,
     };
   }
 

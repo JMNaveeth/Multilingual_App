@@ -54,17 +54,19 @@ class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
     }
   }
 
-  Future<void> register(String name, String email, String password,
-      String preferredLanguage) async {
+    Future<Map<String, dynamic>> register(String name, String email,
+      String password, String preferredLanguage) async {
     final previousState = state;
     if (kDebugMode) debugPrint('[AuthNotifier] register start: $email');
     try {
-      await _authService.register(name, email, password, preferredLanguage);
+      final result =
+          await _authService.register(name, email, password, preferredLanguage);
       final user = await _authService.getCurrentUser();
       state = AsyncValue.data(user);
       if (kDebugMode) {
         debugPrint('[AuthNotifier] register done: hasUser=${user != null}');
       }
+      return result;
     } catch (error, stackTrace) {
       state = previousState;
       if (kDebugMode) debugPrint('[AuthNotifier] register error: $error');

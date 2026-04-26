@@ -158,12 +158,21 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
     try {
-      await ref.read(authProvider.notifier).register(
+      final result = await ref.read(authProvider.notifier).register(
             _nameCtrl.text.trim(),
             _emailCtrl.text.trim(),
             _passwordCtrl.text,
             _selectedLanguage,
           );
+
+      final requiresEmailConfirmation =
+          result['requiresEmailConfirmation'] == true;
+      if (mounted && requiresEmailConfirmation) {
+        _snack((result['message'] ??
+                'Account created in Supabase. Please confirm your email, then log in.')
+            .toString());
+        _openLoginScreen();
+      }
     } catch (e) {
       if (mounted) _snack('Registration failed: $e');
     } finally {
