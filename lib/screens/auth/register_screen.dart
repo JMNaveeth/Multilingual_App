@@ -174,7 +174,13 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
         _openLoginScreen();
       }
     } catch (e) {
-      if (mounted) _snack('Registration failed: $e');
+      if (mounted) {
+        final raw = e.toString();
+        final cleaned = raw.startsWith('Exception: ')
+            ? raw.substring('Exception: '.length)
+            : raw;
+        _snack(cleaned);
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }

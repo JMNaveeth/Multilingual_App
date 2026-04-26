@@ -34,6 +34,8 @@ add_definitions(-DUNICODE -D_UNICODE)
 
 # Allow parallel MSVC compilation to share the same PDB safely across plugin targets.
 add_compile_options(/FS)
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /FS")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /FS")
 
 # Compilation settings that should be applied to most targets.
 #

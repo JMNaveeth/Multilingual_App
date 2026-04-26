@@ -29,6 +29,14 @@ class AuthService {
     return DateTime.now();
   }
 
+  String _normalizedEmail(String email) {
+    return email.replaceAll(RegExp(r'\s+'), '').trim().toLowerCase();
+  }
+
+  bool _looksLikeEmail(String email) {
+    return RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email);
+  }
+
   Map<String, dynamic> _userToProfileMap(app_model.User user) {
     return {
       'id': user.id,
@@ -140,10 +148,15 @@ class AuthService {
           'Supabase is not configured. Run with --dart-define=SUPABASE_URL=... --dart-define=SUPABASE_ANON_KEY=...');
     }
 
+    final normalizedEmail = _normalizedEmail(email);
+    if (!_looksLikeEmail(normalizedEmail)) {
+      throw Exception('Enter a valid email address (example: name@gmail.com).');
+    }
+
     late final AuthResponse signUp;
     try {
       signUp = await _client.auth.signUp(
-        email: email.trim().toLowerCase(),
+        email: normalizedEmail,
         password: password,
         data: {
           'name': name.trim(),
@@ -152,17 +165,24 @@ class AuthService {
       );
     } on AuthException catch (e) {
       final msg = (e.message).toLowerCase();
+      final code = (e.code ?? '').toLowerCase();
       if (e.statusCode == '429' ||
+          code == 'over_email_send_rate_limit' ||
           msg.contains('over_email_send_rate_limit') ||
           msg.contains('rate limit')) {
         throw Exception(
-            'Too many signup attempts in a short time. Please wait a few minutes and try again, or create the user in Supabase Dashboard -> Authentication -> Users.');
+            'Too many signup attempts right now. Please wait 2-5 minutes and try again.');
+      }
+      if (code == 'email_address_invalid' ||
+          msg.contains('email address') && msg.contains('invalid')) {
+        throw Exception(
+            'Supabase rejected this email address. Try another email, or check Supabase Authentication -> Providers -> Email settings.');
       }
       if (msg.contains('already') || msg.contains('registered')) {
         throw Exception(
             'This email is already registered. Please use Log In instead of Create Account.');
       }
-      throw Exception('Registration failed: ${e.message}');
+      throw Exception(e.message);
     }
 
     final authUser = signUp.user;
@@ -184,7 +204,7 @@ class AuthService {
         'token': null,
         'user': {
           'id': authUser.id,
-          'email': authUser.email ?? email.trim().toLowerCase(),
+          'email': authUser.email ?? normalizedEmail,
           'name': name.trim(),
           'preferredLanguage': preferredLanguage,
           'isOnline': false,
@@ -198,7 +218,7 @@ class AuthService {
     final appUser = await _ensureProfile(
       app_model.User(
         id: authUser.id,
-        email: authUser.email ?? email.trim().toLowerCase(),
+        email: authUser.email ?? normalizedEmail,
         name: name.trim(),
         preferredLanguage: preferredLanguage,
         isOnline: true,
