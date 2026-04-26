@@ -10,6 +10,7 @@ import 'package:just_audio/just_audio.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:speech_to_text/speech_recognition_error.dart';
 import 'package:speech_to_text/speech_recognition_result.dart';
 import 'package:speech_to_text/speech_to_text.dart';
@@ -697,20 +698,47 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   Future<void> _initializeSpeechToText() async {
     if (_speechReady) return;
     try {
+      // Request microphone permission
+      final micStatus = await Permission.microphone.request();
+      if (micStatus.isDenied) {
+        _speechReady = false;
+        debugPrint('Microphone permission denied');
+        if (mounted) {
+          _showError('Microphone permission is required for voice messages.');
+        }
+        return;
+      }
+      if (micStatus.isPermanentlyDenied) {
+        _speechReady = false;
+        debugPrint('Microphone permission permanently denied');
+        if (mounted) {
+          _showError('Microphone permission is permanently denied. Please enable it in app settings.');
+        }
+        openAppSettings();
+        return;
+      }
+
       _speechReady = await _speechToText.initialize(
         onError: _onSpeechError,
         onStatus: (_) {},
       );
-    } catch (_) {
+      if (!_speechReady) {
+        debugPrint('Failed to initialize speech-to-text');
+      }
+    } catch (e) {
       _speechReady = false;
+      debugPrint('Error initializing speech-to-text: $e');
     }
   }
 
   void _onSpeechError(SpeechRecognitionError error) {
+    debugPrint('Speech recognition error: ${error.errorMsg}');
     if (!mounted) return;
     if (_isRecording) {
       setState(() => _isRecording = false);
     }
+    // Show detailed error to user
+    _showError('Voice capture failed: ${error.errorMsg}. Please try again.');
   }
 
   void _onSpeechResult(SpeechRecognitionResult result) {
@@ -721,7 +749,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     if (_requireCurrentUserId() == null) return;
     await _initializeSpeechToText();
     if (!_speechReady) {
-      _showError('Speech recognition is not available on this device.');
+      _showError('Voice capture is not available. Please check permissions and try again.');
       return;
     }
 
@@ -744,6 +772,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         const SnackBar(content: Text('Listening... tap mic again to send translated voice.')),
       );
     } catch (e) {
+      debugPrint('Error starting voice recording: $e');
       _showError('Could not start voice capture: $e');
     }
   }

@@ -47,5 +47,9 @@
 	<true/>
 	<key>NSContactsUsageDescription</key>
 	<string>This app needs access to your contacts to start chats</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>This app needs access to your microphone to record voice messages</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>This app needs access to speech recognition to transcribe your voice messages</string>
 </dict>
 </plist>
