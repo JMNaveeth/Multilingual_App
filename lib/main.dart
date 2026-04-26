@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:multilingual_chat_app/providers/auth_provider.dart';
 import 'package:multilingual_chat_app/screens/auth/login_screen.dart';
@@ -10,6 +11,13 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Allow local .env config when app is run without --dart-define.
+  try {
+    await dotenv.load(fileName: '.env');
+  } catch (_) {
+    // It's okay if .env is missing as long as --dart-define values are provided.
+  }
 
   if (SupabaseService.isConfigured) {
     await Supabase.initialize(
