@@ -54,7 +54,7 @@ class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
     }
   }
 
-    Future<Map<String, dynamic>> register(String name, String email,
+  Future<Map<String, dynamic>> register(String name, String email,
       String password, String preferredLanguage) async {
     final previousState = state;
     if (kDebugMode) debugPrint('[AuthNotifier] register start: $email');
