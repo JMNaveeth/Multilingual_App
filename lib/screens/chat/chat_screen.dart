@@ -182,16 +182,18 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     _socketReady = true;
     await CallSocketService.instance.connect(userId: currentUser.id);
 
-    _newMessageSub ??= CallSocketService.instance.newMessages.listen((payload) async {
+    _newMessageSub ??=
+        CallSocketService.instance.newMessages.listen((payload) async {
       if (!mounted) return;
       try {
         final messageJson = payload.map((k, v) => MapEntry(k.toString(), v));
         final message = Message.fromJson(messageJson);
-        
+
         // Only add if it belongs to this conversation
-        if ((message.senderId == widget.user.id && message.receiverId == currentUser.id) ||
-            (message.senderId == currentUser.id && message.receiverId == widget.user.id)) {
-          
+        if ((message.senderId == widget.user.id &&
+                message.receiverId == currentUser.id) ||
+            (message.senderId == currentUser.id &&
+                message.receiverId == widget.user.id)) {
           // Check if we already have it to avoid duplicates from local sync
           final exists = _richMessages.any((rm) => rm.message.id == message.id);
           if (!exists) {
@@ -362,7 +364,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       });
       return;
     }
-    
+
     _chatService.sendMessage(rm.message).then((persisted) {
       if (!mounted) return;
       final index =
@@ -664,17 +666,19 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       return;
     }
 
-    _addRich(RichMessage(
-      message: Message(
-        id: _newId(),
-        senderId: currentUser.id,
-        receiverId: widget.user.id,
-        content: text,
-        type: MessageType.text,
-        status: MessageStatus.sent,
-        timestamp: DateTime.now(),
-      ),
-    ), localOnly: true); // Save locally, but let socket handle delivery
+    _addRich(
+        RichMessage(
+          message: Message(
+            id: _newId(),
+            senderId: currentUser.id,
+            receiverId: widget.user.id,
+            content: text,
+            type: MessageType.text,
+            status: MessageStatus.sent,
+            timestamp: DateTime.now(),
+          ),
+        ),
+        localOnly: true); // Save locally, but let socket handle delivery
 
     CallSocketService.instance.sendMessageViaSocket(
       receiverId: widget.user.id,
@@ -712,7 +716,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         _speechReady = false;
         debugPrint('Microphone permission permanently denied');
         if (mounted) {
-          _showError('Microphone permission is permanently denied. Please enable it in app settings.');
+          _showError(
+              'Microphone permission is permanently denied. Please enable it in app settings.');
         }
         openAppSettings();
         return;
@@ -749,7 +754,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     if (_requireCurrentUserId() == null) return;
     await _initializeSpeechToText();
     if (!_speechReady) {
-      _showError('Voice capture is not available. Please check permissions and try again.');
+      _showError(
+          'Voice capture is not available. Please check permissions and try again.');
       return;
     }
 
@@ -769,7 +775,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       if (!mounted) return;
       setState(() => _isRecording = true);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Listening... tap mic again to send translated voice.')),
+        const SnackBar(
+            content:
+                Text('Listening... tap mic again to send translated voice.')),
       );
     } catch (e) {
       debugPrint('Error starting voice recording: $e');
@@ -1287,8 +1295,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   Widget _buildTextBubble(RichMessage rm, bool isMe, String time) {
     final meta = rm.message.metadata ?? const <String, dynamic>{};
     final translated = meta['translatedContent']?.toString();
-    final hasTranslation = !isMe && translated != null && translated.isNotEmpty && translated != rm.message.content;
-    
+    final hasTranslation = !isMe &&
+        translated != null &&
+        translated.isNotEmpty &&
+        translated != rm.message.content;
+
     // Display translated text for receiver if available, otherwise original text
     final displayContent = hasTranslation ? translated : rm.message.content;
 
@@ -1310,7 +1321,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
               borderRadius: BorderRadius.circular(6),
             ),
             child: Row(mainAxisSize: MainAxisSize.min, children: [
-              Icon(Icons.translate_rounded, size: 11, color: Colors.tealAccent.shade200),
+              Icon(Icons.translate_rounded,
+                  size: 11, color: Colors.tealAccent.shade200),
               const SizedBox(width: 4),
               Flexible(
                 child: Text(rm.message.content,
@@ -1366,15 +1378,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
 
   Widget _buildAudioBubble(RichMessage rm, bool isMe, String time) {
     final path = rm.audioPath;
-    final isPlaying = path != null && _isAudioPlaying && _activeAudioPath == path;
+    final isPlaying =
+        path != null && _isAudioPlaying && _activeAudioPath == path;
     final meta = rm.message.metadata ?? const <String, dynamic>{};
     final translatedText = meta['translatedContent']?.toString();
-    final transcript = (meta['voiceTranscript'] ?? rm.message.content).toString();
-    final displayText = !isMe &&
-            translatedText != null &&
-            translatedText.isNotEmpty
-        ? translatedText
-        : transcript;
+    final transcript =
+        (meta['voiceTranscript'] ?? rm.message.content).toString();
+    final displayText =
+        !isMe && translatedText != null && translatedText.isNotEmpty
+            ? translatedText
+            : transcript;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
@@ -1949,7 +1962,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
             child: Icon(
               _isTyping
                   ? Icons.send_rounded
-                  : (_isRecording ? Icons.stop_rounded : Icons.mic_none_rounded),
+                  : (_isRecording
+                      ? Icons.stop_rounded
+                      : Icons.mic_none_rounded),
               color: _isTyping ? Colors.white : _N.textSecondary,
               size: 20,
             ),
