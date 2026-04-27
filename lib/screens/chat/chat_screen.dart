@@ -395,7 +395,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       _chatService.saveLocalMessage(rm.message).catchError((e) {
         debugPrint('[ChatScreen] saveLocalMessage error: $e');
       });
-      return;
+
+      final currentUserId = ref.read(authProvider).value?.id;
+      if (currentUserId == null || rm.message.senderId != currentUserId) {
+        return;
+      }
     }
 
     _chatService.sendMessage(rm.message).then((persisted) {
