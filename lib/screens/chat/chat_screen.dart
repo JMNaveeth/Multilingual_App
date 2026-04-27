@@ -940,7 +940,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   Future<String?> _stopAudioCapture() async {
     try {
       final wasRecording = await _audioRecorder.isRecording();
-      debugPrint('Stopping audio recorder. wasRecording=$wasRecording path=$_currentRecordingPath');
+      debugPrint(
+          'Stopping audio recorder. wasRecording=$wasRecording path=$_currentRecordingPath');
 
       final stoppedPath = await _audioRecorder.stop();
       final path = (stoppedPath != null && stoppedPath.isNotEmpty)
@@ -1034,7 +1035,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       setState(() => _isRecording = true);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('🎙️ Recording voice... tap mic again to stop and send'),
+          content:
+              Text('🎙️ Recording voice... tap mic again to stop and send'),
           duration: Duration(seconds: 6),
         ),
       );
