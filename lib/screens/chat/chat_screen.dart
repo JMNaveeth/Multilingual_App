@@ -15,9 +15,11 @@ import 'package:speech_to_text/speech_recognition_error.dart';
 import 'package:speech_to_text/speech_recognition_result.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:multilingual_chat_app/models/call_history_entry.dart';
 import 'package:multilingual_chat_app/models/message.dart';
 import 'package:multilingual_chat_app/models/user.dart';
 import 'package:multilingual_chat_app/providers/auth_provider.dart';
+import 'package:multilingual_chat_app/providers/call_history_provider.dart';
 import 'package:multilingual_chat_app/screens/chat/call_screen.dart';
 import 'package:multilingual_chat_app/services/call_socket_service.dart';
 import 'package:multilingual_chat_app/services/chat_service.dart';
@@ -230,6 +232,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
             actions: [
               TextButton(
                 onPressed: () {
+                  _recordDeclinedIncomingCall(incomingCall);
                   _incomingDialogOpen = false;
                   Navigator.of(dialogContext).pop();
                 },
@@ -260,6 +263,35 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         ).then((_) => _incomingDialogOpen = false);
       },
     );
+  }
+
+  Future<void> _recordDeclinedIncomingCall(IncomingCall incomingCall) async {
+    final currentUser = ref.read(authProvider).value;
+    if (currentUser == null) {
+      return;
+    }
+
+    final now = DateTime.now();
+    final entry = CallHistoryEntry(
+      id: '${now.microsecondsSinceEpoch}_${incomingCall.fromUserId}',
+      peerUserId: incomingCall.fromUserId,
+      peerName: incomingCall.fromName,
+      peerProfileImageUrl: widget.user.profileImageUrl,
+      callType: incomingCall.callType,
+      direction: CallDirection.incoming,
+      result: CallResult.declined,
+      startedAt: now,
+      endedAt: now,
+      durationSeconds: 0,
+    );
+
+    try {
+      final service = ref.read(callHistoryServiceProvider);
+      await service.addEntry(userId: currentUser.id, entry: entry);
+      ref.invalidate(callHistoryProvider(currentUser.id));
+    } catch (_) {
+      // Best-effort logging only.
+    }
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────

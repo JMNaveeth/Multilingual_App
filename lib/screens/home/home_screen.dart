@@ -6,7 +6,10 @@ import 'package:flutter_contacts/flutter_contacts.dart' as fc;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
+import 'package:multilingual_chat_app/models/call_history_entry.dart';
 import 'package:multilingual_chat_app/providers/auth_provider.dart';
+import 'package:multilingual_chat_app/providers/call_history_provider.dart';
 import 'package:multilingual_chat_app/screens/chat/chat_list_screen.dart';
 import 'package:multilingual_chat_app/screens/discover/discover_screen.dart';
 import 'package:multilingual_chat_app/screens/profile/profile_screen.dart';
@@ -101,8 +104,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       case 2:
         return Column(children: [
           _buildHeader(title: 'Voice'),
-          Expanded(
-              child: _buildComingSoon(Icons.graphic_eq_rounded, 'Voice Calls')),
+          Expanded(child: _buildCallHistoryContent()),
         ]);
       default:
         return _buildMessagesView();
@@ -344,7 +346,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       case 1:
         return _buildComingSoon(Icons.auto_awesome_outlined, 'Moments');
       case 2:
-        return _buildComingSoon(Icons.mic_none_rounded, 'Calls');
+        return _buildCallHistoryContent();
       default:
         return const SizedBox();
     }
@@ -481,6 +483,170 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               style: TextStyle(color: _N.textMuted, fontSize: 13)),
         ]),
       );
+
+  Widget _buildCallHistoryContent() {
+    final currentUser = ref.watch(authProvider).value;
+    if (currentUser == null) {
+      return _buildComingSoon(Icons.mic_none_rounded, 'Calls');
+    }
+
+    final historyAsync = ref.watch(callHistoryProvider(currentUser.id));
+    return historyAsync.when(
+      loading: () => const Center(
+        child: CircularProgressIndicator(color: _N.indigo),
+      ),
+      error: (error, _) => Center(
+        child: Text(
+          'Could not load call history',
+          style: const TextStyle(color: _N.textSecondary, fontSize: 13),
+        ),
+      ),
+      data: (entries) {
+        if (entries.isEmpty) {
+          return _buildComingSoon(Icons.graphic_eq_rounded, 'Voice Calls');
+        }
+
+        return ListView.separated(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 22),
+          itemCount: entries.length,
+          separatorBuilder: (_, __) => const SizedBox(height: 10),
+          itemBuilder: (_, index) {
+            final entry = entries[index];
+            final isMissed = entry.result == CallResult.missed ||
+                entry.result == CallResult.declined;
+            final statusColor = isMissed ? const Color(0xFFF87171) : _N.indigo;
+
+            return Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: _N.card,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: _N.cardBorder),
+              ),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 24,
+                    backgroundColor: _N.navBg,
+                    backgroundImage: entry.peerProfileImageUrl != null &&
+                            entry.peerProfileImageUrl!.isNotEmpty
+                        ? NetworkImage(entry.peerProfileImageUrl!)
+                        : null,
+                    child: entry.peerProfileImageUrl == null ||
+                            entry.peerProfileImageUrl!.isEmpty
+                        ? Text(
+                            entry.peerName.isNotEmpty
+                                ? entry.peerName[0].toUpperCase()
+                                : '?',
+                            style: const TextStyle(
+                              color: _N.textPrimary,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          )
+                        : null,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          entry.peerName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: _N.textPrimary,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${_callDirectionLabel(entry.direction)} • ${_callResultLabel(entry.result)}',
+                          style: TextStyle(
+                            color: isMissed ? const Color(0xFFFCA5A5) : _N.textSecondary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          _formatCallTime(entry.startedAt),
+                          style: const TextStyle(
+                            color: _N.textMuted,
+                            fontSize: 11.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Icon(
+                        entry.callType == 'video'
+                            ? Icons.videocam_rounded
+                            : Icons.call_rounded,
+                        color: statusColor,
+                        size: 18,
+                      ),
+                      const SizedBox(height: 7),
+                      Text(
+                        _formatDuration(entry.durationSeconds),
+                        style: const TextStyle(
+                          color: _N.textSecondary,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  String _callDirectionLabel(CallDirection direction) {
+    return direction == CallDirection.incoming ? 'Incoming' : 'Outgoing';
+  }
+
+  String _callResultLabel(CallResult result) {
+    switch (result) {
+      case CallResult.completed:
+        return 'Completed';
+      case CallResult.missed:
+        return 'Missed';
+      case CallResult.declined:
+        return 'Declined';
+      case CallResult.cancelled:
+        return 'Cancelled';
+    }
+  }
+
+  String _formatCallTime(DateTime dateTime) {
+    return DateFormat('MMM d, h:mm a').format(dateTime);
+  }
+
+  String _formatDuration(int totalSeconds) {
+    if (totalSeconds <= 0) {
+      return '0:00';
+    }
+
+    final hours = totalSeconds ~/ 3600;
+    final minutes = (totalSeconds % 3600) ~/ 60;
+    final seconds = totalSeconds % 60;
+
+    if (hours > 0) {
+      return '$hours:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+    }
+    return '$minutes:${seconds.toString().padLeft(2, '0')}';
+  }
 
   Future<void> _openNewChat() async {
     try {

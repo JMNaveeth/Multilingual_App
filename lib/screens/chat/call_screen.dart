@@ -4,8 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:multilingual_chat_app/models/call_history_entry.dart';
 import 'package:multilingual_chat_app/models/user.dart';
 import 'package:multilingual_chat_app/providers/auth_provider.dart';
+import 'package:multilingual_chat_app/providers/call_history_provider.dart';
 import 'package:multilingual_chat_app/services/call_socket_service.dart';
 import 'package:multilingual_chat_app/services/webrtc_call_service.dart';
 import 'package:speech_to_text/speech_to_text.dart';
@@ -56,6 +58,9 @@ class _CallScreenState extends ConsumerState<CallScreen> {
   int? _lastLatencyMs;
   Timer? _mockAudioStreamTimer;
   Timer? _speechRestartTimer;
+  final DateTime _callStartedAt = DateTime.now();
+  DateTime? _connectedAt;
+  bool _historySaved = false;
   
   final AudioPlayer _audioPlayer = AudioPlayer();
   final TextEditingController _messageController = TextEditingController();
@@ -178,6 +183,7 @@ class _CallScreenState extends ConsumerState<CallScreen> {
           _dialing = false;
         });
       }
+      _connectedAt ??= DateTime.now();
       _maybeStartSpeechRecognition();
     });
 
@@ -205,6 +211,7 @@ class _CallScreenState extends ConsumerState<CallScreen> {
           _dialing = false;
         });
       }
+      _connectedAt ??= DateTime.now();
       _maybeStartSpeechRecognition();
     });
 
@@ -311,6 +318,7 @@ class _CallScreenState extends ConsumerState<CallScreen> {
     _stopSpeechRecognition();
     await _webRtcService?.close();
     _webRtcService = null;
+    await _saveCallHistory();
 
     if (mounted) {
       Navigator.of(context).pop();
@@ -325,6 +333,49 @@ class _CallScreenState extends ConsumerState<CallScreen> {
   Future<void> _endCall() async {
     _callSocket.endCall(to: widget.peerUser.id);
     await _finishCall(showSnack: false);
+  }
+
+  Future<void> _saveCallHistory() async {
+    if (_historySaved) {
+      return;
+    }
+
+    final currentUser = ref.read(authProvider).value;
+    if (currentUser == null) {
+      return;
+    }
+
+    final now = DateTime.now();
+    final result = _connected
+        ? CallResult.completed
+        : (widget.isIncoming ? CallResult.missed : CallResult.cancelled);
+    final effectiveConnectedAt = _connectedAt ?? _callStartedAt;
+    final duration = _connected
+        ? now.difference(effectiveConnectedAt).inSeconds
+        : 0;
+
+    final entry = CallHistoryEntry(
+      id: '${now.microsecondsSinceEpoch}_${widget.peerUser.id}',
+      peerUserId: widget.peerUser.id,
+      peerName: widget.peerUser.name,
+      peerProfileImageUrl: widget.peerUser.profileImageUrl,
+      callType: widget.callType.name,
+      direction:
+          widget.isIncoming ? CallDirection.incoming : CallDirection.outgoing,
+      result: result,
+      startedAt: _callStartedAt,
+      endedAt: now,
+      durationSeconds: duration,
+    );
+
+    try {
+      final service = ref.read(callHistoryServiceProvider);
+      await service.addEntry(userId: currentUser.id, entry: entry);
+      ref.invalidate(callHistoryProvider(currentUser.id));
+      _historySaved = true;
+    } catch (_) {
+      // Best-effort logging only.
+    }
   }
 
   Future<void> _toggleMic() async {
