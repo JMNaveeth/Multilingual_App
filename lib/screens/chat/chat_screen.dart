@@ -110,6 +110,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   String? _activeAudioPath;
   bool _speechReady = false;
   String _currentVoiceTranscript = '';
+  bool _speechDetected = false;
 
   late final AnimationController _onlineGlowCtrl;
   late final AnimationController _attachMenuCtrl;
@@ -723,31 +724,65 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         return;
       }
 
+      debugPrint('Initializing speech-to-text...');
       _speechReady = await _speechToText.initialize(
         onError: _onSpeechError,
-        onStatus: (_) {},
+        onStatus: (status) {
+          debugPrint('Speech recognition status: $status');
+        },
       );
-      if (!_speechReady) {
+      
+      if (_speechReady) {
+        final locales = await _speechToText.locales();
+        debugPrint('Available locales: ${locales.length}');
+      } else {
         debugPrint('Failed to initialize speech-to-text');
       }
     } catch (e) {
       _speechReady = false;
       debugPrint('Error initializing speech-to-text: $e');
+      if (mounted) {
+        _showError('Failed to initialize voice capture: $e');
+      }
     }
   }
 
   void _onSpeechError(SpeechRecognitionError error) {
-    debugPrint('Speech recognition error: ${error.errorMsg}');
+    final errorMsg = error.errorMsg;
+    final lowerError = errorMsg.toLowerCase();
+    debugPrint('Speech recognition error: $errorMsg (error code: ${error.permanent ? "permanent" : "temporary"})');
+
     if (!mounted) return;
+
     if (_isRecording) {
       setState(() => _isRecording = false);
     }
-    // Show detailed error to user
-    _showError('Voice capture failed: ${error.errorMsg}. Please try again.');
+
+    // Provide user-friendly error messages
+    String userMessage = 'Voice capture failed';
+    if (lowerError.contains('network')) {
+      userMessage = 'Network error. Check your internet connection.';
+    } else if (lowerError.contains('timeout')) {
+      userMessage = 'Request timeout. Please try again.';
+    } else if (lowerError.contains('no_match') || lowerError.contains('nomatch')) {
+      userMessage = 'No speech detected. Speak louder and try again.';
+    } else if (lowerError.contains('audio')) {
+      userMessage = 'Audio error. Check your microphone.';
+    }
+
+    _showError('$userMessage ($errorMsg)');
   }
 
   void _onSpeechResult(SpeechRecognitionResult result) {
-    _currentVoiceTranscript = result.recognizedWords.trim();
+    final recognized = result.recognizedWords.trim();
+    if (recognized.isNotEmpty) {
+      _speechDetected = true;
+      debugPrint('Speech detected: $recognized (isFinal: ${result.finalResult})');
+    }
+    _currentVoiceTranscript = recognized;
+    if (result.finalResult) {
+      debugPrint('Final speech result: $_currentVoiceTranscript');
+    }
   }
 
   Future<void> _startVoiceRecording() async {
@@ -761,24 +796,40 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
 
     try {
       _currentVoiceTranscript = '';
+      _speechDetected = false;
+
       final currentUser = ref.read(authProvider).value;
-      await _speechToText.listen(
+
+      // Start listening
+      final listening = await _speechToText.listen(
         onResult: _onSpeechResult,
         localeId: _languageToLocale(currentUser?.preferredLanguage ?? 'en'),
         listenOptions: SpeechListenOptions(
           partialResults: true,
           cancelOnError: false,
+          onDevice: true, // Use device speech recognition for faster response
         ),
-        listenFor: const Duration(seconds: 40),
-        pauseFor: const Duration(seconds: 2),
+        listenFor: const Duration(seconds: 45),
+        pauseFor: const Duration(seconds: 3),
       );
+      
+      if (!listening) {
+        if (mounted) {
+          _showError('Could not start speech recognition. Check your microphone.');
+        }
+        debugPrint('Failed to start listening');
+        return;
+      }
+
       if (!mounted) return;
       setState(() => _isRecording = true);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content:
-                Text('Listening... tap mic again to send translated voice.')),
+          content: Text('🎙️ Listening... Speak now (tap to stop)'),
+          duration: Duration(seconds: 45),
+        ),
       );
+      debugPrint('Started voice recording');
     } catch (e) {
       debugPrint('Error starting voice recording: $e');
       _showError('Could not start voice capture: $e');
@@ -793,17 +844,30 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     }
 
     try {
+      // Stop listening
       if (_speechToText.isListening) {
         await _speechToText.stop();
+        debugPrint('Stopped listening. Detected: $_currentVoiceTranscript');
       }
+
       if (!mounted) return;
       setState(() => _isRecording = false);
+
       final transcript = _currentVoiceTranscript.trim();
+
+      // Provide better feedback based on what was detected
       if (transcript.isEmpty) {
-        _showError('Could not detect speech. Please try again.');
+        if (!_speechDetected) {
+          _showError('No speech detected. Please speak clearly and try again.');
+          debugPrint('No speech detected during recording');
+        } else {
+          _showError('Could not process your speech. Please try again.');
+          debugPrint('Speech detected but transcript empty');
+        }
         return;
       }
 
+      debugPrint('Sending voice message: $transcript');
       final rm = RichMessage(
         message: Message(
           id: _newId(),
@@ -832,7 +896,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
           'voiceTranscript': transcript,
         },
       );
+
+      // Clear state after sending
+      _currentVoiceTranscript = '';
+      _speechDetected = false;
     } catch (e) {
+      debugPrint('Error stopping/sending voice message: $e');
       if (!mounted) return;
       setState(() => _isRecording = false);
       _showError('Could not send voice message: $e');
