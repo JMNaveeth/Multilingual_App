@@ -314,9 +314,8 @@ class ChatService {
       return;
     }
 
-    final outgoingImported = imported
-        .where((m) => m.senderId == currentUserId)
-        .toList();
+    final outgoingImported =
+        imported.where((m) => m.senderId == currentUserId).toList();
     if (outgoingImported.isEmpty) {
       return;
     }
