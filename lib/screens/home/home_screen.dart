@@ -92,10 +92,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   Widget _buildBody() {
     switch (_bottomIndex) {
       case 3:
-        return Column(children: [
-          _buildHeader(title: 'My Profile', showActions: false),
-          const Expanded(child: ProfileScreen()),
-        ]);
+        return const ProfileScreen();
       case 1:
         return Column(children: [
           _buildHeader(title: 'Discover'),

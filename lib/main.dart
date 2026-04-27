@@ -49,6 +49,7 @@ class MultilingualChatApp extends ConsumerWidget {
     }
 
     return MaterialApp(
+      debugShowCheckedModeBanner: false,
       title: 'ec communication',
       theme: ThemeData(
         primarySwatch: Colors.blue,
