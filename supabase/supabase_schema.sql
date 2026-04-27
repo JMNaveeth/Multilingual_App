@@ -26,14 +26,33 @@ create table if not exists public.messages (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.call_history (
+  id text primary key,
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  peer_user_id uuid not null references public.profiles(id) on delete cascade,
+  peer_name text not null,
+  peer_profile_image_url text,
+  call_type text not null default 'voice',
+  direction text not null check (direction in ('incoming', 'outgoing')),
+  result text not null check (result in ('completed', 'missed', 'declined', 'cancelled')),
+  started_at timestamptz not null,
+  ended_at timestamptz,
+  duration_seconds integer not null default 0,
+  created_at timestamptz not null default now()
+);
+
 create index if not exists idx_messages_sender_created
   on public.messages(sender_id, created_at desc);
 
 create index if not exists idx_messages_receiver_created
   on public.messages(receiver_id, created_at desc);
 
+create index if not exists idx_call_history_user_started
+  on public.call_history(user_id, started_at desc);
+
 alter table public.profiles enable row level security;
 alter table public.messages enable row level security;
+alter table public.call_history enable row level security;
 
 drop policy if exists "profiles_select_authenticated" on public.profiles;
 create policy "profiles_select_authenticated"
@@ -70,6 +89,35 @@ create policy "messages_insert_sender_only"
   for insert
   to authenticated
   with check (auth.uid() = sender_id);
+
+drop policy if exists "call_history_select_own" on public.call_history;
+create policy "call_history_select_own"
+  on public.call_history
+  for select
+  to authenticated
+  using (auth.uid() = user_id);
+
+drop policy if exists "call_history_insert_own" on public.call_history;
+create policy "call_history_insert_own"
+  on public.call_history
+  for insert
+  to authenticated
+  with check (auth.uid() = user_id);
+
+drop policy if exists "call_history_update_own" on public.call_history;
+create policy "call_history_update_own"
+  on public.call_history
+  for update
+  to authenticated
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+drop policy if exists "call_history_delete_own" on public.call_history;
+create policy "call_history_delete_own"
+  on public.call_history
+  for delete
+  to authenticated
+  using (auth.uid() = user_id);
 
 -- Auto-create profile row whenever a new auth user signs up.
 create or replace function public.handle_new_user()
@@ -128,6 +176,16 @@ begin
         and tablename = 'messages'
     ) then
       alter publication supabase_realtime add table public.messages;
+    end if;
+
+    if not exists (
+      select 1
+      from pg_publication_tables
+      where pubname = 'supabase_realtime'
+        and schemaname = 'public'
+        and tablename = 'call_history'
+    ) then
+      alter publication supabase_realtime add table public.call_history;
     end if;
   end if;
 end
