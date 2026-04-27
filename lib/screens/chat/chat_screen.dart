@@ -840,7 +840,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       final currentUser = ref.read(authProvider).value;
 
       // Start listening
-      final listening = await _speechToText.listen(
+      final listenResult = await _speechToText.listen(
         onResult: _onSpeechResult,
         localeId: _languageToLocale(currentUser?.preferredLanguage ?? 'en'),
         listenOptions: SpeechListenOptions(
@@ -851,6 +851,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         listenFor: const Duration(seconds: 45),
         pauseFor: const Duration(seconds: 3),
       );
+
+      // Some platforms/plugins may return null here; fall back to isListening.
+      final listening = listenResult == true || _speechToText.isListening;
 
       if (!listening) {
         if (mounted) {
