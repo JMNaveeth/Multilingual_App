@@ -763,7 +763,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
           debugPrint('Speech recognition status: $status');
         },
       );
-      
+
       if (_speechReady) {
         final locales = await _speechToText.locales();
         debugPrint('Available locales: ${locales.length}');
@@ -782,7 +782,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   void _onSpeechError(SpeechRecognitionError error) {
     final errorMsg = error.errorMsg;
     final lowerError = errorMsg.toLowerCase();
-    debugPrint('Speech recognition error: $errorMsg (error code: ${error.permanent ? "permanent" : "temporary"})');
+    debugPrint(
+        'Speech recognition error: $errorMsg (error code: ${error.permanent ? "permanent" : "temporary"})');
 
     if (!mounted) return;
 
@@ -796,7 +797,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       userMessage = 'Network error. Check your internet connection.';
     } else if (lowerError.contains('timeout')) {
       userMessage = 'Request timeout. Please try again.';
-    } else if (lowerError.contains('no_match') || lowerError.contains('nomatch')) {
+    } else if (lowerError.contains('no_match') ||
+        lowerError.contains('nomatch')) {
       userMessage = 'No speech detected. Speak louder and try again.';
     } else if (lowerError.contains('audio')) {
       userMessage = 'Audio error. Check your microphone.';
@@ -809,7 +811,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     final recognized = result.recognizedWords.trim();
     if (recognized.isNotEmpty) {
       _speechDetected = true;
-      debugPrint('Speech detected: $recognized (isFinal: ${result.finalResult})');
+      debugPrint(
+          'Speech detected: $recognized (isFinal: ${result.finalResult})');
     }
     _currentVoiceTranscript = recognized;
     if (result.finalResult) {
@@ -844,10 +847,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         listenFor: const Duration(seconds: 45),
         pauseFor: const Duration(seconds: 3),
       );
-      
+
       if (!listening) {
         if (mounted) {
-          _showError('Could not start speech recognition. Check your microphone.');
+          _showError(
+              'Could not start speech recognition. Check your microphone.');
         }
         debugPrint('Failed to start listening');
         return;

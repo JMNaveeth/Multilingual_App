@@ -564,7 +564,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                         Text(
                           '${_callDirectionLabel(entry.direction)} • ${_callResultLabel(entry.result)}',
                           style: TextStyle(
-                            color: isMissed ? const Color(0xFFFCA5A5) : _N.textSecondary,
+                            color: isMissed
+                                ? const Color(0xFFFCA5A5)
+                                : _N.textSecondary,
                             fontSize: 12,
                             fontWeight: FontWeight.w500,
                           ),

@@ -61,7 +61,7 @@ class _CallScreenState extends ConsumerState<CallScreen> {
   final DateTime _callStartedAt = DateTime.now();
   DateTime? _connectedAt;
   bool _historySaved = false;
-  
+
   final AudioPlayer _audioPlayer = AudioPlayer();
   final TextEditingController _messageController = TextEditingController();
   final SpeechToText _speechToText = SpeechToText();
@@ -279,7 +279,8 @@ class _CallScreenState extends ConsumerState<CallScreen> {
       final targetLanguage = payload['targetLanguage']?.toString() ?? 'ta';
       setState(() {
         _translationEnabled = true;
-        _translationBanner = 'Live AI translation: $sourceLanguage -> $targetLanguage';
+        _translationBanner =
+            'Live AI translation: $sourceLanguage -> $targetLanguage';
       });
     });
 
@@ -350,9 +351,8 @@ class _CallScreenState extends ConsumerState<CallScreen> {
         ? CallResult.completed
         : (widget.isIncoming ? CallResult.missed : CallResult.cancelled);
     final effectiveConnectedAt = _connectedAt ?? _callStartedAt;
-    final duration = _connected
-        ? now.difference(effectiveConnectedAt).inSeconds
-        : 0;
+    final duration =
+        _connected ? now.difference(effectiveConnectedAt).inSeconds : 0;
 
     final entry = CallHistoryEntry(
       id: '${now.microsecondsSinceEpoch}_${widget.peerUser.id}',
@@ -409,14 +409,17 @@ class _CallScreenState extends ConsumerState<CallScreen> {
     setState(() {
       _translationEnabled = !_translationEnabled;
       if (_translationEnabled) {
-        _translationBanner = 'Live AI translation: $myLanguage -> $peerLanguage';
+        _translationBanner =
+            'Live AI translation: $myLanguage -> $peerLanguage';
         _callSocket.startTranslation(
           targetUserId: widget.peerUser.id,
           sourceLanguage: myLanguage,
           targetLanguage: peerLanguage,
         );
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('AI Translation Enabled ($myLanguage → $peerLanguage)')),
+          SnackBar(
+              content:
+                  Text('AI Translation Enabled ($myLanguage → $peerLanguage)')),
         );
         _maybeStartSpeechRecognition();
       } else {
@@ -496,7 +499,8 @@ class _CallScreenState extends ConsumerState<CallScreen> {
       if (mounted) {
         setState(() {
           _isSpeechListening = true;
-          _translationBanner ??= 'Live AI translation running (on-device speech)';
+          _translationBanner ??=
+              'Live AI translation running (on-device speech)';
         });
       }
     } catch (_) {
@@ -541,7 +545,8 @@ class _CallScreenState extends ConsumerState<CallScreen> {
 
     final now = DateTime.now();
     final msSinceLast = now.difference(_lastSpeechSentAt).inMilliseconds;
-    final shouldSend = result.finalResult || deltaText.length >= 18 || msSinceLast >= 1300;
+    final shouldSend =
+        result.finalResult || deltaText.length >= 18 || msSinceLast >= 1300;
 
     if (shouldSend && deltaText.isNotEmpty) {
       _sendLiveSpeechText(deltaText);
@@ -775,11 +780,13 @@ class _CallScreenState extends ConsumerState<CallScreen> {
                   bottom: 220,
                   child: Center(
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 10),
                       decoration: BoxDecoration(
                         color: Colors.black.withOpacity(0.7),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFF7A52F4).withOpacity(0.5)),
+                        border: Border.all(
+                            color: const Color(0xFF7A52F4).withOpacity(0.5)),
                       ),
                       child: Text(
                         _currentSubtitle!,
@@ -925,7 +932,7 @@ class _CallScreenState extends ConsumerState<CallScreen> {
                           ),
                         ],
                       ),
-                      
+
                       // Message Input (Only visible when translation is enabled)
                       if (_translationEnabled) ...[
                         const SizedBox(height: 20),
@@ -941,12 +948,15 @@ class _CallScreenState extends ConsumerState<CallScreen> {
                                 ),
                                 child: TextField(
                                   controller: _messageController,
-                                  style: const TextStyle(color: Colors.white, fontSize: 14),
+                                  style: const TextStyle(
+                                      color: Colors.white, fontSize: 14),
                                   decoration: InputDecoration(
                                     hintText: 'Type a message to translate...',
-                                    hintStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
+                                    hintStyle: TextStyle(
+                                        color: Colors.white.withOpacity(0.5)),
                                     border: InputBorder.none,
-                                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                    contentPadding: const EdgeInsets.symmetric(
+                                        horizontal: 16, vertical: 12),
                                   ),
                                 ),
                               ),
@@ -961,7 +971,8 @@ class _CallScreenState extends ConsumerState<CallScreen> {
                                   color: Color(0xFF7A52F4),
                                   shape: BoxShape.circle,
                                 ),
-                                child: const Icon(Icons.send_rounded, color: Colors.white, size: 20),
+                                child: const Icon(Icons.send_rounded,
+                                    color: Colors.white, size: 20),
                               ),
                             ),
                           ],
