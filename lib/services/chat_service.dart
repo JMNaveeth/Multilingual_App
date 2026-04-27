@@ -211,6 +211,37 @@ class ChatService {
     }
   }
 
+  Stream<List<Message>> getConversationStream({
+    required String currentUserId,
+    required String otherUserId,
+  }) {
+    return _client.from('messages').stream(primaryKey: ['id']).map((rows) {
+      final messages = rows
+          .map((row) => _fromRow(row))
+          .where((m) =>
+              m.senderId == currentUserId && m.receiverId == otherUserId)
+          .toList();
+      messages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+      return messages;
+    });
+  }
+
+  Stream<List<Message>> getFullConversationStream({
+    required String currentUserId,
+    required String otherUserId,
+  }) {
+    return _client.from('messages').stream(primaryKey: ['id']).map((rows) {
+      final messages = rows
+          .map((row) => _fromRow(row))
+          .where((m) =>
+              (m.senderId == currentUserId && m.receiverId == otherUserId) ||
+              (m.senderId == otherUserId && m.receiverId == currentUserId))
+          .toList();
+      messages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+      return messages;
+    });
+  }
+
   Future<Message> sendMessage(Message message) async {
     await _upsertSingleLocalMessage(message.senderId, message);
 

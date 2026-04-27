@@ -101,7 +101,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   bool _isLoadingHistory = true;
   bool _historyFetchStarted = false;
   StreamSubscription<IncomingCall>? _incomingCallSub;
-  StreamSubscription<Map<String, dynamic>>? _newMessageSub;
+  StreamSubscription<List<Message>>? _conversationStreamSub;
   int _localIdCounter = 0;
 
   final _chatService = ChatService();
@@ -170,7 +170,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   @override
   void dispose() {
     _incomingCallSub?.cancel();
-    _newMessageSub?.cancel();
+    _conversationStreamSub?.cancel();
     if (_speechToText.isListening) {
       unawaited(_speechToText.stop());
     }
@@ -191,28 +191,20 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     _socketReady = true;
     await CallSocketService.instance.connect(userId: currentUser.id);
 
-    _newMessageSub ??=
-        CallSocketService.instance.newMessages.listen((payload) async {
+    _conversationStreamSub ??= _chatService
+        .getFullConversationStream(
+      currentUserId: currentUser.id,
+      otherUserId: widget.user.id,
+    )
+        .listen((messages) {
       if (!mounted) return;
-      try {
-        final messageJson = payload.map((k, v) => MapEntry(k.toString(), v));
-        final message = Message.fromJson(messageJson);
-
-        // Only add if it belongs to this conversation
-        if ((message.senderId == widget.user.id &&
-                message.receiverId == currentUser.id) ||
-            (message.senderId == currentUser.id &&
-                message.receiverId == widget.user.id)) {
-          // Check if we already have it to avoid duplicates from local sync
-          final exists = _richMessages.any((rm) => rm.message.id == message.id);
-          if (!exists) {
-            final richMessage = await _fromIncomingMessage(message);
-            _addRich(richMessage, localOnly: true);
-          }
-        }
-      } catch (e) {
-        debugPrint('Error parsing new_message: $e');
-      }
+      setState(() {
+        _richMessages
+          ..clear()
+          ..addAll(messages.map(_fromMessage));
+        _isLoadingHistory = false;
+      });
+      _scrollToBottom();
     });
 
     _incomingCallSub ??= CallSocketService.instance.incomingCalls.listen(
@@ -709,20 +701,22 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       return;
     }
 
-    _addRich(
-        RichMessage(
-          message: Message(
-            id: _newId(),
-            senderId: currentUser.id,
-            receiverId: widget.user.id,
-            content: text,
-            type: MessageType.text,
-            status: MessageStatus.sent,
-            timestamp: DateTime.now(),
-          ),
-        ),
-        localOnly: true); // Save locally, but let socket handle delivery
+    final message = Message(
+      id: _newId(),
+      senderId: currentUser.id,
+      receiverId: widget.user.id,
+      content: text,
+      type: MessageType.text,
+      status: MessageStatus.sent,
+      timestamp: DateTime.now(),
+    );
 
+    _addRich(RichMessage(message: message), localOnly: true);
+
+    // Persist to Supabase for history and Realtime delivery
+    unawaited(_chatService.sendMessage(message));
+
+    // Also send via socket for AI translation and legacy paths
     CallSocketService.instance.sendMessageViaSocket(
       receiverId: widget.user.id,
       content: text,
@@ -1132,6 +1126,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     );
 
     _addRich(rm, localOnly: true);
+
+    // Persist to Supabase for history and Realtime delivery
+    unawaited(_chatService.sendMessage(rm.message));
+
     CallSocketService.instance.sendMessageViaSocket(
       receiverId: widget.user.id,
       content: safeText,

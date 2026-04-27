@@ -1,11 +1,14 @@
 import 'package:flutter/foundation.dart' show kDebugMode, debugPrint;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:multilingual_chat_app/models/user.dart' as app_model;
 import 'package:multilingual_chat_app/services/supabase_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide User;
 
 class AuthService {
   // Kept for compatibility with existing call/socket code paths.
-  static const String baseUrl = '';
+  static String get baseUrl {
+    return (dotenv.env['SERVER_URL'] ?? '').trim();
+  }
 
   SupabaseClient get _client => SupabaseService.client;
 
