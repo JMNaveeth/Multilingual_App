@@ -416,7 +416,14 @@ const initializeSocket = (io) => {
 
     // In-call text message translation
     socket.on('send_call_text', async (data) => {
-      const { targetUserId, text, sourceLanguage, targetLanguage } = data;
+      const {
+        targetUserId,
+        text,
+        sourceLanguage,
+        targetLanguage,
+        shouldSpeak = true,
+        isFinal = true
+      } = data;
       const userId = socketToUser.get(socket.id);
 
       if (!userId || !text || text.trim() === '') return;
@@ -432,12 +439,23 @@ const initializeSocket = (io) => {
           await resolveUserPreferredLanguage(targetUserId, 'en')
         );
 
-        // Use the full translate + TTS pipeline
-        const { translatedText, audioBuffer } = await aiTranslationService.translateAndSpeak(
+        // Keep subtitle fast; synthesize speech only for final chunks/messages.
+        const translatedText = await aiTranslationService.translateText(
           text.trim(),
           resolvedSourceLanguage,
           resolvedTargetLanguage
         );
+        let audioBuffer = null;
+        if (shouldSpeak && isFinal) {
+          try {
+            audioBuffer = await aiTranslationService.textToSpeech(
+              translatedText,
+              resolvedTargetLanguage
+            );
+          } catch (err) {
+            console.error('TTS failed for call text:', err.message);
+          }
+        }
         const latencyMs = Date.now() - startedAt;
 
         const targetSocketId = activeUsers.get(targetUserId);
@@ -467,7 +485,8 @@ const initializeSocket = (io) => {
           originalText: text.trim(),
           translatedText,
           targetLanguage: resolvedTargetLanguage,
-          latencyMs
+          latencyMs,
+          isFinal
         });
 
         console.log(`💬 Call text translated in ${latencyMs}ms: "${text}" → "${translatedText}"`);

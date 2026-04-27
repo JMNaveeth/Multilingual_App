@@ -9,6 +9,9 @@ class WebRtcCallService {
 
   RTCPeerConnection? _peerConnection;
   MediaStream? _localStream;
+  final List<Map<String, dynamic>> _pendingRemoteCandidates =
+      <Map<String, dynamic>>[];
+  bool _remoteDescriptionSet = false;
 
   bool _micEnabled = true;
   bool _cameraEnabled = true;
@@ -83,11 +86,18 @@ class WebRtcCallService {
         sdp['type']?.toString() ?? 'offer',
       ),
     );
+    _remoteDescriptionSet = true;
+    await _flushPendingCandidates();
   }
 
   Future<void> addCandidate(Map<String, dynamic> candidate) async {
     final rawCandidate = candidate['candidate']?.toString();
     if (rawCandidate == null || rawCandidate.isEmpty) {
+      return;
+    }
+
+    if (!_remoteDescriptionSet) {
+      _pendingRemoteCandidates.add(candidate);
       return;
     }
 
@@ -98,6 +108,29 @@ class WebRtcCallService {
         candidate['sdpMLineIndex'] as int?,
       ),
     );
+  }
+
+  Future<void> _flushPendingCandidates() async {
+    if (!_remoteDescriptionSet || _pendingRemoteCandidates.isEmpty) {
+      return;
+    }
+
+    final buffered = List<Map<String, dynamic>>.from(_pendingRemoteCandidates);
+    _pendingRemoteCandidates.clear();
+
+    for (final candidate in buffered) {
+      final rawCandidate = candidate['candidate']?.toString();
+      if (rawCandidate == null || rawCandidate.isEmpty) {
+        continue;
+      }
+      await _peerConnection?.addCandidate(
+        RTCIceCandidate(
+          rawCandidate,
+          candidate['sdpMid']?.toString(),
+          candidate['sdpMLineIndex'] as int?,
+        ),
+      );
+    }
   }
 
   Future<void> toggleMic() async {
@@ -125,6 +158,8 @@ class WebRtcCallService {
   bool get hasRemoteVideo => remoteRenderer.srcObject != null;
 
   Future<void> close() async {
+    _pendingRemoteCandidates.clear();
+    _remoteDescriptionSet = false;
     await _peerConnection?.close();
     _peerConnection = null;
 

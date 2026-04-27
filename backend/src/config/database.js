@@ -1,9 +1,11 @@
 const mongoose = require('mongoose');
 
 const connectDB = async () => {
-  const allowWithoutDb =
-      process.env.ALLOW_NO_DB === 'true' ||
-      process.env.NODE_ENV === 'development';
+  const allowWithoutDb = process.env.ALLOW_NO_DB === 'false'
+      ? false
+      : (process.env.ALLOW_NO_DB === 'true' ||
+          !process.env.NODE_ENV ||
+          process.env.NODE_ENV === 'development');
   try {
     const mongoURI = process.env.MONGODB_URI || 'mongodb://localhost:27017/multilingual_chat';
 

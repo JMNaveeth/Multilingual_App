@@ -110,6 +110,8 @@ class CallSocketService {
             .build(),
       );
 
+      final authCompleter = Completer<void>();
+
       _socket!.onConnect((_) {
         _connectedUserId = userId;
         _socket!.emit('authenticate', {'token': userId});
@@ -125,11 +127,27 @@ class CallSocketService {
         if (kDebugMode) {
           debugPrint('Socket authenticated: $data');
         }
+        if (!authCompleter.isCompleted) {
+          authCompleter.complete();
+        }
       });
 
       _socket!.on('unauthenticated', (data) {
         if (kDebugMode) {
           debugPrint('Socket unauthenticated: $data');
+        }
+        if (!authCompleter.isCompleted) {
+          authCompleter.completeError(
+            StateError('Socket authentication failed: $data'),
+          );
+        }
+      });
+
+      _socket!.onConnectError((error) {
+        if (!authCompleter.isCompleted) {
+          authCompleter.completeError(
+            StateError('Socket connection error: $error'),
+          );
         }
       });
 
@@ -223,6 +241,10 @@ class CallSocketService {
       });
 
       _socket!.connect();
+      await authCompleter.future.timeout(
+        const Duration(seconds: 8),
+        onTimeout: () => throw TimeoutException('Socket auth timeout'),
+      );
     } finally {
       _connecting = false;
     }
@@ -329,12 +351,16 @@ class CallSocketService {
     required String text,
     required String sourceLanguage,
     required String targetLanguage,
+    bool shouldSpeak = true,
+    bool isFinal = true,
   }) {
     _socket?.emit('send_call_text', {
       'targetUserId': targetUserId,
       'text': text,
       'sourceLanguage': sourceLanguage,
       'targetLanguage': targetLanguage,
+      'shouldSpeak': shouldSpeak,
+      'isFinal': isFinal,
     });
   }
 

@@ -70,6 +70,8 @@ class _CallScreenState extends ConsumerState<CallScreen> {
   bool _isSpeechListening = false;
   String _lastInterimTranscript = '';
   DateTime _lastSpeechSentAt = DateTime.fromMillisecondsSinceEpoch(0);
+  final List<List<int>> _translatedAudioQueue = <List<int>>[];
+  bool _isPlayingTranslatedAudio = false;
 
   bool get _isVideoCall => widget.callType == CallType.video;
 
@@ -127,6 +129,20 @@ class _CallScreenState extends ConsumerState<CallScreen> {
     );
 
     await _webRtcService!.initialize();
+    _webRtcService!.remoteRenderer.onResize = () {
+      if (!mounted) {
+        return;
+      }
+      if (_connected) {
+        return;
+      }
+      setState(() {
+        _connected = true;
+        _dialing = false;
+      });
+      _connectedAt ??= DateTime.now();
+      _maybeStartSpeechRecognition();
+    };
 
     _acceptedSub = _callSocket.callAccepted.listen((_) async {
       if (!mounted || _webRtcService == null) {
@@ -264,9 +280,8 @@ class _CallScreenState extends ConsumerState<CallScreen> {
       // The backend sends a Buffer which comes through Socket.io as a List of ints
       if (audioData != null && audioData is List) {
         try {
-          final bytes = List<int>.from(audioData);
-          await _audioPlayer.setAudioSource(_MyCustomSource(bytes));
-          _audioPlayer.play();
+          _translatedAudioQueue.add(List<int>.from(audioData));
+          _playNextTranslatedAudioIfIdle();
         } catch (e) {
           debugPrint('Error playing translated audio: $e');
         }
@@ -302,6 +317,12 @@ class _CallScreenState extends ConsumerState<CallScreen> {
         callType: widget.callType.name,
       );
     } else {
+      // Send accept only after listeners and local WebRTC are fully ready,
+      // otherwise caller offer can arrive before this screen is subscribed.
+      _callSocket.answerCall(
+        to: widget.peerUser.id,
+        callType: widget.callType.name,
+      );
       if (mounted) {
         setState(() {
           _dialing = false;
@@ -546,7 +567,7 @@ class _CallScreenState extends ConsumerState<CallScreen> {
     final now = DateTime.now();
     final msSinceLast = now.difference(_lastSpeechSentAt).inMilliseconds;
     final shouldSend =
-        result.finalResult || deltaText.length >= 18 || msSinceLast >= 1300;
+        result.finalResult || deltaText.length >= 12 || msSinceLast >= 900;
 
     if (shouldSend && deltaText.isNotEmpty) {
       _sendLiveSpeechText(deltaText);
@@ -610,6 +631,29 @@ class _CallScreenState extends ConsumerState<CallScreen> {
       ),
     );
     _messageController.clear();
+  }
+
+  Future<void> _playNextTranslatedAudioIfIdle() async {
+    if (_isPlayingTranslatedAudio || _translatedAudioQueue.isEmpty) {
+      return;
+    }
+    _isPlayingTranslatedAudio = true;
+
+    while (_translatedAudioQueue.isNotEmpty && mounted) {
+      final bytes = _translatedAudioQueue.removeAt(0);
+      try {
+        await _audioPlayer.stop();
+        await _audioPlayer.setAudioSource(_MyCustomSource(bytes));
+        await _audioPlayer.play();
+        await _audioPlayer.playerStateStream.firstWhere(
+          (state) => state.processingState == ProcessingState.completed,
+        );
+      } catch (e) {
+        debugPrint('Translated audio playback error: $e');
+      }
+    }
+
+    _isPlayingTranslatedAudio = false;
   }
 
   String get _statusText {

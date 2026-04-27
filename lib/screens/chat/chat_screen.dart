@@ -238,10 +238,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
               ),
               ElevatedButton(
                 onPressed: () {
-                  CallSocketService.instance.answerCall(
-                    to: incomingCall.fromUserId,
-                    callType: incomingCall.callType,
-                  );
                   _incomingDialogOpen = false;
                   Navigator.of(dialogContext).pop();
                   Navigator.of(context).push(MaterialPageRoute(
