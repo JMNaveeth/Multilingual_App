@@ -76,7 +76,8 @@ class CallHistoryService {
     List<CallHistoryEntry> entries,
   ) async {
     final prefs = await SharedPreferences.getInstance();
-    final sorted = [...entries]..sort((a, b) => b.startedAt.compareTo(a.startedAt));
+    final sorted = [...entries]
+      ..sort((a, b) => b.startedAt.compareTo(a.startedAt));
     final trimmed = sorted.take(_maxEntriesPerUser).toList();
     await prefs.setString(
       _storageKey(userId),
