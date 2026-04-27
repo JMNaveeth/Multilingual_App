@@ -11,6 +11,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:record/record.dart';
 import 'package:speech_to_text/speech_recognition_error.dart';
 import 'package:speech_to_text/speech_recognition_result.dart';
 import 'package:speech_to_text/speech_to_text.dart';
@@ -106,10 +107,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   final _chatService = ChatService();
   final _imagePicker = ImagePicker();
   final _audioPlayer = AudioPlayer();
+  final AudioRecorder _audioRecorder = AudioRecorder();
   final SpeechToText _speechToText = SpeechToText();
   bool _isRecording = false;
   bool _isAudioPlaying = false;
   String? _activeAudioPath;
+  String? _currentRecordingPath;
   bool _speechReady = false;
   String _currentVoiceTranscript = '';
   String _lastNonEmptyVoiceTranscript = '';
@@ -171,6 +174,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     if (_speechToText.isListening) {
       unawaited(_speechToText.stop());
     }
+    unawaited(_audioRecorder.stop());
+    unawaited(_audioRecorder.dispose());
     unawaited(_audioPlayer.dispose());
     _messageController.dispose();
     _scrollController.dispose();
@@ -793,7 +798,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     if (!mounted) return;
 
     if (_isRecording) {
-      setState(() => _isRecording = false);
+      // Keep audio recording alive even if live transcription fails.
+      debugPrint('Speech error while recording audio; continuing capture.');
+      return;
     }
 
     // Provide user-friendly error messages
@@ -886,12 +893,102 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     return result == true || _speechToText.isListening;
   }
 
+  Future<String> _buildRecordingPath() async {
+    final extension = Platform.isWindows ? 'wav' : 'm4a';
+    return '${Directory.systemTemp.path}${Platform.pathSeparator}voice_${DateTime.now().microsecondsSinceEpoch}.$extension';
+  }
+
+  Future<bool> _startAudioCapture() async {
+    try {
+      final hasPermission = await _audioRecorder.hasPermission();
+      if (!hasPermission) {
+        debugPrint('Audio recorder permission not granted by plugin.');
+        return false;
+      }
+
+      final path = await _buildRecordingPath();
+      _currentRecordingPath = path;
+
+      try {
+        await _audioRecorder.start(
+          RecordConfig(
+            encoder: Platform.isWindows ? AudioEncoder.wav : AudioEncoder.aacLc,
+            bitRate: 128000,
+            sampleRate: 44100,
+            numChannels: 1,
+          ),
+          path: path,
+        );
+      } catch (_) {
+        debugPrint('Primary recorder config failed, trying default config...');
+        await _audioRecorder.start(const RecordConfig(), path: path);
+      }
+
+      final recording = await _audioRecorder.isRecording();
+      debugPrint('Audio recorder started: $recording, path=$path');
+      if (!recording) {
+        return false;
+      }
+
+      return true;
+    } catch (e) {
+      debugPrint('Error starting audio recorder: $e');
+      return false;
+    }
+  }
+
+  Future<String?> _stopAudioCapture() async {
+    try {
+      final wasRecording = await _audioRecorder.isRecording();
+      debugPrint('Stopping audio recorder. wasRecording=$wasRecording path=$_currentRecordingPath');
+
+      final stoppedPath = await _audioRecorder.stop();
+      final path = (stoppedPath != null && stoppedPath.isNotEmpty)
+          ? stoppedPath
+          : _currentRecordingPath;
+      _currentRecordingPath = null;
+      if (path == null || path.isEmpty) {
+        return null;
+      }
+
+      final file = File(path);
+      for (var attempt = 0; attempt < 6; attempt++) {
+        if (await file.exists()) {
+          break;
+        }
+        await Future<void>.delayed(const Duration(milliseconds: 120));
+      }
+      if (!await file.exists()) {
+        debugPrint('Recorded file not found: $path');
+        return null;
+      }
+
+      final size = await file.length();
+      debugPrint('Recorded file size: $size bytes at $path');
+      if (size <= 64) {
+        debugPrint('Recorded file too small to use as voice message.');
+        return null;
+      }
+      return path;
+    } catch (e) {
+      debugPrint('Error stopping audio recorder: $e');
+      _currentRecordingPath = null;
+      return null;
+    }
+  }
+
   Future<void> _startVoiceRecording() async {
     if (_requireCurrentUserId() == null) return;
-    await _initializeSpeechToText();
-    if (!_speechReady) {
+
+    final micStatus = await Permission.microphone.request();
+    if (micStatus.isDenied) {
+      _showError('Microphone permission is required for voice messages.');
+      return;
+    }
+    if (micStatus.isPermanentlyDenied) {
       _showError(
-          'Voice capture is not available. Please check permissions and try again.');
+          'Microphone permission is permanently denied. Please enable it in app settings.');
+      openAppSettings();
       return;
     }
 
@@ -900,44 +997,44 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       _lastNonEmptyVoiceTranscript = '';
       _speechDetected = false;
 
+      final audioStarted = await _startAudioCapture();
+      if (!audioStarted) {
+        _showError('Could not start audio recording. Check microphone access.');
+        return;
+      }
+
       final currentUser = ref.read(authProvider).value;
       final preferredLocale =
           _languageToLocale(currentUser?.preferredLanguage ?? 'en');
       final supportedLocale = await _resolveSupportedLocale(preferredLocale);
 
-      // Try on-device first, then network-backed recognition for better compatibility.
-      var listening = await _tryStartListening(
-        localeId: supportedLocale,
-        onDevice: true,
-      );
-      if (!listening) {
-        listening = await _tryStartListening(
-          localeId: supportedLocale,
-          onDevice: false,
-        );
-      }
-      if (!listening && supportedLocale != null) {
-        // Final fallback: allow engine default locale.
-        listening = await _tryStartListening(
-          localeId: null,
-          onDevice: false,
-        );
-      }
+      await _initializeSpeechToText();
 
-      if (!listening) {
-        if (mounted) {
-          _showError(
-              'Could not start speech recognition. Check your microphone.');
+      if (_speechReady) {
+        // Best-effort transcription while recording; audio recording remains primary.
+        var listening = await _tryStartListening(
+          localeId: supportedLocale,
+          onDevice: true,
+        );
+        if (!listening) {
+          listening = await _tryStartListening(
+            localeId: supportedLocale,
+            onDevice: false,
+          );
         }
-        debugPrint('Failed to start listening');
-        return;
+        if (!listening && supportedLocale != null) {
+          listening = await _tryStartListening(
+            localeId: null,
+            onDevice: false,
+          );
+        }
       }
 
       if (!mounted) return;
       setState(() => _isRecording = true);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('🎙️ Listening... Speak clearly, then tap mic to send'),
+          content: Text('🎙️ Recording voice... tap mic again to stop and send'),
           duration: Duration(seconds: 6),
         ),
       );
@@ -962,6 +1059,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         debugPrint('Stopped listening. Detected: $_currentVoiceTranscript');
       }
 
+      final audioPath = await _stopAudioCapture();
+
       if (!mounted) return;
       setState(() => _isRecording = false);
 
@@ -969,14 +1068,20 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
           ? _currentVoiceTranscript.trim()
           : _lastNonEmptyVoiceTranscript.trim();
 
+      final messageText = transcript.isNotEmpty ? transcript : 'Voice message';
+
       // Provide better feedback based on what was detected
-      if (transcript.isEmpty) {
+      if (transcript.isEmpty && audioPath == null) {
         debugPrint('No usable transcript detected. Opening text fallback.');
         await _promptVoiceFallbackInput(currentUser);
         return;
       }
 
-      await _sendVoiceTranscriptAsMessage(transcript, currentUser);
+      await _sendVoiceTranscriptAsMessage(
+        messageText,
+        currentUser,
+        audioPath: audioPath,
+      );
 
       // Clear state after sending
       _currentVoiceTranscript = '';
@@ -991,39 +1096,49 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   }
 
   Future<void> _sendVoiceTranscriptAsMessage(
-      String transcript, User currentUser) async {
+    String transcript,
+    User currentUser, {
+    String? audioPath,
+  }) async {
     final trimmed = transcript.trim();
-    if (trimmed.isEmpty) {
+    if (trimmed.isEmpty && (audioPath == null || audioPath.isEmpty)) {
       return;
     }
 
-    debugPrint('Sending voice message: $trimmed');
+    final safeText = trimmed.isNotEmpty ? trimmed : 'Voice message';
+    final hasAudio = audioPath != null && audioPath.isNotEmpty;
+    final messageType = hasAudio ? MessageType.audio : MessageType.text;
+
+    debugPrint('Sending voice message: $safeText (hasAudio=$hasAudio)');
     final rm = RichMessage(
       message: Message(
         id: _newId(),
         senderId: currentUser.id,
         receiverId: widget.user.id,
-        content: trimmed,
-        type: MessageType.audio,
+        content: safeText,
+        type: messageType,
         status: MessageStatus.sent,
         timestamp: DateTime.now(),
         metadata: {
-          'voiceTranscript': trimmed,
+          'voiceTranscript': safeText,
+          if (audioPath != null && audioPath.isNotEmpty) 'audioPath': audioPath,
           'originalLanguage': currentUser.preferredLanguage,
           'targetLanguage': widget.user.preferredLanguage,
         },
       ),
+      audioPath: audioPath,
     );
 
     _addRich(rm, localOnly: true);
     CallSocketService.instance.sendMessageViaSocket(
       receiverId: widget.user.id,
-      content: trimmed,
-      type: 'audio',
+      content: safeText,
+      type: hasAudio ? 'audio' : 'text',
       senderLanguage: currentUser.preferredLanguage,
       receiverLanguage: widget.user.preferredLanguage,
       metadata: {
-        'voiceTranscript': trimmed,
+        'voiceTranscript': safeText,
+        if (audioPath != null && audioPath.isNotEmpty) 'audioPath': audioPath,
       },
     );
   }
