@@ -112,6 +112,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   String? _activeAudioPath;
   bool _speechReady = false;
   String _currentVoiceTranscript = '';
+  String _lastNonEmptyVoiceTranscript = '';
   bool _speechDetected = false;
 
   late final AnimationController _onlineGlowCtrl;
@@ -815,6 +816,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     final recognized = result.recognizedWords.trim();
     if (recognized.isNotEmpty) {
       _speechDetected = true;
+      _lastNonEmptyVoiceTranscript = recognized;
       debugPrint(
           'Speech detected: $recognized (isFinal: ${result.finalResult})');
     }
@@ -822,6 +824,66 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     if (result.finalResult) {
       debugPrint('Final speech result: $_currentVoiceTranscript');
     }
+  }
+
+  Future<String?> _resolveSupportedLocale(String preferredLocale) async {
+    try {
+      final locales = await _speechToText.locales();
+      if (locales.isEmpty) {
+        return null;
+      }
+
+      bool hasExact = false;
+      bool hasLanguageFallback = false;
+      final preferredLanguage = preferredLocale.split('_').first.toLowerCase();
+
+      for (final locale in locales) {
+        final id = locale.localeId;
+        if (id == preferredLocale) {
+          hasExact = true;
+          break;
+        }
+        if (id.toLowerCase().startsWith(preferredLanguage)) {
+          hasLanguageFallback = true;
+        }
+      }
+
+      if (hasExact) {
+        return preferredLocale;
+      }
+
+      if (hasLanguageFallback) {
+        for (final locale in locales) {
+          final id = locale.localeId;
+          if (id.toLowerCase().startsWith(preferredLanguage)) {
+            return id;
+          }
+        }
+      }
+
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<bool> _tryStartListening({
+    required String? localeId,
+    required bool onDevice,
+  }) async {
+    final result = await _speechToText.listen(
+      onResult: _onSpeechResult,
+      localeId: localeId,
+      listenOptions: SpeechListenOptions(
+        partialResults: true,
+        cancelOnError: false,
+        onDevice: onDevice,
+      ),
+      listenFor: const Duration(seconds: 60),
+      pauseFor: const Duration(seconds: 8),
+    );
+
+    return result == true || _speechToText.isListening;
   }
 
   Future<void> _startVoiceRecording() async {
@@ -835,25 +897,32 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
 
     try {
       _currentVoiceTranscript = '';
+      _lastNonEmptyVoiceTranscript = '';
       _speechDetected = false;
 
       final currentUser = ref.read(authProvider).value;
+      final preferredLocale =
+          _languageToLocale(currentUser?.preferredLanguage ?? 'en');
+      final supportedLocale = await _resolveSupportedLocale(preferredLocale);
 
-      // Start listening
-      final listenResult = await _speechToText.listen(
-        onResult: _onSpeechResult,
-        localeId: _languageToLocale(currentUser?.preferredLanguage ?? 'en'),
-        listenOptions: SpeechListenOptions(
-          partialResults: true,
-          cancelOnError: false,
-          onDevice: true, // Use device speech recognition for faster response
-        ),
-        listenFor: const Duration(seconds: 45),
-        pauseFor: const Duration(seconds: 3),
+      // Try on-device first, then network-backed recognition for better compatibility.
+      var listening = await _tryStartListening(
+        localeId: supportedLocale,
+        onDevice: true,
       );
-
-      // Some platforms/plugins may return null here; fall back to isListening.
-      final listening = listenResult == true || _speechToText.isListening;
+      if (!listening) {
+        listening = await _tryStartListening(
+          localeId: supportedLocale,
+          onDevice: false,
+        );
+      }
+      if (!listening && supportedLocale != null) {
+        // Final fallback: allow engine default locale.
+        listening = await _tryStartListening(
+          localeId: null,
+          onDevice: false,
+        );
+      }
 
       if (!listening) {
         if (mounted) {
@@ -868,8 +937,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       setState(() => _isRecording = true);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('🎙️ Listening... Speak now (tap to stop)'),
-          duration: Duration(seconds: 45),
+          content: Text('🎙️ Listening... Speak clearly, then tap mic to send'),
+          duration: Duration(seconds: 6),
         ),
       );
       debugPrint('Started voice recording');
@@ -896,52 +965,22 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       if (!mounted) return;
       setState(() => _isRecording = false);
 
-      final transcript = _currentVoiceTranscript.trim();
+        final transcript = _currentVoiceTranscript.trim().isNotEmpty
+          ? _currentVoiceTranscript.trim()
+          : _lastNonEmptyVoiceTranscript.trim();
 
       // Provide better feedback based on what was detected
       if (transcript.isEmpty) {
-        if (!_speechDetected) {
-          _showError('No speech detected. Please speak clearly and try again.');
-          debugPrint('No speech detected during recording');
-        } else {
-          _showError('Could not process your speech. Please try again.');
-          debugPrint('Speech detected but transcript empty');
-        }
+        debugPrint('No usable transcript detected. Opening text fallback.');
+        await _promptVoiceFallbackInput(currentUser);
         return;
       }
 
-      debugPrint('Sending voice message: $transcript');
-      final rm = RichMessage(
-        message: Message(
-          id: _newId(),
-          senderId: currentUser.id,
-          receiverId: widget.user.id,
-          content: transcript,
-          type: MessageType.audio,
-          status: MessageStatus.sent,
-          timestamp: DateTime.now(),
-          metadata: {
-            'voiceTranscript': transcript,
-            'originalLanguage': currentUser.preferredLanguage,
-            'targetLanguage': widget.user.preferredLanguage,
-          },
-        ),
-      );
-
-      _addRich(rm, localOnly: true);
-      CallSocketService.instance.sendMessageViaSocket(
-        receiverId: widget.user.id,
-        content: transcript,
-        type: 'audio',
-        senderLanguage: currentUser.preferredLanguage,
-        receiverLanguage: widget.user.preferredLanguage,
-        metadata: {
-          'voiceTranscript': transcript,
-        },
-      );
+      await _sendVoiceTranscriptAsMessage(transcript, currentUser);
 
       // Clear state after sending
       _currentVoiceTranscript = '';
+      _lastNonEmptyVoiceTranscript = '';
       _speechDetected = false;
     } catch (e) {
       debugPrint('Error stopping/sending voice message: $e');
@@ -949,6 +988,140 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       setState(() => _isRecording = false);
       _showError('Could not send voice message: $e');
     }
+  }
+
+  Future<void> _sendVoiceTranscriptAsMessage(String transcript, User currentUser) async {
+    final trimmed = transcript.trim();
+    if (trimmed.isEmpty) {
+      return;
+    }
+
+    debugPrint('Sending voice message: $trimmed');
+    final rm = RichMessage(
+      message: Message(
+        id: _newId(),
+        senderId: currentUser.id,
+        receiverId: widget.user.id,
+        content: trimmed,
+        type: MessageType.audio,
+        status: MessageStatus.sent,
+        timestamp: DateTime.now(),
+        metadata: {
+          'voiceTranscript': trimmed,
+          'originalLanguage': currentUser.preferredLanguage,
+          'targetLanguage': widget.user.preferredLanguage,
+        },
+      ),
+    );
+
+    _addRich(rm, localOnly: true);
+    CallSocketService.instance.sendMessageViaSocket(
+      receiverId: widget.user.id,
+      content: trimmed,
+      type: 'audio',
+      senderLanguage: currentUser.preferredLanguage,
+      receiverLanguage: widget.user.preferredLanguage,
+      metadata: {
+        'voiceTranscript': trimmed,
+      },
+    );
+  }
+
+  Future<void> _promptVoiceFallbackInput(User currentUser) async {
+    if (!mounted) return;
+
+    final controller = TextEditingController(
+      text: _lastNonEmptyVoiceTranscript,
+    );
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: _N.card,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      builder: (sheetContext) {
+        return Padding(
+          padding: EdgeInsets.only(
+            left: 16,
+            right: 16,
+            top: 16,
+            bottom: MediaQuery.of(sheetContext).viewInsets.bottom + 16,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Could not catch voice clearly',
+                style: TextStyle(
+                  color: _N.textPrimary,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'You can type quickly and send now, or retry mic.',
+                style: TextStyle(color: _N.textSecondary, fontSize: 13),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: controller,
+                maxLines: 3,
+                minLines: 1,
+                style: const TextStyle(color: _N.textPrimary),
+                decoration: InputDecoration(
+                  hintText: 'Type message... ',
+                  hintStyle: const TextStyle(color: _N.textMuted),
+                  filled: true,
+                  fillColor: _N.inputBg,
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: _N.inputBorder),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: _N.indigo),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () {
+                        Navigator.of(sheetContext).pop();
+                        _handleMicTap();
+                      },
+                      child: const Text('Retry Mic'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        final text = controller.text.trim();
+                        Navigator.of(sheetContext).pop();
+                        if (text.isEmpty) {
+                          return;
+                        }
+                        await _sendVoiceTranscriptAsMessage(text, currentUser);
+                      },
+                      child: const Text('Send'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    controller.dispose();
   }
 
   String _languageToLocale(String languageCode) {
