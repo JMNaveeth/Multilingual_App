@@ -9,6 +9,58 @@ class AuthService {
 
   SupabaseClient get _client => SupabaseService.client;
 
+  bool _isRetryableNetworkError(Object error) {
+    final text = error.toString().toLowerCase();
+    return text.contains('authretryablefetchexception') ||
+        text.contains('socketexception') ||
+        text.contains('failed host lookup') ||
+        text.contains('temporary failure in name resolution') ||
+        text.contains('connection timed out') ||
+        text.contains('network is unreachable');
+  }
+
+  String _toUserFriendlyAuthError(Object error) {
+    final text = error.toString();
+    final lower = text.toLowerCase();
+
+    if (lower.contains('failed host lookup') ||
+        lower.contains('socketexception')) {
+      return 'Cannot reach Supabase server from this device. Check mobile internet/Wi-Fi, disable strict Private DNS or VPN, then try again.';
+    }
+
+    if (lower.contains('timed out')) {
+      return 'Network timeout while contacting Supabase. Please try again.';
+    }
+
+    if (lower.contains('invalid login credentials')) {
+      return 'Invalid email or password.';
+    }
+
+    return text;
+  }
+
+  Future<T> _withNetworkRetry<T>(Future<T> Function() action) async {
+    const delays = <Duration>[
+      Duration(milliseconds: 350),
+      Duration(milliseconds: 850),
+    ];
+
+    Object? lastError;
+    for (var attempt = 0; attempt <= delays.length; attempt++) {
+      try {
+        return await action();
+      } catch (error) {
+        lastError = error;
+        if (!_isRetryableNetworkError(error) || attempt == delays.length) {
+          rethrow;
+        }
+        await Future<void>.delayed(delays[attempt]);
+      }
+    }
+
+    throw Exception(_toUserFriendlyAuthError(lastError ?? 'Unknown error'));
+  }
+
   Future<String?> getToken() async {
     return _client.auth.currentSession?.accessToken;
   }
@@ -105,10 +157,17 @@ class AuthService {
           'Supabase is not configured. Run with --dart-define=SUPABASE_URL=... --dart-define=SUPABASE_ANON_KEY=...');
     }
 
-    final result = await _client.auth.signInWithPassword(
-      email: email.trim(),
-      password: password,
-    );
+    AuthResponse result;
+    try {
+      result = await _withNetworkRetry(() {
+        return _client.auth.signInWithPassword(
+          email: email.trim(),
+          password: password,
+        );
+      });
+    } catch (error) {
+      throw Exception(_toUserFriendlyAuthError(error));
+    }
 
     final authUser = result.user;
     final session = result.session;
@@ -158,14 +217,16 @@ class AuthService {
 
     late final AuthResponse signUp;
     try {
-      signUp = await _client.auth.signUp(
-        email: normalizedEmail,
-        password: password,
-        data: {
-          'name': name.trim(),
-          'preferred_language': preferredLanguage,
-        },
-      );
+      signUp = await _withNetworkRetry(() {
+        return _client.auth.signUp(
+          email: normalizedEmail,
+          password: password,
+          data: {
+            'name': name.trim(),
+            'preferred_language': preferredLanguage,
+          },
+        );
+      });
     } on AuthException catch (e) {
       final msg = (e.message).toLowerCase();
       final code = (e.code ?? '').toLowerCase();
@@ -186,6 +247,8 @@ class AuthService {
             'This email is already registered. Please use Log In instead of Create Account.');
       }
       throw Exception(e.message);
+    } catch (error) {
+      throw Exception(_toUserFriendlyAuthError(error));
     }
 
     final authUser = signUp.user;
