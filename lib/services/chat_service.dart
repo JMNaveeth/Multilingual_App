@@ -16,6 +16,8 @@ class ChatService {
   SupabaseClient get _client => SupabaseService.client;
 
   String _localMessagesKey(String userId) => 'chat_local_messages_$userId';
+  String _legacyMigrationDoneKey(String userId) =>
+      'chat_legacy_migration_done_$userId';
 
   String _messageMergeKey(Message message) {
     final clientId = message.metadata?['clientMessageId']?.toString();
@@ -81,7 +83,8 @@ class ChatService {
     );
   }
 
-  Future<void> _upsertLocalMessages(String userId, List<Message> messages) async {
+  Future<void> _upsertLocalMessages(
+      String userId, List<Message> messages) async {
     final existing = await _getLocalMessages(userId);
     final merged = _mergeMessages(messages, existing);
     await _saveLocalMessages(userId, merged);
@@ -168,8 +171,7 @@ class ChatService {
         .select()
         .eq('sender_id', message.senderId)
         .eq('receiver_id', message.receiverId)
-        .contains('metadata', {'clientMessageId': clientId})
-        .limit(1);
+        .contains('metadata', {'clientMessageId': clientId}).limit(1);
 
     if (rows.isEmpty) {
       return null;
@@ -243,6 +245,10 @@ class ChatService {
     List<String> knownPeerIds = const [],
   }) async {
     final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool(_legacyMigrationDoneKey(currentUserId)) == true) {
+      return;
+    }
+
     final legacyKeys = prefs.getKeys().where((key) {
       final k = key.toLowerCase();
       return k.contains('message') || k.contains('chat');
@@ -254,13 +260,13 @@ class ChatService {
         continue;
       }
 
-      final raw = prefs.getString(key);
-      if (raw == null || raw.isEmpty) {
+      final value = prefs.get(key);
+      if (value is! String || value.isEmpty) {
         continue;
       }
 
       try {
-        final decoded = jsonDecode(raw);
+        final decoded = jsonDecode(value);
         if (decoded is! List) {
           continue;
         }
@@ -271,15 +277,16 @@ class ChatService {
           }
           final map = item.map((k, v) => MapEntry(k.toString(), v));
           final message = Message.fromJson(map);
-          final belongsToCurrentUser =
-              message.senderId == currentUserId || message.receiverId == currentUserId;
+          final belongsToCurrentUser = message.senderId == currentUserId ||
+              message.receiverId == currentUserId;
           if (!belongsToCurrentUser) {
             continue;
           }
 
           if (knownPeerIds.isNotEmpty) {
-            final belongsToKnownPeer = knownPeerIds.contains(message.senderId) ||
-                knownPeerIds.contains(message.receiverId);
+            final belongsToKnownPeer =
+                knownPeerIds.contains(message.senderId) ||
+                    knownPeerIds.contains(message.receiverId);
             if (!belongsToKnownPeer) {
               continue;
             }
@@ -296,14 +303,26 @@ class ChatService {
       await _upsertLocalMessages(currentUserId, imported);
     }
 
+    await prefs.setBool(_legacyMigrationDoneKey(currentUserId), true);
+
     if (!SupabaseService.isConfigured) {
       return;
     }
 
-    final local = await _getLocalMessages(currentUserId);
-    final outgoing = local.where((m) => m.senderId == currentUserId).toList();
-    for (final message in outgoing) {
-      await sendMessage(message);
+    // Best-effort background sync for imported outgoing history.
+    if (imported.isEmpty) {
+      return;
+    }
+
+    final outgoingImported = imported
+        .where((m) => m.senderId == currentUserId)
+        .toList();
+    if (outgoingImported.isEmpty) {
+      return;
+    }
+
+    for (final message in outgoingImported) {
+      sendMessage(message);
     }
   }
 
