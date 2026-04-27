@@ -965,7 +965,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       if (!mounted) return;
       setState(() => _isRecording = false);
 
-        final transcript = _currentVoiceTranscript.trim().isNotEmpty
+      final transcript = _currentVoiceTranscript.trim().isNotEmpty
           ? _currentVoiceTranscript.trim()
           : _lastNonEmptyVoiceTranscript.trim();
 
@@ -990,7 +990,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     }
   }
 
-  Future<void> _sendVoiceTranscriptAsMessage(String transcript, User currentUser) async {
+  Future<void> _sendVoiceTranscriptAsMessage(
+      String transcript, User currentUser) async {
     final trimmed = transcript.trim();
     if (trimmed.isEmpty) {
       return;
