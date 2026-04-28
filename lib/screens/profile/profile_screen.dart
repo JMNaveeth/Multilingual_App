@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'dart:io';
 import 'package:multilingual_chat_app/providers/auth_provider.dart';
 
@@ -573,12 +574,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(28),
                       gradient: _selectedImage == null
-                        ? const LinearGradient(
-                            colors: [_N.indigo, _N.violet],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          )
-                        : null,
+                          ? const LinearGradient(
+                              colors: [_N.indigo, _N.violet],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            )
+                          : null,
                       boxShadow: [
                         BoxShadow(
                           color: _N.indigo
@@ -589,35 +590,35 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                       ],
                     ),
                     child: _selectedImage != null
-                      ? ClipRRect(
-                          borderRadius: BorderRadius.circular(28),
-                          child: Image.file(
-                            _selectedImage!,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => Center(
-                              child: Text(
-                                _initials(user.name),
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 36,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: -1,
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(28),
+                            child: Image.file(
+                              _selectedImage!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Center(
+                                child: Text(
+                                  _initials(user.name),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 36,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: -1,
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                        )
-                      : Center(
-                          child: Text(
-                            _initials(user.name),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 36,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: -1,
+                          )
+                        : Center(
+                            child: Text(
+                              _initials(user.name),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 36,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: -1,
+                              ),
                             ),
                           ),
-                        ),
                   ),
                 ),
 
@@ -635,31 +636,31 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                         borderRadius: BorderRadius.circular(10),
                         color: _isUploadingImage ? _N.amber : _N.card,
                         border: Border.all(
-                          color: _isUploadingImage 
-                            ? _N.amber.withOpacity(0.6) 
-                            : _N.indigo.withOpacity(0.5),
+                          color: _isUploadingImage
+                              ? _N.amber.withOpacity(0.6)
+                              : _N.indigo.withOpacity(0.5),
                         ),
                         boxShadow: _isUploadingImage
-                          ? [
-                              BoxShadow(
-                                color: _N.amber.withOpacity(0.4),
-                                blurRadius: 8,
-                                spreadRadius: 1,
-                              )
-                            ]
-                          : [],
+                            ? [
+                                BoxShadow(
+                                  color: _N.amber.withOpacity(0.4),
+                                  blurRadius: 8,
+                                  spreadRadius: 1,
+                                )
+                              ]
+                            : [],
                       ),
                       child: !_isUploadingImage
-                        ? const Icon(Icons.camera_alt_rounded,
-                            color: _N.indigoLight, size: 16)
-                        : const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation(_N.amber),
+                          ? const Icon(Icons.camera_alt_rounded,
+                              color: _N.indigoLight, size: 16)
+                          : const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation(_N.amber),
+                              ),
                             ),
-                          ),
                     ),
                   ),
                 ),
