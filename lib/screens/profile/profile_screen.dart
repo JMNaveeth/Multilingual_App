@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
 import 'package:multilingual_chat_app/providers/auth_provider.dart';
 
 // ── Nexus Design Tokens ───────────────────────────────────────────────────────
@@ -38,9 +40,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
   bool _isEditingName = false;
   bool _isEditingStatus = false;
   bool _controllersInitialized = false;
+  File? _selectedImage;
+  bool _isUploadingImage = false;
 
   late final AnimationController _glowCtrl;
   late final AnimationController _onlineCtrl;
+  final ImagePicker _imagePicker = ImagePicker();
 
   // ── Language list ──────────────────────────────────────────────────────────
   static const _languages = [
@@ -118,6 +123,200 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
         (l) => l['code'] == _selectedLanguage,
         orElse: () => {'name': 'English', 'flag': '🇬🇧'},
       )['flag'])!;
+
+  // ── Image Picker Methods ──────────────────────────────────────────────────
+
+  void _showImagePickerOptions() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => Container(
+        decoration: const BoxDecoration(
+          color: _N.surface,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          border: Border(top: BorderSide(color: _N.cardBorder)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Handle
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                margin: const EdgeInsets.only(top: 12, bottom: 4),
+                decoration: BoxDecoration(
+                  color: _N.textMuted,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+
+            // Title
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+              child: Row(
+                children: [
+                  const Icon(Icons.image_rounded,
+                      color: _N.indigoLight, size: 18),
+                  const SizedBox(width: 10),
+                  const Text(
+                    'Update Profile Photo',
+                    style: TextStyle(
+                      color: _N.textPrimary,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const Divider(height: 1, color: _N.cardBorder),
+
+            // Options
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: Column(
+                children: [
+                  _imagePickerOption(
+                    icon: Icons.camera_alt_rounded,
+                    label: 'Take a Photo',
+                    color: _N.cyan,
+                    onTap: () {
+                      Navigator.pop(_);
+                      _pickImageFromCamera();
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  _imagePickerOption(
+                    icon: Icons.photo_library_rounded,
+                    label: 'Choose from Gallery',
+                    color: _N.violet,
+                    onTap: () {
+                      Navigator.pop(_);
+                      _pickImageFromGallery();
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  if (_selectedImage != null)
+                    _imagePickerOption(
+                      icon: Icons.delete_rounded,
+                      label: 'Remove Photo',
+                      color: _N.rose,
+                      onTap: () {
+                        Navigator.pop(_);
+                        setState(() => _selectedImage = null);
+                        _snack('Profile photo removed', _N.rose);
+                      },
+                    ),
+                  const SizedBox(height: 8),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _imagePickerOption({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: color.withOpacity(0.3)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: color, size: 20),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: _N.textPrimary,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+            Icon(Icons.arrow_forward_ios_rounded,
+                color: color.withOpacity(0.6), size: 14),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickImageFromCamera() async {
+    try {
+      final XFile? pickedFile = await _imagePicker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 85,
+        preferredCameraDevice: CameraDevice.front,
+      );
+
+      if (pickedFile != null) {
+        await _handleImagePicked(File(pickedFile.path));
+      }
+    } catch (e) {
+      if (mounted) {
+        _snack('Failed to access camera: $e', _N.rose);
+      }
+    }
+  }
+
+  Future<void> _pickImageFromGallery() async {
+    try {
+      final XFile? pickedFile = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 85,
+      );
+
+      if (pickedFile != null) {
+        await _handleImagePicked(File(pickedFile.path));
+      }
+    } catch (e) {
+      if (mounted) {
+        _snack('Failed to access gallery: $e', _N.rose);
+      }
+    }
+  }
+
+  Future<void> _handleImagePicked(File imageFile) async {
+    if (!mounted) return;
+
+    // Check file size (limit to 5MB)
+    final fileSizeInMB = imageFile.lengthSync() / (1024 * 1024);
+    if (fileSizeInMB > 5) {
+      _snack('Image size must be less than 5MB', _N.rose);
+      return;
+    }
+
+    setState(() {
+      _selectedImage = imageFile;
+    });
+
+    _snack('Profile photo updated', _N.emerald);
+  }
 
   // ── Save ──────────────────────────────────────────────────────────────────
   Future<void> _saveProfile() async {
@@ -373,11 +572,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                     height: 96,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(28),
-                      gradient: const LinearGradient(
-                        colors: [_N.indigo, _N.violet],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
+                      gradient: _selectedImage == null
+                        ? const LinearGradient(
+                            colors: [_N.indigo, _N.violet],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          )
+                        : null,
                       boxShadow: [
                         BoxShadow(
                           color: _N.indigo
@@ -387,17 +588,36 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                         ),
                       ],
                     ),
-                    child: Center(
-                      child: Text(
-                        _initials(user.name),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 36,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -1,
+                    child: _selectedImage != null
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(28),
+                          child: Image.file(
+                            _selectedImage!,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Center(
+                              child: Text(
+                                _initials(user.name),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 36,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: -1,
+                                ),
+                              ),
+                            ),
+                          ),
+                        )
+                      : Center(
+                          child: Text(
+                            _initials(user.name),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 36,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -1,
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
                   ),
                 ),
 
@@ -406,17 +626,40 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                   bottom: -4,
                   right: -4,
                   child: GestureDetector(
-                    onTap: () => _snack('Photo upload coming soon', _N.amber),
-                    child: Container(
+                    onTap: _showImagePickerOptions,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
                       width: 32,
                       height: 32,
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(10),
-                        color: _N.card,
-                        border: Border.all(color: _N.indigo.withOpacity(0.5)),
+                        color: _isUploadingImage ? _N.amber : _N.card,
+                        border: Border.all(
+                          color: _isUploadingImage 
+                            ? _N.amber.withOpacity(0.6) 
+                            : _N.indigo.withOpacity(0.5),
+                        ),
+                        boxShadow: _isUploadingImage
+                          ? [
+                              BoxShadow(
+                                color: _N.amber.withOpacity(0.4),
+                                blurRadius: 8,
+                                spreadRadius: 1,
+                              )
+                            ]
+                          : [],
                       ),
-                      child: const Icon(Icons.camera_alt_rounded,
-                          color: _N.indigoLight, size: 16),
+                      child: !_isUploadingImage
+                        ? const Icon(Icons.camera_alt_rounded,
+                            color: _N.indigoLight, size: 16)
+                        : const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation(_N.amber),
+                            ),
+                          ),
                     ),
                   ),
                 ),
