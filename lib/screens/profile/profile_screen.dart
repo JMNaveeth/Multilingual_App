@@ -271,17 +271,19 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     try {
       // Request camera permission
       final cameraStatus = await Permission.camera.request();
-      
+
       if (cameraStatus.isDenied) {
         if (mounted) {
           _snack('Camera permission is required', _N.rose);
         }
         return;
       }
-      
+
       if (cameraStatus.isPermanentlyDenied) {
         if (mounted) {
-          _snack('Camera permission is permanently denied. Open app settings to enable.', _N.rose);
+          _snack(
+              'Camera permission is permanently denied. Open app settings to enable.',
+              _N.rose);
           openAppSettings();
         }
         return;
@@ -307,7 +309,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     try {
       // Request photo/storage permission
       PermissionStatus photoStatus;
-      
+
       if (Platform.isAndroid) {
         // Try photos permission first (Android 13+), fallback to storage
         photoStatus = await Permission.photos.request();
@@ -327,7 +329,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
 
       if (photoStatus.isPermanentlyDenied) {
         if (mounted) {
-          _snack('Photo permission is permanently denied. Open app settings to enable.', _N.rose);
+          _snack(
+              'Photo permission is permanently denied. Open app settings to enable.',
+              _N.rose);
           openAppSettings();
         }
         return;
