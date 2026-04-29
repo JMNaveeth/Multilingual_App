@@ -58,7 +58,8 @@ class CallSocketService {
       StreamController<Map<String, dynamic>>.broadcast();
   final StreamController<Map<String, dynamic>> _receiveSubtitleController =
       StreamController<Map<String, dynamic>>.broadcast();
-  final StreamController<Map<String, dynamic>> _receiveTranslatedAudioController =
+  final StreamController<Map<String, dynamic>>
+      _receiveTranslatedAudioController =
       StreamController<Map<String, dynamic>>.broadcast();
 
   // Chat StreamControllers
@@ -80,15 +81,21 @@ class CallSocketService {
   Stream<Map<String, dynamic>> get candidates => _candidateController.stream;
 
   // Translation Streams
-  Stream<Map<String, dynamic>> get translationStarted => _translationStartedController.stream;
-  Stream<Map<String, dynamic>> get receiveSubtitle => _receiveSubtitleController.stream;
-  Stream<Map<String, dynamic>> get receiveTranslatedAudio => _receiveTranslatedAudioController.stream;
+  Stream<Map<String, dynamic>> get translationStarted =>
+      _translationStartedController.stream;
+  Stream<Map<String, dynamic>> get receiveSubtitle =>
+      _receiveSubtitleController.stream;
+  Stream<Map<String, dynamic>> get receiveTranslatedAudio =>
+      _receiveTranslatedAudioController.stream;
 
   // Chat Streams
   Stream<Map<String, dynamic>> get newMessages => _newMessageController.stream;
-  Stream<Map<String, dynamic>> get callTextSent => _callTextSentController.stream;
-  Stream<Map<String, dynamic>> get messageDeleted => _messageDeletedController.stream;
-  Stream<Map<String, dynamic>> get messageForwarded => _messageForwardedController.stream;
+  Stream<Map<String, dynamic>> get callTextSent =>
+      _callTextSentController.stream;
+  Stream<Map<String, dynamic>> get messageDeleted =>
+      _messageDeletedController.stream;
+  Stream<Map<String, dynamic>> get messageForwarded =>
+      _messageForwardedController.stream;
 
   bool get isConnected => _socket?.connected ?? false;
 
@@ -213,21 +220,27 @@ class CallSocketService {
       _socket!.on('translation_started', (data) {
         final payload = data is Map<String, dynamic>
             ? data
-            : data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{};
+            : data is Map
+                ? Map<String, dynamic>.from(data)
+                : <String, dynamic>{};
         _translationStartedController.add(payload);
       });
 
       _socket!.on('receive_subtitle', (data) {
         final payload = data is Map<String, dynamic>
             ? data
-            : data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{};
+            : data is Map
+                ? Map<String, dynamic>.from(data)
+                : <String, dynamic>{};
         _receiveSubtitleController.add(payload);
       });
 
       _socket!.on('receive_translated_audio', (data) {
         final payload = data is Map<String, dynamic>
             ? data
-            : data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{};
+            : data is Map
+                ? Map<String, dynamic>.from(data)
+                : <String, dynamic>{};
         _receiveTranslatedAudioController.add(payload);
       });
 
@@ -235,14 +248,18 @@ class CallSocketService {
       _socket!.on('new_message', (data) {
         final payload = data is Map<String, dynamic>
             ? data
-            : data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{};
+            : data is Map
+                ? Map<String, dynamic>.from(data)
+                : <String, dynamic>{};
         _newMessageController.add(payload);
       });
 
       _socket!.on('call_text_sent', (data) {
         final payload = data is Map<String, dynamic>
             ? data
-            : data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{};
+            : data is Map
+                ? Map<String, dynamic>.from(data)
+                : <String, dynamic>{};
         _callTextSentController.add(payload);
       });
 
@@ -250,7 +267,9 @@ class CallSocketService {
       _socket!.on('message_deleted', (data) {
         final payload = data is Map<String, dynamic>
             ? data
-            : data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{};
+            : data is Map
+                ? Map<String, dynamic>.from(data)
+                : <String, dynamic>{};
         _messageDeletedController.add(payload);
       });
 
@@ -258,7 +277,9 @@ class CallSocketService {
       _socket!.on('message_forwarded', (data) {
         final payload = data is Map<String, dynamic>
             ? data
-            : data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{};
+            : data is Map
+                ? Map<String, dynamic>.from(data)
+                : <String, dynamic>{};
         _messageForwardedController.add(payload);
       });
 
@@ -387,7 +408,7 @@ class CallSocketService {
   }
 
   // --- Real-time Chat Emitters ---
-  
+
   void sendMessageViaSocket({
     required String receiverId,
     required String content,
