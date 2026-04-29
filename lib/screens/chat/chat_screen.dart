@@ -102,6 +102,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   bool _historyFetchStarted = false;
   StreamSubscription<IncomingCall>? _incomingCallSub;
   StreamSubscription<List<Message>>? _conversationStreamSub;
+  StreamSubscription<Map<String, dynamic>>? _messageDeletedSub;
   int _localIdCounter = 0;
 
   final _chatService = ChatService();
@@ -175,6 +176,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   void dispose() {
     _incomingCallSub?.cancel();
     _conversationStreamSub?.cancel();
+    _messageDeletedSub?.cancel();
     if (_speechToText.isListening) {
       unawaited(_speechToText.stop());
     }
@@ -266,13 +268,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     );
 
     // Real-time listener for message deletions
-    CallSocketService.instance.messageDeleted.listen((event) {
+    _messageDeletedSub ??= CallSocketService.instance.messageDeleted.listen((event) {
       if (!mounted) return;
       final deletedMessageId = event['messageId']?.toString() ?? '';
-      if (deletedMessageId.isEmpty) return;
+      final clientMessageId = event['clientMessageId']?.toString() ?? '';
+      if (deletedMessageId.isEmpty && clientMessageId.isEmpty) return;
 
       setState(() {
-        _richMessages.removeWhere((m) => m.message.id == deletedMessageId);
+        _richMessages.removeWhere((m) =>
+            m.message.id == deletedMessageId || m.message.id == clientMessageId ||
+            m.message.metadata?['clientMessageId']?.toString() == clientMessageId);
       });
     });
   }
@@ -800,32 +805,33 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     final selectedIds = _selectedMessageIds.toList();
     if (selectedIds.isEmpty) return;
 
+    final selectedMessages = _richMessages
+        .where((m) => selectedIds.contains(m.message.id))
+        .toList();
+
     // Update UI immediately
     if (!mounted) return;
     setState(() {
-      _richMessages.removeWhere((m) => _selectedMessageIds.contains(m.message.id));
+      _richMessages.removeWhere((m) => selectedIds.contains(m.message.id));
       _selectedMessageIds.clear();
     });
 
     // Delete from backend and notify in real-time
     var successCount = 0;
-    for (final id in selectedIds) {
-      final rm = _richMessages.where((m) => m.message.id == id).cast<RichMessage?>().firstOrNull;
-      if (rm != null) {
-        final success = await _chatService.deleteMessage(
-          message: rm.message,
-          deleteForEveryone: false,
-        );
-        if (success) {
-          successCount++;
-        }
-        // Emit socket event for real-time deletion
-        CallSocketService.instance.deleteMessageViaSocket(
-          messageId: id,
-          receiverId: widget.user.id,
-          deleteForEveryone: false,
-        );
+    for (final rm in selectedMessages) {
+      final success = await _chatService.deleteMessage(
+        message: rm.message,
+        deleteForEveryone: false,
+      );
+      if (success) {
+        successCount++;
       }
+      // Emit socket event for real-time deletion
+      CallSocketService.instance.deleteMessageViaSocket(
+        messageId: rm.message.id,
+        receiverId: widget.user.id,
+        deleteForEveryone: false,
+      );
     }
 
     if (!mounted) return;

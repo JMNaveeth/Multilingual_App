@@ -224,6 +224,73 @@ const initializeSocket = (io) => {
       }
     });
 
+    socket.on('delete_message', async (data) => {
+      try {
+        const { messageId, receiverId, deleteForEveryone = false } = data || {};
+        const senderId = socketToUser.get(socket.id);
+
+        if (!senderId || !messageId) {
+          socket.emit('error', { message: 'Not authenticated or missing messageId' });
+          return;
+        }
+
+        // Only the sender can delete for everyone.
+        if (deleteForEveryone) {
+          let message = null;
+          if (isValidObjectId(messageId)) {
+            message = await Message.findById(messageId);
+          }
+
+          if (!message) {
+            message = await Message.findOne({
+              'metadata.clientMessageId': messageId,
+              sender: senderId,
+            });
+          }
+
+          if (!message) {
+            socket.emit('message_delete_failed', { messageId, reason: 'not_found' });
+            return;
+          }
+
+          if (message.sender.toString() !== senderId.toString()) {
+            socket.emit('message_delete_failed', { messageId, reason: 'not_authorized' });
+            return;
+          }
+
+          await Message.findByIdAndDelete(message._id);
+
+          const targetRoom = receiverId || message.receiver.toString();
+          if (targetRoom) {
+            io.to(targetRoom).emit('message_deleted', {
+              messageId: message._id.toString(),
+              clientMessageId: message.metadata?.clientMessageId || messageId,
+              deleteForEveryone: true,
+            });
+          }
+
+          socket.emit('message_deleted', {
+            messageId: message._id.toString(),
+            clientMessageId: message.metadata?.clientMessageId || messageId,
+            deleteForEveryone: true,
+          });
+          return;
+        }
+
+        // Delete-for-me is handled locally by the client, but we still confirm it.
+        socket.emit('message_deleted', {
+          messageId,
+          deleteForEveryone: false,
+        });
+      } catch (error) {
+        console.error('Delete message error:', error);
+        socket.emit('message_delete_failed', {
+          messageId: data?.messageId,
+          reason: 'server_error',
+        });
+      }
+    });
+
     // Mark messages as read
     socket.on('mark_read', async (data) => {
       try {
