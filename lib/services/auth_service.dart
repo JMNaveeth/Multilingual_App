@@ -348,8 +348,18 @@ class AuthService {
       throw Exception('Not authenticated');
     }
 
+    final authEmail = _client.auth.currentUser?.email?.trim() ?? '';
+    final profileEmail = current.email.trim().isNotEmpty
+        ? current.email.trim()
+        : authEmail;
+    if (profileEmail.isEmpty) {
+      throw Exception(
+          'Your account email is missing. Please sign in again before saving profile changes.');
+    }
+
     final payload = {
       'id': current.id,
+      'email': profileEmail,
       if (name != null) 'name': name,
       if (preferredLanguage != null) 'preferred_language': preferredLanguage,
       if (profileImageUrl != null) 'profile_image_url': profileImageUrl,
