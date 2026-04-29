@@ -131,7 +131,8 @@ class ChatService {
   }) async {
     final currentUser = await _authService.getCurrentUser();
     final ownerId = currentUser?.id ?? message.senderId;
-    final clientMessageId = message.metadata?['clientMessageId']?.toString() ?? message.id;
+    final clientMessageId =
+        message.metadata?['clientMessageId']?.toString() ?? message.id;
 
     await _removeMessageFromLocalCache(ownerId, message.id);
 
@@ -142,10 +143,8 @@ class ChatService {
 
     if (SupabaseService.isConfigured) {
       try {
-        await _client
-            .from('messages')
-            .delete()
-            .or('id.eq.${message.id},metadata->>clientMessageId.eq.$clientMessageId');
+        await _client.from('messages').delete().or(
+            'id.eq.${message.id},metadata->>clientMessageId.eq.$clientMessageId');
         await _hideMessageForUser(ownerId, message.id);
         return true;
       } catch (_) {
