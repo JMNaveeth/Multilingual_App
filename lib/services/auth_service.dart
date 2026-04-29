@@ -349,9 +349,8 @@ class AuthService {
     }
 
     final authEmail = _client.auth.currentUser?.email?.trim() ?? '';
-    final profileEmail = current.email.trim().isNotEmpty
-        ? current.email.trim()
-        : authEmail;
+    final profileEmail =
+        current.email.trim().isNotEmpty ? current.email.trim() : authEmail;
     if (profileEmail.isEmpty) {
       throw Exception(
           'Your account email is missing. Please sign in again before saving profile changes.');
