@@ -117,10 +117,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   String _currentVoiceTranscript = '';
   String _lastNonEmptyVoiceTranscript = '';
   bool _speechDetected = false;
+  RichMessage? _replyingTo;
+  final Set<String> _selectedMessageIds = <String>{};
 
   late final AnimationController _onlineGlowCtrl;
   late final AnimationController _attachMenuCtrl;
   late final Animation<double> _attachMenuAnim;
+
+  bool get _isSelectionMode => _selectedMessageIds.isNotEmpty;
 
   // ── Init ──────────────────────────────────────────────────────────────────
 
@@ -196,12 +200,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       currentUserId: currentUser.id,
       otherUserId: widget.user.id,
     )
-        .listen((messages) {
+        .listen((messages) async {
       if (!mounted) return;
+      final hiddenIds = await _chatService.getHiddenMessageIds(currentUser.id);
       setState(() {
         _richMessages
           ..clear()
-          ..addAll(messages.map(_fromMessage));
+          ..addAll(messages
+              .where((message) => !hiddenIds.contains(message.id))
+              .map(_fromMessage));
         _isLoadingHistory = false;
       });
       _scrollToBottom();
@@ -378,6 +385,332 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       }
     }
     return _fromMessage(message);
+  }
+
+  Future<void> _showMessageActions(RichMessage rm, bool isMe) async {
+    if (_isSelectionMode) {
+      _toggleMessageSelection(rm);
+      return;
+    }
+
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: _N.card,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      builder: (sheetContext) {
+        final isTextMessage = rm.message.type == MessageType.text;
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 18),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 44,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: _N.cardBorder,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                const Text(
+                  'Message options',
+                  style: TextStyle(
+                    color: _N.textPrimary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  isTextMessage ? rm.message.content : 'Choose an action',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: _N.textSecondary,
+                    fontSize: 12.5,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                _actionTile(
+                  icon: Icons.reply_rounded,
+                  label: 'Reply',
+                  onTap: () {
+                    Navigator.of(sheetContext).pop();
+                    _startReply(rm);
+                  },
+                ),
+                const SizedBox(height: 8),
+                _actionTile(
+                  icon: Icons.forward_rounded,
+                  label: 'Forward',
+                  onTap: () async {
+                    Navigator.of(sheetContext).pop();
+                    await _forwardMessage(rm);
+                  },
+                ),
+                const SizedBox(height: 8),
+                _actionTile(
+                  icon: Icons.checklist_rounded,
+                  label: 'Select messages',
+                  onTap: () {
+                    Navigator.of(sheetContext).pop();
+                    _toggleMessageSelection(rm);
+                  },
+                ),
+                const SizedBox(height: 8),
+                if (isTextMessage)
+                  _actionTile(
+                    icon: Icons.copy_rounded,
+                    label: 'Copy text',
+                    onTap: () {
+                      Clipboard.setData(ClipboardData(text: rm.message.content));
+                      Navigator.of(sheetContext).pop();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Message copied')),
+                      );
+                    },
+                  ),
+                if (isTextMessage) const SizedBox(height: 8),
+                _actionTile(
+                  icon: Icons.delete_outline_rounded,
+                  label: 'Delete for me',
+                  iconColor: Colors.redAccent,
+                  onTap: () async {
+                    Navigator.of(sheetContext).pop();
+                    await _deleteMessage(rm, deleteForEveryone: false);
+                  },
+                ),
+                if (isMe) ...[
+                  const SizedBox(height: 8),
+                  _actionTile(
+                    icon: Icons.delete_forever_rounded,
+                    label: 'Delete for everyone',
+                    iconColor: Colors.redAccent,
+                    onTap: () async {
+                      Navigator.of(sheetContext).pop();
+                      await _deleteMessage(rm, deleteForEveryone: true);
+                    },
+                  ),
+                ],
+                const SizedBox(height: 8),
+                _actionTile(
+                  icon: Icons.arrow_forward_ios_rounded,
+                  label: 'Cancel',
+                  iconColor: _N.textSecondary,
+                  onTap: () => Navigator.of(sheetContext).pop(),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _deleteMessage(
+    RichMessage rm, {
+    required bool deleteForEveryone,
+  }) async {
+    final success = await _chatService.deleteMessage(
+      message: rm.message,
+      deleteForEveryone: deleteForEveryone,
+    );
+
+    if (!mounted) return;
+
+    if (!success) {
+      _showError('Could not delete this message right now.');
+      return;
+    }
+
+    setState(() {
+      _richMessages.removeWhere((message) => message.message.id == rm.message.id);
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(deleteForEveryone
+            ? 'Message deleted for everyone.'
+            : 'Message deleted for you.'),
+      ),
+    );
+  }
+
+  void _startReply(RichMessage rm) {
+    if (!mounted) return;
+    setState(() {
+      _replyingTo = rm;
+    });
+    FocusScope.of(context).requestFocus(FocusNode());
+  }
+
+  void _cancelReply() {
+    if (!mounted) return;
+    setState(() {
+      _replyingTo = null;
+    });
+  }
+
+  Map<String, dynamic>? _buildReplyMetadata() {
+    final replying = _replyingTo;
+    if (replying == null) {
+      return null;
+    }
+
+    final originalMeta = replying.message.metadata ?? const <String, dynamic>{};
+    final originalText = (originalMeta['voiceTranscript'] ?? replying.message.content).toString();
+
+    return {
+      'replyToMessageId': replying.message.id,
+      'replyToSenderId': replying.message.senderId,
+      'replyPreview': originalText,
+    };
+  }
+
+  Future<void> _forwardMessage(RichMessage rm) async {
+    final currentUser = ref.read(authProvider).value;
+    if (currentUser == null) {
+      _showError('Please sign in.');
+      return;
+    }
+
+    final sourceMeta = rm.message.metadata ?? const <String, dynamic>{};
+    final forwardText = (sourceMeta['voiceTranscript'] ?? rm.message.content).toString().trim();
+    if (forwardText.isEmpty) {
+      _showError('Cannot forward an empty message.');
+      return;
+    }
+
+    final metadata = {
+      ...sourceMeta,
+      'forwarded': true,
+      'forwardedFromMessageId': rm.message.id,
+    };
+
+    final message = Message(
+      id: _newId(),
+      senderId: currentUser.id,
+      receiverId: widget.user.id,
+      content: forwardText,
+      type: MessageType.text,
+      status: MessageStatus.sent,
+      timestamp: DateTime.now(),
+      metadata: metadata,
+    );
+
+    _addRich(RichMessage(message: message), localOnly: true);
+    unawaited(_chatService.sendMessage(message));
+    CallSocketService.instance.sendMessageViaSocket(
+      receiverId: widget.user.id,
+      content: forwardText,
+      type: 'text',
+      senderLanguage: currentUser.preferredLanguage,
+      receiverLanguage: widget.user.preferredLanguage,
+      metadata: metadata,
+    );
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Message forwarded.')),
+    );
+  }
+
+  void _toggleMessageSelection(RichMessage rm) {
+    if (!mounted) return;
+    setState(() {
+      final id = rm.message.id;
+      if (_selectedMessageIds.contains(id)) {
+        _selectedMessageIds.remove(id);
+      } else {
+        _selectedMessageIds.add(id);
+      }
+    });
+  }
+
+  void _clearSelection() {
+    if (!mounted) return;
+    setState(() {
+      _selectedMessageIds.clear();
+    });
+  }
+
+  Future<void> _deleteSelectedMessages() async {
+    final selectedIds = _selectedMessageIds.toList();
+    if (selectedIds.isEmpty) return;
+
+    var successCount = 0;
+    for (final id in selectedIds) {
+      final rm = _richMessages.where((m) => m.message.id == id).cast<RichMessage?>().firstOrNull;
+      if (rm == null) continue;
+      final success = await _chatService.deleteMessage(
+        message: rm.message,
+        deleteForEveryone: false,
+      );
+      if (success) {
+        successCount++;
+      }
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _richMessages.removeWhere((m) => _selectedMessageIds.contains(m.message.id));
+      _selectedMessageIds.clear();
+    });
+
+    if (successCount == 0) {
+      _showError('Could not delete selected messages.');
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('$successCount message(s) deleted.')),
+    );
+  }
+
+  Widget _actionTile({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    Color? iconColor,
+  }) {
+    return Material(
+      color: _N.surface,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: _N.cardBorder),
+          ),
+          child: Row(
+            children: [
+              Icon(icon, color: iconColor ?? _N.indigoLight, size: 20),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    color: iconColor ?? _N.textPrimary,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              const Icon(Icons.chevron_right_rounded, color: _N.textMuted),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   void _addRich(RichMessage rm, {bool persist = true, bool localOnly = false}) {
@@ -697,6 +1030,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       return;
     }
 
+    final replyMeta = _buildReplyMetadata();
     final message = Message(
       id: _newId(),
       senderId: currentUser.id,
@@ -705,6 +1039,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       type: MessageType.text,
       status: MessageStatus.sent,
       timestamp: DateTime.now(),
+      metadata: {
+        if (replyMeta != null) ...replyMeta,
+      },
     );
 
     _addRich(RichMessage(message: message), localOnly: true);
@@ -719,9 +1056,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       type: 'text',
       senderLanguage: currentUser.preferredLanguage,
       receiverLanguage: widget.user.preferredLanguage,
+      metadata: {
+        if (replyMeta != null) ...replyMeta,
+      },
     );
 
     _messageController.clear();
+    _cancelReply();
   }
 
   Future<void> _handleMicTap() async {
@@ -1102,6 +1443,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     final messageType = hasAudio ? MessageType.audio : MessageType.text;
 
     debugPrint('Sending voice message: $safeText (hasAudio=$hasAudio)');
+    final replyMeta = _buildReplyMetadata();
     final rm = RichMessage(
       message: Message(
         id: _newId(),
@@ -1116,6 +1458,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
           if (audioPath != null && audioPath.isNotEmpty) 'audioPath': audioPath,
           'originalLanguage': currentUser.preferredLanguage,
           'targetLanguage': widget.user.preferredLanguage,
+          if (replyMeta != null) ...replyMeta,
         },
       ),
       audioPath: audioPath,
@@ -1135,8 +1478,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       metadata: {
         'voiceTranscript': safeText,
         if (audioPath != null && audioPath.isNotEmpty) 'audioPath': audioPath,
+        if (replyMeta != null) ...replyMeta,
       },
     );
+
+    _cancelReply();
   }
 
   Future<void> _promptVoiceFallbackInput(User currentUser) async {
@@ -1383,6 +1729,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   // ── AppBar ────────────────────────────────────────────────────────────────
 
   Widget _buildAppBar() {
+    if (_isSelectionMode) {
+      return _buildSelectionAppBar();
+    }
+
     return Container(
       padding: EdgeInsets.only(
         top: MediaQuery.of(context).padding.top + 8,
@@ -1631,6 +1981,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   Widget _buildMessageRow(RichMessage rm, bool isMe) {
     final time = '${rm.message.timestamp.hour.toString().padLeft(2, '0')}:'
         '${rm.message.timestamp.minute.toString().padLeft(2, '0')}';
+    final isSelected = _selectedMessageIds.contains(rm.message.id);
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 3),
@@ -1641,27 +1992,34 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         children: [
           if (!isMe) ...[_miniAvatar(), const SizedBox(width: 6)],
           Flexible(
-            child: Container(
-              constraints: BoxConstraints(
-                  maxWidth: MediaQuery.of(context).size.width * 0.72),
-              decoration: BoxDecoration(
-                color: isMe ? const Color(0xFF005C4B) : const Color(0xFF202C33),
-                borderRadius: BorderRadius.only(
-                  topLeft: const Radius.circular(18),
-                  topRight: const Radius.circular(18),
-                  bottomLeft: Radius.circular(isMe ? 18 : 4),
-                  bottomRight: Radius.circular(isMe ? 4 : 18),
+            child: GestureDetector(
+              onLongPress: () => _showMessageActions(rm, isMe),
+              onTap: _isSelectionMode ? () => _toggleMessageSelection(rm) : null,
+              child: Container(
+                constraints: BoxConstraints(
+                    maxWidth: MediaQuery.of(context).size.width * 0.72),
+                decoration: BoxDecoration(
+                  color: isMe ? const Color(0xFF005C4B) : const Color(0xFF202C33),
+                  border: isSelected
+                      ? Border.all(color: _N.indigoLight, width: 1.4)
+                      : null,
+                  borderRadius: BorderRadius.only(
+                    topLeft: const Radius.circular(18),
+                    topRight: const Radius.circular(18),
+                    bottomLeft: Radius.circular(isMe ? 18 : 4),
+                    bottomRight: Radius.circular(isMe ? 4 : 18),
+                  ),
+                  boxShadow: isMe
+                      ? [
+                          BoxShadow(
+                              color: Colors.black.withOpacity(0.18),
+                              blurRadius: 6,
+                              offset: const Offset(0, 2))
+                        ]
+                      : [],
                 ),
-                boxShadow: isMe
-                    ? [
-                        BoxShadow(
-                            color: Colors.black.withOpacity(0.18),
-                            blurRadius: 6,
-                            offset: const Offset(0, 2))
-                      ]
-                    : [],
+                child: _buildBubbleContent(rm, isMe, time),
               ),
-              child: _buildBubbleContent(rm, isMe, time),
             ),
           ),
           if (isMe) const SizedBox(width: 4),
@@ -2262,112 +2620,231 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         color: _N.inputBg,
         border: Border(top: BorderSide(color: _N.inputBorder, width: 1)),
       ),
-      child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-        GestureDetector(
-          onTap: _toggleAttachMenu,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: _showAttachMenu ? _N.indigo.withOpacity(0.2) : _N.card,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                  color: _showAttachMenu ? _N.indigo : _N.cardBorder),
-            ),
-            child: Icon(
-              _showAttachMenu ? Icons.close_rounded : Icons.add_rounded,
-              color: _showAttachMenu ? _N.indigoLight : _N.textSecondary,
-              size: 22,
-            ),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Container(
-            constraints: const BoxConstraints(minHeight: 42, maxHeight: 120),
-            decoration: BoxDecoration(
-              color: _N.card,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: _N.cardBorder),
-            ),
-            child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-              Expanded(
-                child: TextField(
-                  controller: _messageController,
-                  style: const TextStyle(color: _N.textPrimary, fontSize: 14.5),
-                  cursorColor: _N.indigoLight,
-                  maxLines: null,
-                  textInputAction: TextInputAction.newline,
-                  onSubmitted: (_) => _sendMessage(),
-                  decoration: const InputDecoration(
-                    hintText: 'Write a message…',
-                    hintStyle: TextStyle(color: _N.textMuted, fontSize: 14.5),
-                    border: InputBorder.none,
-                    contentPadding: EdgeInsets.fromLTRB(14, 11, 4, 11),
-                    isDense: true,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (_replyingTo != null)
+            Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
+              decoration: BoxDecoration(
+                color: _N.card,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: _N.cardBorder),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 3,
+                    height: 36,
+                    margin: const EdgeInsets.only(right: 10),
+                    decoration: BoxDecoration(
+                      color: _N.indigoLight,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
                   ),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Replying to',
+                          style: TextStyle(
+                            color: _N.indigoLight,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          ((_replyingTo!.message.metadata?['voiceTranscript'] ??
+                                      _replyingTo!.message.content)
+                                  .toString())
+                              .trim(),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: _N.textSecondary,
+                            fontSize: 12.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: _cancelReply,
+                    child: const Icon(Icons.close_rounded,
+                        color: _N.textSecondary, size: 18),
+                  ),
+                ],
+              ),
+            ),
+          Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+            GestureDetector(
+              onTap: _toggleAttachMenu,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: _showAttachMenu ? _N.indigo.withOpacity(0.2) : _N.card,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                      color: _showAttachMenu ? _N.indigo : _N.cardBorder),
+                ),
+                child: Icon(
+                  _showAttachMenu ? Icons.close_rounded : Icons.add_rounded,
+                  color: _showAttachMenu ? _N.indigoLight : _N.textSecondary,
+                  size: 22,
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.only(right: 6, bottom: 6),
-                child: GestureDetector(
-                  onTap: () {
-                    final text = _messageController.text;
-                    final sel = _messageController.selection;
-                    final at = sel.isValid ? sel.start : text.length;
-                    final updated = text.replaceRange(at, at, ' 😊');
-                    _messageController.value = TextEditingValue(
-                      text: updated,
-                      selection:
-                          TextSelection.collapsed(offset: updated.length),
-                    );
-                  },
-                  child: const Icon(Icons.emoji_emotions_outlined,
-                      color: _N.textMuted, size: 20),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Container(
+                constraints: const BoxConstraints(minHeight: 42, maxHeight: 120),
+                decoration: BoxDecoration(
+                  color: _N.card,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: _N.cardBorder),
+                ),
+                child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _messageController,
+                      style: const TextStyle(color: _N.textPrimary, fontSize: 14.5),
+                      cursorColor: _N.indigoLight,
+                      maxLines: null,
+                      textInputAction: TextInputAction.newline,
+                      onSubmitted: (_) => _sendMessage(),
+                      decoration: const InputDecoration(
+                        hintText: 'Write a message…',
+                        hintStyle: TextStyle(color: _N.textMuted, fontSize: 14.5),
+                        border: InputBorder.none,
+                        contentPadding: EdgeInsets.fromLTRB(14, 11, 4, 11),
+                        isDense: true,
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(right: 6, bottom: 6),
+                    child: GestureDetector(
+                      onTap: () {
+                        final text = _messageController.text;
+                        final sel = _messageController.selection;
+                        final at = sel.isValid ? sel.start : text.length;
+                        final updated = text.replaceRange(at, at, ' 😊');
+                        _messageController.value = TextEditingValue(
+                          text: updated,
+                          selection:
+                              TextSelection.collapsed(offset: updated.length),
+                        );
+                      },
+                      child: const Icon(Icons.emoji_emotions_outlined,
+                          color: _N.textMuted, size: 20),
+                    ),
+                  ),
+                ]),
+              ),
+            ),
+            const SizedBox(width: 8),
+            GestureDetector(
+              onTap: _isTyping ? _sendMessage : _handleMicTap,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(14),
+                  gradient: _isTyping
+                      ? const LinearGradient(
+                          colors: [_N.indigo, _N.violet],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight)
+                      : null,
+                  color: _isTyping ? null : _N.card,
+                  border: _isTyping ? null : Border.all(color: _N.cardBorder),
+                  boxShadow: _isTyping
+                      ? [
+                          BoxShadow(
+                              color: _N.indigo.withOpacity(0.5),
+                              blurRadius: 14,
+                              offset: const Offset(0, 4))
+                        ]
+                      : [],
+                ),
+                child: Icon(
+                  _isTyping
+                      ? Icons.send_rounded
+                      : (_isRecording
+                          ? Icons.stop_rounded
+                          : Icons.mic_none_rounded),
+                  color: _isTyping ? Colors.white : _N.textSecondary,
+                  size: 20,
                 ),
               ),
-            ]),
-          ),
-        ),
-        const SizedBox(width: 8),
-        GestureDetector(
-          onTap: _isTyping ? _sendMessage : _handleMicTap,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(14),
-              gradient: _isTyping
-                  ? const LinearGradient(
-                      colors: [_N.indigo, _N.violet],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight)
-                  : null,
-              color: _isTyping ? null : _N.card,
-              border: _isTyping ? null : Border.all(color: _N.cardBorder),
-              boxShadow: _isTyping
-                  ? [
-                      BoxShadow(
-                          color: _N.indigo.withOpacity(0.5),
-                          blurRadius: 14,
-                          offset: const Offset(0, 4))
-                    ]
-                  : [],
             ),
-            child: Icon(
-              _isTyping
-                  ? Icons.send_rounded
-                  : (_isRecording
-                      ? Icons.stop_rounded
-                      : Icons.mic_none_rounded),
-              color: _isTyping ? Colors.white : _N.textSecondary,
-              size: 20,
+          ]),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSelectionAppBar() {
+    return Container(
+      padding: EdgeInsets.only(
+        top: MediaQuery.of(context).padding.top + 8,
+        left: 8,
+        right: 12,
+        bottom: 12,
+      ),
+      decoration: BoxDecoration(
+        color: _N.surface.withOpacity(0.95),
+        border: const Border(bottom: BorderSide(color: _N.cardBorder)),
+      ),
+      child: Row(
+        children: [
+          GestureDetector(
+            onTap: _clearSelection,
+            child: Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: _N.card,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: _N.cardBorder),
+              ),
+              child: const Icon(Icons.close_rounded,
+                  color: _N.textSecondary, size: 18),
             ),
           ),
-        ),
-      ]),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              '${_selectedMessageIds.length} selected',
+              style: const TextStyle(
+                color: _N.textPrimary,
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          GestureDetector(
+            onTap: _deleteSelectedMessages,
+            child: Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: Colors.redAccent.withOpacity(0.16),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.redAccent.withOpacity(0.4)),
+              ),
+              child: const Icon(Icons.delete_outline_rounded,
+                  color: Colors.redAccent, size: 18),
+            ),
+          ),
+        ],
+      ),
     );
   }
 

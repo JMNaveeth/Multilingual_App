@@ -18,6 +18,8 @@ class ChatService {
   String _localMessagesKey(String userId) => 'chat_local_messages_$userId';
   String _legacyMigrationDoneKey(String userId) =>
       'chat_legacy_migration_done_$userId';
+  String _deletedMessagesKey(String userId) =>
+      'chat_deleted_messages_$userId';
 
   String _messageMergeKey(Message message) {
     final clientId = message.metadata?['clientMessageId']?.toString();
@@ -92,6 +94,63 @@ class ChatService {
 
   Future<void> _upsertSingleLocalMessage(String userId, Message message) async {
     await _upsertLocalMessages(userId, [message]);
+  }
+
+  Future<Set<String>> getHiddenMessageIds(String userId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final hidden = prefs.getStringList(_deletedMessagesKey(userId)) ?? const [];
+    return hidden.where((id) => id.isNotEmpty).toSet();
+  }
+
+  Future<void> _hideMessageForUser(String userId, String messageId) async {
+    if (messageId.isEmpty) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    final hidden = prefs.getStringList(_deletedMessagesKey(userId)) ?? <String>[];
+    if (hidden.contains(messageId)) return;
+
+    hidden.add(messageId);
+    await prefs.setStringList(_deletedMessagesKey(userId), hidden);
+  }
+
+  Future<void> _removeMessageFromLocalCache(
+    String userId,
+    String messageId,
+  ) async {
+    if (messageId.isEmpty) return;
+
+    final messages = await _getLocalMessages(userId);
+    final filtered = messages.where((message) => message.id != messageId).toList();
+    await _saveLocalMessages(userId, filtered);
+  }
+
+  Future<bool> deleteMessage({
+    required Message message,
+    required bool deleteForEveryone,
+  }) async {
+    final currentUser = await _authService.getCurrentUser();
+    final ownerId = currentUser?.id ?? message.senderId;
+
+    await _removeMessageFromLocalCache(ownerId, message.id);
+
+    if (!deleteForEveryone) {
+      await _hideMessageForUser(ownerId, message.id);
+      return true;
+    }
+
+    if (SupabaseService.isConfigured) {
+      try {
+        await _client.from('messages').delete().eq('id', message.id);
+        await _hideMessageForUser(ownerId, message.id);
+        return true;
+      } catch (_) {
+        return false;
+      }
+    }
+
+    // No remote store available, so fall back to local removal only.
+    await _hideMessageForUser(ownerId, message.id);
+    return true;
   }
 
   Future<List<Message>> _loadRemoteMessagesForUser(String userId) async {
@@ -189,8 +248,12 @@ class ChatService {
     required String currentUserId,
     required String otherUserId,
   }) async {
+    final hiddenIds = await getHiddenMessageIds(currentUserId);
     final localAll = await _getLocalMessages(currentUserId);
     final localConversation = localAll.where((message) {
+      if (hiddenIds.contains(message.id)) {
+        return false;
+      }
       return (message.senderId == currentUserId &&
               message.receiverId == otherUserId) ||
           (message.senderId == otherUserId &&
@@ -205,7 +268,10 @@ class ChatService {
       final remoteConversation =
           await _loadRemoteConversation(currentUserId, otherUserId);
       await _upsertLocalMessages(currentUserId, remoteConversation);
-      return _mergeMessages(remoteConversation, localConversation);
+      final merged = _mergeMessages(remoteConversation, localConversation)
+          .where((message) => !hiddenIds.contains(message.id))
+          .toList();
+      return _sortByTimestampAsc(merged);
     } catch (_) {
       return _sortByTimestampAsc(localConversation);
     }
