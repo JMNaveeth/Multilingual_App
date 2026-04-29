@@ -8,6 +8,8 @@ import 'package:multilingual_chat_app/models/call_history_entry.dart';
 import 'package:multilingual_chat_app/models/user.dart';
 import 'package:multilingual_chat_app/providers/auth_provider.dart';
 import 'package:multilingual_chat_app/providers/call_history_provider.dart';
+import 'package:multilingual_chat_app/widgets/subtitle_overlay.dart';
+import 'package:multilingual_chat_app/services/translation_service.dart';
 import 'package:multilingual_chat_app/services/call_socket_service.dart';
 import 'package:multilingual_chat_app/services/webrtc_call_service.dart';
 import 'package:speech_to_text/speech_to_text.dart';
@@ -816,83 +818,27 @@ class _CallScreenState extends ConsumerState<CallScreen> {
                 ),
               ),
 
-              // Subtitle Overlay
-              if (_currentSubtitle != null)
-                Positioned(
-                  left: 20,
-                  right: 20,
-                  bottom: 220,
-                  child: Center(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.7),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                            color: const Color(0xFF7A52F4).withOpacity(0.5)),
-                      ),
-                      child: Text(
-                        _currentSubtitle!,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w500,
+              Positioned(
+                left: 16,
+                right: 16,
+                bottom: _translationEnabled ? 290 : 210,
+                child: SubtitleOverlay(
+                  onToggleTranslation: _toggleTranslation,
+                  statusOverride:
+                      _translationEnabled ? TranslationStatus.active : TranslationStatus.idle,
+                  subtitleOverride: _currentSubtitle == null
+                      ? null
+                      : SubtitleEvent(
+                          original: _translationBanner ?? '',
+                          translated: _currentSubtitle!,
+                          isLocal: false,
+                          latencyMs: _lastLatencyMs,
                         ),
-                      ),
-                    ),
-                  ),
+                  bannerText: _translationBanner,
+                  isListening: _isSpeechListening,
+                  latencyMs: _lastLatencyMs,
                 ),
-
-              if (_translationEnabled)
-                Positioned(
-                  left: 20,
-                  right: 20,
-                  bottom: 270,
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1B1D39).withOpacity(0.9),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: const Color(0xFF7A52F4).withOpacity(0.55),
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.auto_awesome_rounded,
-                          color: Color(0xFFB9A6FF),
-                          size: 16,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            _isSpeechListening
-                                ? '${_translationBanner ?? 'Live AI translation enabled'} | Listening'
-                                : '${_translationBanner ?? 'Live AI translation enabled'} | Waiting mic',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                        if (_lastLatencyMs != null)
-                          Text(
-                            '${_lastLatencyMs}ms',
-                            style: const TextStyle(
-                              color: Color(0xFF8EF7B5),
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
+              ),
 
               Positioned(
                 left: 0,
