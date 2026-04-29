@@ -211,8 +211,7 @@ class TranslationService {
       _scheduleRestart(delay: const Duration(milliseconds: 300));
     } else {
       _lastInterimText = text;
-      final elapsed =
-          DateTime.now().difference(_lastSentAt).inMilliseconds;
+      final elapsed = DateTime.now().difference(_lastSentAt).inMilliseconds;
       if (elapsed >= _minSendIntervalMs) {
         _flushText(text, isFinal: false);
       }
@@ -257,8 +256,7 @@ class TranslationService {
     }
   }
 
-  void _scheduleRestart(
-      {Duration delay = const Duration(seconds: 1)}) {
+  void _scheduleRestart({Duration delay = const Duration(seconds: 1)}) {
     _restartTimer?.cancel();
     _restartTimer = Timer(delay, () {
       if (_sessionActive && !_disposed) _startListening();
@@ -272,24 +270,21 @@ class TranslationService {
     _audioSub?.cancel();
     _translationStartedSub?.cancel();
 
-    _translationStartedSub =
-        _socket.translationStarted.listen((data) {
+    _translationStartedSub = _socket.translationStarted.listen((data) {
       if (kDebugMode) {
         debugPrint('[TranslationService] translation_started: $data');
       }
     });
 
     _subtitleSub = _socket.receiveSubtitle.listen(_handleSubtitleEvent);
-    _audioSub =
-        _socket.receiveTranslatedAudio.listen(_handleTranslatedAudio);
+    _audioSub = _socket.receiveTranslatedAudio.listen(_handleTranslatedAudio);
   }
 
   void _handleSubtitleEvent(Map<String, dynamic> data) {
     final original = data['original']?.toString() ?? '';
     final translated =
         data['translated']?.toString() ?? data['text']?.toString() ?? '';
-    final latency =
-        data['latencyMs'] is int ? data['latencyMs'] as int : null;
+    final latency = data['latencyMs'] is int ? data['latencyMs'] as int : null;
     final fromSelf = data['fromSelf'] == true;
     if (translated.isEmpty) return;
     _subtitleController.add(SubtitleEvent(
@@ -398,10 +393,8 @@ Uint8List _base64DecodeImpl(String input) {
   for (var i = 0; i < padded.length; i += 4) {
     final a = lookup[padded.codeUnitAt(i)];
     final b = lookup[padded.codeUnitAt(i + 1)];
-    final c =
-        i + 2 < padded.length ? lookup[padded.codeUnitAt(i + 2)] : -1;
-    final d =
-        i + 3 < padded.length ? lookup[padded.codeUnitAt(i + 3)] : -1;
+    final c = i + 2 < padded.length ? lookup[padded.codeUnitAt(i + 2)] : -1;
+    final d = i + 3 < padded.length ? lookup[padded.codeUnitAt(i + 3)] : -1;
     if (a < 0 || b < 0) break;
     out.add((a << 2) | (b >> 4));
     if (c >= 0) out.add(((b & 0xF) << 4) | (c >> 2));
