@@ -598,16 +598,131 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       return;
     }
 
+    // Show contact picker to select who to forward to
+    if (!mounted) return;
+    await _showForwardContactPicker(rm, forwardText, sourceMeta, currentUser);
+  }
+
+  Future<void> _showForwardContactPicker(
+    RichMessage rm,
+    String forwardText,
+    Map<String, dynamic> sourceMeta,
+    User currentUser,
+  ) async {
+    if (!mounted) return;
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: _N.card,
+        title: const Text(
+          'Forward to',
+          style: TextStyle(color: _N.textPrimary, fontWeight: FontWeight.w700),
+        ),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: FutureBuilder<List<Contact>>(
+            future: _loadForwardContacts(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(
+                  child: CircularProgressIndicator(color: _N.indigoLight),
+                );
+              }
+
+              if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
+                return Center(
+                  child: Text(
+                    'No contacts found',
+                    style: TextStyle(color: _N.textMuted),
+                  ),
+                );
+              }
+
+              final contacts = snapshot.data!;
+              return ListView.separated(
+                shrinkWrap: true,
+                itemCount: contacts.length,
+                separatorBuilder: (_, __) => Divider(color: _N.cardBorder),
+                itemBuilder: (_, index) {
+                  final contact = contacts[index];
+                  final name = contact.displayName ?? contact.name.first ?? 'Unknown';
+                  final phone = contact.phones.firstOrNull?.number ?? '';
+
+                  return ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    title: Text(
+                      name,
+                      style: const TextStyle(color: _N.textPrimary),
+                    ),
+                    subtitle: Text(
+                      phone,
+                      style: const TextStyle(color: _N.textMuted, fontSize: 11),
+                    ),
+                    onTap: () async {
+                      Navigator.of(ctx).pop();
+                      // Forward with phone number as receiver identifier
+                      await _sendForwardedMessage(
+                        forwardText,
+                        sourceMeta,
+                        currentUser,
+                        receiverIdentifier: phone,
+                        receiverName: name,
+                      );
+                    },
+                  );
+                },
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: _N.indigoLight),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<List<Contact>> _loadForwardContacts() async {
+    try {
+      final hasPermission = await FlutterContacts.requestPermission();
+      if (!hasPermission) {
+        return [];
+      }
+
+      final contacts = await FlutterContacts.getContacts(withProperties: true);
+      return contacts.where((c) => c.phones.isNotEmpty).toList();
+    } catch (e) {
+      debugPrint('Error loading contacts: $e');
+      return [];
+    }
+  }
+
+  Future<void> _sendForwardedMessage(
+    String forwardText,
+    Map<String, dynamic> sourceMeta,
+    User currentUser, {
+    required String receiverIdentifier,
+    required String receiverName,
+  }) async {
     final metadata = {
       ...sourceMeta,
       'forwarded': true,
-      'forwardedFromMessageId': rm.message.id,
+      'forwardedTo': receiverName,
+      'forwardedToPhone': receiverIdentifier,
     };
 
+    // For app users, use their ID; for external contacts, use phone as identifier
     final message = Message(
       id: _newId(),
       senderId: currentUser.id,
-      receiverId: widget.user.id,
+      receiverId: receiverIdentifier, // Phone number or user ID
       content: forwardText,
       type: MessageType.text,
       status: MessageStatus.sent,
@@ -617,17 +732,23 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
 
     _addRich(RichMessage(message: message), localOnly: true);
     unawaited(_chatService.sendMessage(message));
+
+    // Send via socket with metadata
     CallSocketService.instance.sendMessageViaSocket(
-      receiverId: widget.user.id,
+      receiverId: receiverIdentifier,
       content: forwardText,
       type: 'text',
       senderLanguage: currentUser.preferredLanguage,
-      receiverLanguage: widget.user.preferredLanguage,
+      receiverLanguage: 'en',
       metadata: metadata,
     );
 
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Message forwarded.')),
+      SnackBar(
+        content: Text('Message forwarded to $receiverName'),
+        behavior: SnackBarBehavior.floating,
+      ),
     );
   }
 
