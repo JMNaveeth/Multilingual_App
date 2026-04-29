@@ -395,19 +395,27 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
 
     await showModalBottomSheet<void>(
       context: context,
+      isScrollControlled: true,
       backgroundColor: _N.card,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
       ),
       builder: (sheetContext) {
         final isTextMessage = rm.message.type == MessageType.text;
+        final bottomInset = MediaQuery.of(sheetContext).viewInsets.bottom;
         return SafeArea(
+          top: false,
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 10, 16, 18),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+            padding: EdgeInsets.fromLTRB(16, 10, 16, 12 + bottomInset),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(sheetContext).size.height * 0.78,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                 Center(
                   child: Container(
                     width: 44,
@@ -506,7 +514,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                   iconColor: _N.textSecondary,
                   onTap: () => Navigator.of(sheetContext).pop(),
                 ),
-              ],
+                  ],
+                ),
+              ),
             ),
           ),
         );
