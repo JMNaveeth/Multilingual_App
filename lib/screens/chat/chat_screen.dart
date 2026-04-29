@@ -2000,6 +2000,25 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
             isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
+          if (_isSelectionMode && !isMe)
+            Padding(
+              padding: const EdgeInsets.only(right: 6),
+              child: Container(
+                width: 24,
+                height: 24,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: isSelected ? _N.indigoLight : _N.textMuted,
+                    width: 2,
+                  ),
+                  color: isSelected ? _N.indigoLight : Colors.transparent,
+                ),
+                child: isSelected
+                    ? const Icon(Icons.check, size: 14, color: Colors.white)
+                    : null,
+              ),
+            ),
           if (!isMe) ...[_miniAvatar(), const SizedBox(width: 6)],
           Flexible(
             child: GestureDetector(
@@ -2032,9 +2051,82 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
               ),
             ),
           ),
-          if (isMe) const SizedBox(width: 4),
+          if (isMe) ...[const SizedBox(width: 4)],
+          if (_isSelectionMode && isMe)
+            Padding(
+              padding: const EdgeInsets.only(left: 8),
+              child: Container(
+                width: 24,
+                height: 24,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: isSelected ? _N.indigoLight : _N.textMuted,
+                    width: 2,
+                  ),
+                  color: isSelected ? _N.indigoLight : Colors.transparent,
+                ),
+                child: isSelected
+                    ? const Icon(Icons.check, size: 14, color: Colors.white)
+                    : null,
+              ),
+            ),
         ],
       ),
+    );
+  }
+
+  Widget _buildReplyPreviewWidget(Map<String, dynamic> meta) {
+    final replyPreview = (meta['replyPreview'] as String?)?.toString() ?? '';
+    return Container(
+      padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.06),
+        borderRadius: BorderRadius.circular(6),
+        border: Border(left: BorderSide(color: _N.indigoLight, width: 3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Replying to',
+            style: TextStyle(
+              color: _N.indigoLight,
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            replyPreview.isEmpty ? '...' : replyPreview,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: Colors.grey.shade400,
+              fontSize: 11,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildForwardedBadge() {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Icons.forward_rounded, size: 12, color: _N.indigoLight),
+        const SizedBox(width: 4),
+        Text(
+          'Forwarded',
+          style: TextStyle(
+            color: _N.indigoLight,
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            fontStyle: FontStyle.italic,
+          ),
+        ),
+      ],
     );
   }
 
@@ -2064,6 +2156,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         translated != null &&
         translated.isNotEmpty &&
         translated != rm.message.content;
+    final isReply = meta['replyToMessageId'] != null && (meta['replyToMessageId'] as String).isNotEmpty;
+    final isForwarded = meta['forwarded'] == true;
 
     // Display translated text for receiver if available, otherwise original text
     final displayContent = hasTranslation ? translated : rm.message.content;
@@ -2071,6 +2165,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        // Show reply preview if this is a reply
+        if (isReply) ...[_buildReplyPreviewWidget(meta), const SizedBox(height: 8)],
+        // Show forwarded badge if forwarded
+        if (isForwarded) ...[_buildForwardedBadge(), const SizedBox(height: 6)],
         Text(displayContent,
             style: TextStyle(
               color: isMe ? Colors.white : const Color(0xFFE9F0F4),
