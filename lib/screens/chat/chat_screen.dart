@@ -264,6 +264,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         ).then((_) => _incomingDialogOpen = false);
       },
     );
+
+    // Real-time listener for message deletions
+    CallSocketService.instance.messageDeleted.listen((event) {
+      if (!mounted) return;
+      final deletedMessageId = event['messageId']?.toString() ?? '';
+      if (deletedMessageId.isEmpty) return;
+
+      setState(() {
+        _richMessages.removeWhere((m) => m.message.id == deletedMessageId);
+      });
+    });
   }
 
   Future<void> _recordDeclinedIncomingCall(IncomingCall incomingCall) async {
@@ -528,8 +539,22 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     RichMessage rm, {
     required bool deleteForEveryone,
   }) async {
+    // Update UI immediately
+    if (!mounted) return;
+    setState(() {
+      _richMessages.removeWhere((message) => message.message.id == rm.message.id);
+    });
+
+    // Delete from backend and notify other users in real-time
     final success = await _chatService.deleteMessage(
       message: rm.message,
+      deleteForEveryone: deleteForEveryone,
+    );
+
+    // Emit socket event for real-time deletion notification
+    CallSocketService.instance.deleteMessageViaSocket(
+      messageId: rm.message.id,
+      receiverId: widget.user.id,
       deleteForEveryone: deleteForEveryone,
     );
 
@@ -537,12 +562,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
 
     if (!success) {
       _showError('Could not delete this message right now.');
+      // Add back to list if backend delete failed
+      setState(() {
+        _richMessages.add(rm);
+      });
       return;
     }
-
-    setState(() {
-      _richMessages.removeWhere((message) => message.message.id == rm.message.id);
-    });
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -775,24 +800,35 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     final selectedIds = _selectedMessageIds.toList();
     if (selectedIds.isEmpty) return;
 
-    var successCount = 0;
-    for (final id in selectedIds) {
-      final rm = _richMessages.where((m) => m.message.id == id).cast<RichMessage?>().firstOrNull;
-      if (rm == null) continue;
-      final success = await _chatService.deleteMessage(
-        message: rm.message,
-        deleteForEveryone: false,
-      );
-      if (success) {
-        successCount++;
-      }
-    }
-
+    // Update UI immediately
     if (!mounted) return;
     setState(() {
       _richMessages.removeWhere((m) => _selectedMessageIds.contains(m.message.id));
       _selectedMessageIds.clear();
     });
+
+    // Delete from backend and notify in real-time
+    var successCount = 0;
+    for (final id in selectedIds) {
+      final rm = _richMessages.where((m) => m.message.id == id).cast<RichMessage?>().firstOrNull;
+      if (rm != null) {
+        final success = await _chatService.deleteMessage(
+          message: rm.message,
+          deleteForEveryone: false,
+        );
+        if (success) {
+          successCount++;
+        }
+        // Emit socket event for real-time deletion
+        CallSocketService.instance.deleteMessageViaSocket(
+          messageId: id,
+          receiverId: widget.user.id,
+          deleteForEveryone: false,
+        );
+      }
+    }
+
+    if (!mounted) return;
 
     if (successCount == 0) {
       _showError('Could not delete selected messages.');

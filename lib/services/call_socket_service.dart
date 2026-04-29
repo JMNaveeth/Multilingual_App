@@ -66,6 +66,10 @@ class CallSocketService {
       StreamController<Map<String, dynamic>>.broadcast();
   final StreamController<Map<String, dynamic>> _callTextSentController =
       StreamController<Map<String, dynamic>>.broadcast();
+  final StreamController<Map<String, dynamic>> _messageDeletedController =
+      StreamController<Map<String, dynamic>>.broadcast();
+  final StreamController<Map<String, dynamic>> _messageForwardedController =
+      StreamController<Map<String, dynamic>>.broadcast();
 
   Stream<IncomingCall> get incomingCalls => _incomingCallController.stream;
   Stream<Map<String, dynamic>> get callAccepted =>
@@ -83,6 +87,8 @@ class CallSocketService {
   // Chat Streams
   Stream<Map<String, dynamic>> get newMessages => _newMessageController.stream;
   Stream<Map<String, dynamic>> get callTextSent => _callTextSentController.stream;
+  Stream<Map<String, dynamic>> get messageDeleted => _messageDeletedController.stream;
+  Stream<Map<String, dynamic>> get messageForwarded => _messageForwardedController.stream;
 
   bool get isConnected => _socket?.connected ?? false;
 
@@ -240,6 +246,22 @@ class CallSocketService {
         _callTextSentController.add(payload);
       });
 
+      // Real-time Delete Listener
+      _socket!.on('message_deleted', (data) {
+        final payload = data is Map<String, dynamic>
+            ? data
+            : data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{};
+        _messageDeletedController.add(payload);
+      });
+
+      // Real-time Forward Listener
+      _socket!.on('message_forwarded', (data) {
+        final payload = data is Map<String, dynamic>
+            ? data
+            : data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{};
+        _messageForwardedController.add(payload);
+      });
+
       _socket!.connect();
       await authCompleter.future.timeout(
         const Duration(seconds: 8),
@@ -383,6 +405,34 @@ class CallSocketService {
       'senderLanguage': senderLanguage,
       'receiverLanguage': receiverLanguage,
       'metadata': metadata ?? {},
+    });
+  }
+
+  void deleteMessageViaSocket({
+    required String messageId,
+    required String receiverId,
+    bool deleteForEveryone = false,
+  }) {
+    _socket?.emit('delete_message', {
+      'messageId': messageId,
+      'receiverId': receiverId,
+      'deleteForEveryone': deleteForEveryone,
+      'timestamp': DateTime.now().toIso8601String(),
+    });
+  }
+
+  void forwardMessageViaSocket({
+    required String originalMessageId,
+    required String targetReceiverId,
+    required String content,
+    Map<String, dynamic>? metadata,
+  }) {
+    _socket?.emit('forward_message', {
+      'originalMessageId': originalMessageId,
+      'targetReceiverId': targetReceiverId,
+      'content': content,
+      'metadata': metadata ?? {},
+      'timestamp': DateTime.now().toIso8601String(),
     });
   }
 
