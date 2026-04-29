@@ -817,15 +817,15 @@ class _CallScreenState extends ConsumerState<CallScreen> {
                   ),
                 ),
               ),
-
               Positioned(
                 left: 16,
                 right: 16,
                 bottom: _translationEnabled ? 290 : 210,
                 child: SubtitleOverlay(
                   onToggleTranslation: _toggleTranslation,
-                  statusOverride:
-                      _translationEnabled ? TranslationStatus.active : TranslationStatus.idle,
+                  statusOverride: _translationEnabled
+                      ? TranslationStatus.active
+                      : TranslationStatus.idle,
                   subtitleOverride: _currentSubtitle == null
                       ? null
                       : SubtitleEvent(
@@ -839,7 +839,6 @@ class _CallScreenState extends ConsumerState<CallScreen> {
                   latencyMs: _lastLatencyMs,
                 ),
               ),
-
               Positioned(
                 left: 0,
                 right: 0,

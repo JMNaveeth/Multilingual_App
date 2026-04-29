@@ -45,13 +45,11 @@ class _SubtitleOverlayState extends ConsumerState<SubtitleOverlay>
       vsync: this,
       duration: const Duration(milliseconds: 350),
     );
-    _fadeAnim =
-        CurvedAnimation(parent: _animCtrl, curve: Curves.easeOut);
+    _fadeAnim = CurvedAnimation(parent: _animCtrl, curve: Curves.easeOut);
     _slideAnim = Tween<Offset>(
       begin: const Offset(0, 0.3),
       end: Offset.zero,
-    ).animate(
-        CurvedAnimation(parent: _animCtrl, curve: Curves.easeOutCubic));
+    ).animate(CurvedAnimation(parent: _animCtrl, curve: Curves.easeOutCubic));
   }
 
   @override
@@ -70,14 +68,12 @@ class _SubtitleOverlayState extends ConsumerState<SubtitleOverlay>
     });
   }
 
-  void _openHistory(
-      BuildContext context, List<SubtitleEvent> history) {
+  void _openHistory(BuildContext context, List<SubtitleEvent> history) {
     showModalBottomSheet(
       context: context,
       backgroundColor: const Color(0xFF151626),
       shape: const RoundedRectangleBorder(
-        borderRadius:
-            BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (_) => _HistorySheet(history: history),
     );
@@ -105,9 +101,8 @@ class _SubtitleOverlayState extends ConsumerState<SubtitleOverlay>
           status: status,
           onToggle: widget.onToggleTranslation,
           historyCount: history.length,
-          onOpenHistory: history.isNotEmpty
-              ? () => _openHistory(context, history)
-              : null,
+          onOpenHistory:
+              history.isNotEmpty ? () => _openHistory(context, history) : null,
         ),
         const SizedBox(height: 8),
 
@@ -177,21 +172,18 @@ class _StatusPill extends StatelessWidget {
         GestureDetector(
           onTap: onToggle,
           child: Container(
-            padding: const EdgeInsets.symmetric(
-                horizontal: 12, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
               color: const Color(0xFF1C1E31).withOpacity(0.88),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                  color: dotColor.withOpacity(0.35), width: 1),
+              border: Border.all(color: dotColor.withOpacity(0.35), width: 1),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 _PulseDot(
                     color: dotColor,
-                    animate:
-                        status == TranslationStatus.active),
+                    animate: status == TranslationStatus.active),
                 const SizedBox(width: 6),
                 Text(label,
                     style: TextStyle(
@@ -230,8 +222,7 @@ class _StatusPill extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF6366F1)
-                            .withOpacity(0.25),
+                        color: const Color(0xFF6366F1).withOpacity(0.25),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text('$historyCount',
@@ -272,10 +263,9 @@ class _PulseDotState extends State<_PulseDot>
   void initState() {
     super.initState();
     _ctrl = AnimationController(
-        vsync: this,
-        duration: const Duration(milliseconds: 900));
-    _scale = Tween<double>(begin: 0.85, end: 1.15).animate(
-        CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
+        vsync: this, duration: const Duration(milliseconds: 900));
+    _scale = Tween<double>(begin: 0.85, end: 1.15)
+        .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
     if (widget.animate) _ctrl.repeat(reverse: true);
   }
 
@@ -303,8 +293,8 @@ class _PulseDotState extends State<_PulseDot>
       child: Container(
           width: 7,
           height: 7,
-          decoration: BoxDecoration(
-              color: widget.color, shape: BoxShape.circle)),
+          decoration:
+              BoxDecoration(color: widget.color, shape: BoxShape.circle)),
     );
   }
 }
@@ -321,8 +311,7 @@ class _SubtitleCard extends StatelessWidget {
     final accent =
         event.isLocal ? const Color(0xFF6366F1) : const Color(0xFF22D3EE);
     return Container(
-      padding:
-          const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
         color: const Color(0xFF1C1E31).withOpacity(0.92),
         borderRadius: BorderRadius.circular(14),
@@ -354,8 +343,8 @@ class _SubtitleCard extends StatelessWidget {
             if ((latencyMsOverride ?? event.latencyMs) != null) ...[
               const Spacer(),
               Text('${latencyMsOverride ?? event.latencyMs}ms',
-                  style: const TextStyle(
-                      color: Color(0xFF475569), fontSize: 9)),
+                  style:
+                      const TextStyle(color: Color(0xFF475569), fontSize: 9)),
             ],
           ]),
           const SizedBox(height: 6),
@@ -391,14 +380,12 @@ class _WaitingCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding:
-          const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
         color: const Color(0xFF1C1E31).withOpacity(0.7),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-            color: const Color(0xFF475569).withOpacity(0.2),
-            width: 1),
+            color: const Color(0xFF475569).withOpacity(0.2), width: 1),
       ),
       child: const Row(
         mainAxisSize: MainAxisSize.min,
@@ -407,8 +394,7 @@ class _WaitingCard extends StatelessWidget {
             width: 14,
             height: 14,
             child: CircularProgressIndicator(
-                strokeWidth: 1.5,
-                color: Color(0xFF94A3B8)),
+                strokeWidth: 1.5, color: Color(0xFF94A3B8)),
           ),
           SizedBox(width: 8),
           Text('Listening for speech…',
@@ -446,8 +432,7 @@ class _HistorySheet extends StatelessWidget {
         const Padding(
           padding: EdgeInsets.symmetric(horizontal: 16),
           child: Row(children: [
-            Icon(Icons.history_rounded,
-                size: 18, color: Color(0xFF818CF8)),
+            Icon(Icons.history_rounded, size: 18, color: Color(0xFF818CF8)),
             SizedBox(width: 8),
             Text('Translation History',
                 style: TextStyle(
@@ -473,8 +458,7 @@ class _HistorySheet extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: const Color(0xFF1C1E31),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border(
-                      left: BorderSide(color: accent, width: 3)),
+                  border: Border(left: BorderSide(color: accent, width: 3)),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -524,22 +508,19 @@ class TranslationToggleButton extends ConsumerWidget {
         height: 58,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: isOn
-              ? const Color(0xFF7A52F4)
-              : const Color(0xFF2B2D55),
+          color: isOn ? const Color(0xFF7A52F4) : const Color(0xFF2B2D55),
           boxShadow: isOn
               ? [
                   BoxShadow(
-                    color:
-                        const Color(0xFF7A52F4).withOpacity(0.45),
+                    color: const Color(0xFF7A52F4).withOpacity(0.45),
                     blurRadius: 16,
                     offset: const Offset(0, 8),
                   )
                 ]
               : [],
         ),
-        child: const Icon(Icons.translate_rounded,
-            color: Colors.white, size: 24),
+        child:
+            const Icon(Icons.translate_rounded, color: Colors.white, size: 24),
       ),
     );
   }
