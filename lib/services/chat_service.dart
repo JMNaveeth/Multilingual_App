@@ -18,8 +18,7 @@ class ChatService {
   String _localMessagesKey(String userId) => 'chat_local_messages_$userId';
   String _legacyMigrationDoneKey(String userId) =>
       'chat_legacy_migration_done_$userId';
-  String _deletedMessagesKey(String userId) =>
-      'chat_deleted_messages_$userId';
+  String _deletedMessagesKey(String userId) => 'chat_deleted_messages_$userId';
 
   String _messageMergeKey(Message message) {
     final clientId = message.metadata?['clientMessageId']?.toString();
@@ -106,7 +105,8 @@ class ChatService {
     if (messageId.isEmpty) return;
 
     final prefs = await SharedPreferences.getInstance();
-    final hidden = prefs.getStringList(_deletedMessagesKey(userId)) ?? <String>[];
+    final hidden =
+        prefs.getStringList(_deletedMessagesKey(userId)) ?? <String>[];
     if (hidden.contains(messageId)) return;
 
     hidden.add(messageId);
@@ -120,7 +120,8 @@ class ChatService {
     if (messageId.isEmpty) return;
 
     final messages = await _getLocalMessages(userId);
-    final filtered = messages.where((message) => message.id != messageId).toList();
+    final filtered =
+        messages.where((message) => message.id != messageId).toList();
     await _saveLocalMessages(userId, filtered);
   }
 
@@ -284,8 +285,8 @@ class ChatService {
     return _client.from('messages').stream(primaryKey: ['id']).map((rows) {
       final messages = rows
           .map((row) => _fromRow(row))
-          .where((m) =>
-              m.senderId == currentUserId && m.receiverId == otherUserId)
+          .where(
+              (m) => m.senderId == currentUserId && m.receiverId == otherUserId)
           .toList();
       messages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
       return messages;
