@@ -144,6 +144,7 @@ class _CallScreenState extends ConsumerState<CallScreen> {
       });
       _connectedAt ??= DateTime.now();
       _maybeStartSpeechRecognition();
+      _autoEnableTranslationIfNeeded();
     };
 
     _acceptedSub = _callSocket.callAccepted.listen((_) async {
@@ -330,6 +331,18 @@ class _CallScreenState extends ConsumerState<CallScreen> {
           _dialing = false;
         });
       }
+    }
+  }
+
+  void _autoEnableTranslationIfNeeded() {
+    if (_translationEnabled) return;
+    final currentUser = ref.read(authProvider).value;
+    if (currentUser == null) return;
+    final myLang = currentUser.preferredLanguage;
+    final peerLang = widget.peerUser.preferredLanguage;
+    if (myLang.toLowerCase() != peerLang.toLowerCase()) {
+      // Start translation automatically when languages differ
+      _toggleTranslation();
     }
   }
 
