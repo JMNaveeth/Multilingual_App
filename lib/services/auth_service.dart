@@ -347,7 +347,7 @@ class AuthService {
 
     try {
       const bucketName = 'avatars';
-      
+
       // Ensure the bucket exists, create if necessary
       try {
         await _ensureBucketExists(bucketName);
@@ -395,9 +395,10 @@ class AuthService {
 
       if (!bucketExists) {
         if (kDebugMode) {
-          debugPrint('[AuthService] Bucket "$bucketName" not found, creating...');
+          debugPrint(
+              '[AuthService] Bucket "$bucketName" not found, creating...');
         }
-        
+
         // Create the bucket with public access
         await _client.storage.createBucket(
           bucketName,
