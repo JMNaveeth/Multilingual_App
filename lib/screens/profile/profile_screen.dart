@@ -642,7 +642,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                     height: 96,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(28),
-                      gradient: (_selectedImage == null && user.profileImageUrl == null)
+                      gradient: (_selectedImage == null &&
+                              user.profileImageUrl == null)
                           ? const LinearGradient(
                               colors: [_N.indigo, _N.violet],
                               begin: Alignment.topLeft,

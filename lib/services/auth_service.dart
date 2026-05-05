@@ -359,8 +359,7 @@ class AuthService {
           );
 
       // Get the public URL
-      final publicUrl =
-          _client.storage.from('avatars').getPublicUrl(filePath);
+      final publicUrl = _client.storage.from('avatars').getPublicUrl(filePath);
 
       if (kDebugMode) {
         debugPrint(
