@@ -346,20 +346,32 @@ class AuthService {
     }
 
     try {
+      const bucketName = 'avatars';
+      
+      // Ensure the bucket exists, create if necessary
+      try {
+        await _ensureBucketExists(bucketName);
+      } catch (bucketError) {
+        if (kDebugMode) {
+          debugPrint('[AuthService] Bucket setup error: $bucketError');
+        }
+        // Continue anyway, bucket might already exist
+      }
+
       // Create a unique filename based on user ID and timestamp
       final fileName =
           'profile_${current.id}_${DateTime.now().millisecondsSinceEpoch}.jpg';
       final filePath = 'profile_images/$fileName';
 
       // Upload the file to Supabase storage
-      await _client.storage.from('avatars').upload(
+      await _client.storage.from(bucketName).upload(
             filePath,
             imageFile,
             fileOptions: const FileOptions(upsert: false),
           );
 
       // Get the public URL
-      final publicUrl = _client.storage.from('avatars').getPublicUrl(filePath);
+      final publicUrl = _client.storage.from(bucketName).getPublicUrl(filePath);
 
       if (kDebugMode) {
         debugPrint(
@@ -372,6 +384,36 @@ class AuthService {
         debugPrint('[AuthService] Profile image upload error: $error');
       }
       throw Exception('Failed to upload profile image: $error');
+    }
+  }
+
+  Future<void> _ensureBucketExists(String bucketName) async {
+    try {
+      // Try to get the bucket list
+      final buckets = await _client.storage.listBuckets();
+      final bucketExists = buckets.any((b) => b.name == bucketName);
+
+      if (!bucketExists) {
+        if (kDebugMode) {
+          debugPrint('[AuthService] Bucket "$bucketName" not found, creating...');
+        }
+        
+        // Create the bucket with public access
+        await _client.storage.createBucket(
+          bucketName,
+          const BucketOptions(public: true),
+        );
+
+        if (kDebugMode) {
+          debugPrint('[AuthService] Bucket "$bucketName" created successfully');
+        }
+      }
+    } catch (error) {
+      if (kDebugMode) {
+        debugPrint('[AuthService] Error ensuring bucket exists: $error');
+      }
+      // If we can't create the bucket, let the upload attempt fail with a clearer message
+      rethrow;
     }
   }
 
