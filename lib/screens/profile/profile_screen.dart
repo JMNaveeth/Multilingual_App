@@ -374,9 +374,28 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     if (!(_formKey.currentState?.validate() ?? false)) return;
     setState(() => _isLoading = true);
     try {
+      String? profileImageUrl;
+
+      // Upload profile image if selected
+      if (_selectedImage != null) {
+        setState(() => _isUploadingImage = true);
+        try {
+          profileImageUrl = await ref
+              .read(authProvider.notifier)
+              .uploadProfileImage(_selectedImage!);
+          if (mounted) _snack('Profile photo uploaded', _N.emerald);
+        } catch (e) {
+          if (mounted) _snack('Photo upload failed: $e', _N.rose);
+          return;
+        } finally {
+          if (mounted) setState(() => _isUploadingImage = false);
+        }
+      }
+
       await ref.read(authProvider.notifier).updateProfile(
             name: _nameController!.text.trim(),
             preferredLanguage: _selectedLanguage,
+            profileImageUrl: profileImageUrl,
           );
       if (mounted) _snack('Profile updated', _N.emerald);
     } catch (e) {
@@ -623,7 +642,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                     height: 96,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(28),
-                      gradient: _selectedImage == null
+                      gradient: (_selectedImage == null && user.profileImageUrl == null)
                           ? const LinearGradient(
                               colors: [_N.indigo, _N.violet],
                               begin: Alignment.topLeft,
@@ -658,17 +677,36 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                               ),
                             ),
                           )
-                        : Center(
-                            child: Text(
-                              _initials(user.name),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 36,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: -1,
+                        : user.profileImageUrl != null
+                            ? ClipRRect(
+                                borderRadius: BorderRadius.circular(28),
+                                child: Image.network(
+                                  user.profileImageUrl!,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => Center(
+                                    child: Text(
+                                      _initials(user.name),
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 36,
+                                        fontWeight: FontWeight.w800,
+                                        letterSpacing: -1,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              )
+                            : Center(
+                                child: Text(
+                                  _initials(user.name),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 36,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: -1,
+                                  ),
+                                ),
                               ),
-                            ),
-                          ),
                   ),
                 ),
 

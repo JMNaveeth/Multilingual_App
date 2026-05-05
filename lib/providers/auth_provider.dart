@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/foundation.dart';
 import 'package:multilingual_chat_app/models/user.dart';
 import 'package:multilingual_chat_app/services/auth_service.dart';
+import 'dart:io';
 
 // Auth service provider
 final authServiceProvider = Provider<AuthService>((ref) => AuthService());
@@ -90,6 +91,10 @@ class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
       // Keep current state on error but could show a snackbar
       state = AsyncValue.error(error, stackTrace);
     }
+  }
+
+  Future<String> uploadProfileImage(File imageFile) async {
+    return await _authService.uploadProfileImage(imageFile);
   }
 
   Future<void> logout() async {

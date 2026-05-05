@@ -3,6 +3,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:multilingual_chat_app/models/user.dart' as app_model;
 import 'package:multilingual_chat_app/services/supabase_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide User;
+import 'dart:io';
 
 class AuthService {
   // Kept for compatibility with existing call/socket code paths.
@@ -336,6 +337,43 @@ class AuthService {
 
   Future<void> logout() async {
     await _client.auth.signOut();
+  }
+
+  Future<String> uploadProfileImage(File imageFile) async {
+    final current = await getCurrentUser();
+    if (current == null) {
+      throw Exception('Not authenticated');
+    }
+
+    try {
+      // Create a unique filename based on user ID and timestamp
+      final fileName =
+          'profile_${current.id}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final filePath = 'profile_images/$fileName';
+
+      // Upload the file to Supabase storage
+      await _client.storage.from('avatars').upload(
+            filePath,
+            imageFile,
+            fileOptions: const FileOptions(upsert: false),
+          );
+
+      // Get the public URL
+      final publicUrl =
+          _client.storage.from('avatars').getPublicUrl(filePath);
+
+      if (kDebugMode) {
+        debugPrint(
+            '[AuthService] Profile image uploaded successfully: $publicUrl');
+      }
+
+      return publicUrl;
+    } catch (error) {
+      if (kDebugMode) {
+        debugPrint('[AuthService] Profile image upload error: $error');
+      }
+      throw Exception('Failed to upload profile image: $error');
+    }
   }
 
   Future<app_model.User> updateProfile({
