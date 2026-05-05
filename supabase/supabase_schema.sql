@@ -160,6 +160,37 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();
 
+-- Storage RLS Policies for avatars bucket
+-- Allow authenticated users to upload their own profile images
+create policy "Allow authenticated users to upload profile images"
+on storage.objects
+for insert
+to authenticated
+with check (
+  bucket_id = 'avatars' and
+  (storage.foldername(name))[1] = 'profile_images'
+);
+
+-- Allow public read access to profile images
+create policy "Allow public to read profile images"
+on storage.objects
+for select
+to public
+using (
+  bucket_id = 'avatars' and
+  (storage.foldername(name))[1] = 'profile_images'
+);
+
+-- Allow authenticated users to read profile images
+create policy "Allow authenticated users to read profile images"
+on storage.objects
+for select
+to authenticated
+using (
+  bucket_id = 'avatars' and
+  (storage.foldername(name))[1] = 'profile_images'
+);
+
 -- Optional realtime for messages table (safe to rerun)
 do $$
 begin
