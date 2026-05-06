@@ -538,12 +538,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                             children: [
                               CircleAvatar(
                                 radius: 28,
-                                backgroundImage: entry.peerProfileImageUrl != null && entry.peerProfileImageUrl!.isNotEmpty
+                                backgroundImage: entry.peerProfileImageUrl !=
+                                            null &&
+                                        entry.peerProfileImageUrl!.isNotEmpty
                                     ? NetworkImage(entry.peerProfileImageUrl!)
                                     : null,
                                 backgroundColor: _N.navBg,
-                                child: entry.peerProfileImageUrl == null || entry.peerProfileImageUrl!.isEmpty
-                                    ? Text(entry.peerName.isNotEmpty ? entry.peerName[0].toUpperCase() : '?', style: const TextStyle(color: _N.textPrimary, fontWeight: FontWeight.w700))
+                                child: entry.peerProfileImageUrl == null ||
+                                        entry.peerProfileImageUrl!.isEmpty
+                                    ? Text(
+                                        entry.peerName.isNotEmpty
+                                            ? entry.peerName[0].toUpperCase()
+                                            : '?',
+                                        style: const TextStyle(
+                                            color: _N.textPrimary,
+                                            fontWeight: FontWeight.w700))
                                     : null,
                               ),
                               const SizedBox(width: 12),
@@ -551,25 +560,38 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(entry.peerName, style: const TextStyle(color: _N.textPrimary, fontSize: 16, fontWeight: FontWeight.w800)),
+                                    Text(entry.peerName,
+                                        style: const TextStyle(
+                                            color: _N.textPrimary,
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w800)),
                                     const SizedBox(height: 4),
-                                    Text('${_callDirectionLabel(entry.direction)} • ${_callResultLabel(entry.result)}', style: const TextStyle(color: _N.textSecondary)),
+                                    Text(
+                                        '${_callDirectionLabel(entry.direction)} • ${_callResultLabel(entry.result)}',
+                                        style: const TextStyle(
+                                            color: _N.textSecondary)),
                                   ],
                                 ),
                               ),
-                              Text(_formatDuration(entry.durationSeconds), style: const TextStyle(color: _N.textSecondary)),
+                              Text(_formatDuration(entry.durationSeconds),
+                                  style:
+                                      const TextStyle(color: _N.textSecondary)),
                             ],
                           ),
                           const SizedBox(height: 14),
-                          Text('Started: ${_formatCallTime(entry.startedAt)}', style: const TextStyle(color: _N.textMuted)),
+                          Text('Started: ${_formatCallTime(entry.startedAt)}',
+                              style: const TextStyle(color: _N.textMuted)),
                           const SizedBox(height: 6),
-                          Text('Ended: ${entry.endedAt != null ? _formatCallTime(entry.endedAt!) : '-'}', style: const TextStyle(color: _N.textMuted)),
+                          Text(
+                              'Ended: ${entry.endedAt != null ? _formatCallTime(entry.endedAt!) : '-'}',
+                              style: const TextStyle(color: _N.textMuted)),
                           const SizedBox(height: 18),
                           Row(
                             children: [
                               Expanded(
                                 child: ElevatedButton.icon(
-                                  style: ElevatedButton.styleFrom(backgroundColor: _N.indigo),
+                                  style: ElevatedButton.styleFrom(
+                                      backgroundColor: _N.indigo),
                                   onPressed: () {
                                     // call back (voice)
                                   },
@@ -580,7 +602,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                               const SizedBox(width: 10),
                               Expanded(
                                 child: OutlinedButton.icon(
-                                  style: OutlinedButton.styleFrom(foregroundColor: _N.textPrimary, side: BorderSide(color: _N.cardBorder)),
+                                  style: OutlinedButton.styleFrom(
+                                      foregroundColor: _N.textPrimary,
+                                      side: BorderSide(color: _N.cardBorder)),
                                   onPressed: () {},
                                   icon: const Icon(Icons.info_outline_rounded),
                                   label: const Text('Details'),
@@ -601,7 +625,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: _N.cardBorder),
                     boxShadow: [
-                      BoxShadow(color: Colors.black.withOpacity(0.18), blurRadius: 18, offset: const Offset(0, 8)),
+                      BoxShadow(
+                          color: Colors.black.withOpacity(0.18),
+                          blurRadius: 18,
+                          offset: const Offset(0, 8)),
                     ],
                   ),
                   child: Row(
@@ -612,17 +639,34 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                         height: 56,
                         decoration: BoxDecoration(
                           gradient: isMissed
-                              ? LinearGradient(colors: [const Color(0xFFFB7185).withOpacity(0.12), Colors.transparent])
-                              : LinearGradient(colors: [_N.indigo.withOpacity(0.14), _N.violet.withOpacity(0.06)]),
+                              ? LinearGradient(colors: [
+                                  const Color(0xFFFB7185).withOpacity(0.12),
+                                  Colors.transparent
+                                ])
+                              : LinearGradient(colors: [
+                                  _N.indigo.withOpacity(0.14),
+                                  _N.violet.withOpacity(0.06)
+                                ]),
                           shape: BoxShape.circle,
                         ),
                         child: Center(
                           child: CircleAvatar(
                             radius: 22,
-                            backgroundImage: entry.peerProfileImageUrl != null && entry.peerProfileImageUrl!.isNotEmpty ? NetworkImage(entry.peerProfileImageUrl!) : null,
+                            backgroundImage:
+                                entry.peerProfileImageUrl != null &&
+                                        entry.peerProfileImageUrl!.isNotEmpty
+                                    ? NetworkImage(entry.peerProfileImageUrl!)
+                                    : null,
                             backgroundColor: _N.navBg,
-                            child: entry.peerProfileImageUrl == null || entry.peerProfileImageUrl!.isEmpty
-                                ? Text(entry.peerName.isNotEmpty ? entry.peerName[0].toUpperCase() : '?', style: const TextStyle(color: _N.textPrimary, fontWeight: FontWeight.w700))
+                            child: entry.peerProfileImageUrl == null ||
+                                    entry.peerProfileImageUrl!.isEmpty
+                                ? Text(
+                                    entry.peerName.isNotEmpty
+                                        ? entry.peerName[0].toUpperCase()
+                                        : '?',
+                                    style: const TextStyle(
+                                        color: _N.textPrimary,
+                                        fontWeight: FontWeight.w700))
                                 : null,
                           ),
                         ),
@@ -635,18 +679,46 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                             Row(
                               children: [
                                 Expanded(
-                                  child: Text(entry.peerName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _N.textPrimary, fontSize: 15, fontWeight: FontWeight.w800)),
+                                  child: Text(entry.peerName,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                          color: _N.textPrimary,
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w800)),
                                 ),
                                 const SizedBox(width: 8),
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(color: statusColor.withOpacity(0.12), borderRadius: BorderRadius.circular(12), border: Border.all(color: statusColor.withOpacity(0.16))),
-                                  child: Row(children: [Icon(entry.callType == 'video' ? Icons.videocam_rounded : Icons.call_rounded, size: 14, color: statusColor), const SizedBox(width: 6), Text(_callResultLabel(entry.result), style: TextStyle(color: statusColor, fontSize: 12, fontWeight: FontWeight.w700))]),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                      color: statusColor.withOpacity(0.12),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                          color:
+                                              statusColor.withOpacity(0.16))),
+                                  child: Row(children: [
+                                    Icon(
+                                        entry.callType == 'video'
+                                            ? Icons.videocam_rounded
+                                            : Icons.call_rounded,
+                                        size: 14,
+                                        color: statusColor),
+                                    const SizedBox(width: 6),
+                                    Text(_callResultLabel(entry.result),
+                                        style: TextStyle(
+                                            color: statusColor,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w700))
+                                  ]),
                                 ),
                               ],
                             ),
                             const SizedBox(height: 6),
-                            Text('${_callDirectionLabel(entry.direction)} • ${_formatCallTime(entry.startedAt)}', style: TextStyle(color: _N.textSecondary, fontSize: 12)),
+                            Text(
+                                '${_callDirectionLabel(entry.direction)} • ${_formatCallTime(entry.startedAt)}',
+                                style: TextStyle(
+                                    color: _N.textSecondary, fontSize: 12)),
                           ],
                         ),
                       ),
@@ -655,7 +727,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          Text(_formatDuration(entry.durationSeconds), style: const TextStyle(color: _N.textSecondary, fontWeight: FontWeight.w700)),
+                          Text(_formatDuration(entry.durationSeconds),
+                              style: const TextStyle(
+                                  color: _N.textSecondary,
+                                  fontWeight: FontWeight.w700)),
                           const SizedBox(height: 8),
                           Row(children: [
                             IconButton(
@@ -669,7 +744,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                               onPressed: () {
                                 // quick video callback
                               },
-                              icon: Icon(Icons.videocam_rounded, color: _N.violet),
+                              icon: Icon(Icons.videocam_rounded,
+                                  color: _N.violet),
                               splashRadius: 20,
                             ),
                           ])
