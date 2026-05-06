@@ -17,6 +17,7 @@ import 'package:multilingual_chat_app/screens/profile/profile_screen.dart';
 // ── Nexus Design Tokens ─────────────────────────────────────────────────────
 class _N {
   static const bg = Color(0xFF0D0E1A);
+  static const surface = Color(0xFF151626);
   static const card = Color(0xFF1C1E31);
   static const cardBorder = Color(0xFF252842);
   static const indigo = Color(0xFF6366F1);
@@ -506,103 +507,177 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         return ListView.separated(
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 22),
           itemCount: entries.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 10),
+          separatorBuilder: (_, __) => const SizedBox(height: 12),
           itemBuilder: (_, index) {
             final entry = entries[index];
             final isMissed = entry.result == CallResult.missed ||
                 entry.result == CallResult.declined;
-            final statusColor = isMissed ? const Color(0xFFF87171) : _N.indigo;
+            final statusColor = isMissed ? const Color(0xFFFB7185) : _N.indigo;
 
-            return Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: _N.card,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: _N.cardBorder),
-              ),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    radius: 24,
-                    backgroundColor: _N.navBg,
-                    backgroundImage: entry.peerProfileImageUrl != null &&
-                            entry.peerProfileImageUrl!.isNotEmpty
-                        ? NetworkImage(entry.peerProfileImageUrl!)
-                        : null,
-                    child: entry.peerProfileImageUrl == null ||
-                            entry.peerProfileImageUrl!.isEmpty
-                        ? Text(
-                            entry.peerName.isNotEmpty
-                                ? entry.peerName[0].toUpperCase()
-                                : '?',
-                            style: const TextStyle(
-                              color: _N.textPrimary,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          )
-                        : null,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          entry.peerName,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: _N.textPrimary,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
+            // rich card with avatar, metadata, and quick actions
+            return Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(16),
+                onTap: () async {
+                  // open details or call back
+                  // placeholder: show details bottom sheet
+                  showModalBottomSheet(
+                    context: context,
+                    backgroundColor: _N.surface,
+                    shape: const RoundedRectangleBorder(
+                        borderRadius:
+                            BorderRadius.vertical(top: Radius.circular(20))),
+                    builder: (_) => Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              CircleAvatar(
+                                radius: 28,
+                                backgroundImage: entry.peerProfileImageUrl != null && entry.peerProfileImageUrl!.isNotEmpty
+                                    ? NetworkImage(entry.peerProfileImageUrl!)
+                                    : null,
+                                backgroundColor: _N.navBg,
+                                child: entry.peerProfileImageUrl == null || entry.peerProfileImageUrl!.isEmpty
+                                    ? Text(entry.peerName.isNotEmpty ? entry.peerName[0].toUpperCase() : '?', style: const TextStyle(color: _N.textPrimary, fontWeight: FontWeight.w700))
+                                    : null,
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(entry.peerName, style: const TextStyle(color: _N.textPrimary, fontSize: 16, fontWeight: FontWeight.w800)),
+                                    const SizedBox(height: 4),
+                                    Text('${_callDirectionLabel(entry.direction)} • ${_callResultLabel(entry.result)}', style: const TextStyle(color: _N.textSecondary)),
+                                  ],
+                                ),
+                              ),
+                              Text(_formatDuration(entry.durationSeconds), style: const TextStyle(color: _N.textSecondary)),
+                            ],
                           ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '${_callDirectionLabel(entry.direction)} • ${_callResultLabel(entry.result)}',
-                          style: TextStyle(
-                            color: isMissed
-                                ? const Color(0xFFFCA5A5)
-                                : _N.textSecondary,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
+                          const SizedBox(height: 14),
+                          Text('Started: ${_formatCallTime(entry.startedAt)}', style: const TextStyle(color: _N.textMuted)),
+                          const SizedBox(height: 6),
+                          Text('Ended: ${entry.endedAt != null ? _formatCallTime(entry.endedAt!) : '-'}', style: const TextStyle(color: _N.textMuted)),
+                          const SizedBox(height: 18),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  style: ElevatedButton.styleFrom(backgroundColor: _N.indigo),
+                                  onPressed: () {
+                                    // call back (voice)
+                                  },
+                                  icon: const Icon(Icons.call_rounded),
+                                  label: const Text('Call Back'),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  style: OutlinedButton.styleFrom(foregroundColor: _N.textPrimary, side: BorderSide(color: _N.cardBorder)),
+                                  onPressed: () {},
+                                  icon: const Icon(Icons.info_outline_rounded),
+                                  label: const Text('Details'),
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          _formatCallTime(entry.startedAt),
-                          style: const TextStyle(
-                            color: _N.textMuted,
-                            fontSize: 11.5,
-                          ),
-                        ),
-                      ],
+                          const SizedBox(height: 12),
+                        ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Icon(
-                        entry.callType == 'video'
-                            ? Icons.videocam_rounded
-                            : Icons.call_rounded,
-                        color: statusColor,
-                        size: 18,
-                      ),
-                      const SizedBox(height: 7),
-                      Text(
-                        _formatDuration(entry.durationSeconds),
-                        style: const TextStyle(
-                          color: _N.textSecondary,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
+                  );
+                },
+                child: Ink(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: _N.card,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: _N.cardBorder),
+                    boxShadow: [
+                      BoxShadow(color: Colors.black.withOpacity(0.18), blurRadius: 18, offset: const Offset(0, 8)),
                     ],
                   ),
-                ],
+                  child: Row(
+                    children: [
+                      // Avatar with gradient ring
+                      Container(
+                        width: 56,
+                        height: 56,
+                        decoration: BoxDecoration(
+                          gradient: isMissed
+                              ? LinearGradient(colors: [const Color(0xFFFB7185).withOpacity(0.12), Colors.transparent])
+                              : LinearGradient(colors: [_N.indigo.withOpacity(0.14), _N.violet.withOpacity(0.06)]),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Center(
+                          child: CircleAvatar(
+                            radius: 22,
+                            backgroundImage: entry.peerProfileImageUrl != null && entry.peerProfileImageUrl!.isNotEmpty ? NetworkImage(entry.peerProfileImageUrl!) : null,
+                            backgroundColor: _N.navBg,
+                            child: entry.peerProfileImageUrl == null || entry.peerProfileImageUrl!.isEmpty
+                                ? Text(entry.peerName.isNotEmpty ? entry.peerName[0].toUpperCase() : '?', style: const TextStyle(color: _N.textPrimary, fontWeight: FontWeight.w700))
+                                : null,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(entry.peerName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _N.textPrimary, fontSize: 15, fontWeight: FontWeight.w800)),
+                                ),
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(color: statusColor.withOpacity(0.12), borderRadius: BorderRadius.circular(12), border: Border.all(color: statusColor.withOpacity(0.16))),
+                                  child: Row(children: [Icon(entry.callType == 'video' ? Icons.videocam_rounded : Icons.call_rounded, size: 14, color: statusColor), const SizedBox(width: 6), Text(_callResultLabel(entry.result), style: TextStyle(color: statusColor, fontSize: 12, fontWeight: FontWeight.w700))]),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Text('${_callDirectionLabel(entry.direction)} • ${_formatCallTime(entry.startedAt)}', style: TextStyle(color: _N.textSecondary, fontSize: 12)),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(_formatDuration(entry.durationSeconds), style: const TextStyle(color: _N.textSecondary, fontWeight: FontWeight.w700)),
+                          const SizedBox(height: 8),
+                          Row(children: [
+                            IconButton(
+                              onPressed: () {
+                                // quick voice callback
+                              },
+                              icon: Icon(Icons.call_rounded, color: _N.indigo),
+                              splashRadius: 20,
+                            ),
+                            IconButton(
+                              onPressed: () {
+                                // quick video callback
+                              },
+                              icon: Icon(Icons.videocam_rounded, color: _N.violet),
+                              splashRadius: 20,
+                            ),
+                          ])
+                        ],
+                      )
+                    ],
+                  ),
+                ),
               ),
             );
           },
