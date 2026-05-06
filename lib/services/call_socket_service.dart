@@ -118,8 +118,10 @@ class CallSocketService {
         io.OptionBuilder()
             .setTransports(['websocket', 'polling'])
             .disableAutoConnect()
-            .setReconnectionAttempts(5)
+            .enableReconnection()
+            .setReconnectionAttempts(10)
             .setReconnectionDelay(1000)
+            .setReconnectionDelayMax(5000)
             .build(),
       );
 

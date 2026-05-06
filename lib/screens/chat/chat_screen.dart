@@ -741,16 +741,18 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     required String receiverIdentifier,
     required String receiverName,
   }) async {
+    final messageId = _newId();
     final metadata = {
       ...sourceMeta,
       'forwarded': true,
       'forwardedTo': receiverName,
       'forwardedToPhone': receiverIdentifier,
+      'clientMessageId': messageId,
     };
 
     // For app users, use their ID; for external contacts, use phone as identifier
     final message = Message(
-      id: _newId(),
+      id: messageId,
       senderId: currentUser.id,
       receiverId: receiverIdentifier, // Phone number or user ID
       content: forwardText,
@@ -1204,8 +1206,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     }
 
     final replyMeta = _buildReplyMetadata();
+    final messageId = _newId();
     final message = Message(
-      id: _newId(),
+      id: messageId,
       senderId: currentUser.id,
       receiverId: widget.user.id,
       content: text,
@@ -1213,6 +1216,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       status: MessageStatus.sent,
       timestamp: DateTime.now(),
       metadata: {
+        'clientMessageId': messageId,
         if (replyMeta != null) ...replyMeta,
       },
     );
@@ -1230,6 +1234,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       senderLanguage: currentUser.preferredLanguage,
       receiverLanguage: widget.user.preferredLanguage,
       metadata: {
+        'clientMessageId': messageId,
         if (replyMeta != null) ...replyMeta,
       },
     );
@@ -1617,9 +1622,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
 
     debugPrint('Sending voice message: $safeText (hasAudio=$hasAudio)');
     final replyMeta = _buildReplyMetadata();
+    final messageId = _newId();
     final rm = RichMessage(
       message: Message(
-        id: _newId(),
+        id: messageId,
         senderId: currentUser.id,
         receiverId: widget.user.id,
         content: safeText,
@@ -1627,6 +1633,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         status: MessageStatus.sent,
         timestamp: DateTime.now(),
         metadata: {
+          'clientMessageId': messageId,
           'voiceTranscript': safeText,
           if (audioPath != null && audioPath.isNotEmpty) 'audioPath': audioPath,
           'originalLanguage': currentUser.preferredLanguage,
@@ -1649,6 +1656,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       senderLanguage: currentUser.preferredLanguage,
       receiverLanguage: widget.user.preferredLanguage,
       metadata: {
+        'clientMessageId': messageId,
         'voiceTranscript': safeText,
         if (audioPath != null && audioPath.isNotEmpty) 'audioPath': audioPath,
         if (replyMeta != null) ...replyMeta,
@@ -2315,10 +2323,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   Widget _buildTextBubble(RichMessage rm, bool isMe, String time) {
     final meta = rm.message.metadata ?? const <String, dynamic>{};
     final translated = meta['translatedContent']?.toString();
-    final hasTranslation = !isMe &&
-        translated != null &&
+    final originalLang = meta['originalLanguage']?.toString();
+    final targetLang = meta['targetLanguage']?.toString();
+    final hasTranslation = translated != null &&
         translated.isNotEmpty &&
-        translated != rm.message.content;
+        translated.toLowerCase() != rm.message.content.toLowerCase();
     final isReply = meta['replyToMessageId'] != null && (meta['replyToMessageId'] as String).isNotEmpty;
     final isForwarded = meta['forwarded'] == true;
 
@@ -2332,6 +2341,36 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         if (isReply) ...[_buildReplyPreviewWidget(meta), const SizedBox(height: 8)],
         // Show forwarded badge if forwarded
         if (isForwarded) ...[_buildForwardedBadge(), const SizedBox(height: 6)],
+        // Translation language banner
+        if (hasTranslation) ...[
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            margin: const EdgeInsets.only(bottom: 6),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  Colors.tealAccent.shade700.withOpacity(0.15),
+                  Colors.tealAccent.shade700.withOpacity(0.05),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.tealAccent.shade700.withOpacity(0.2)),
+            ),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Icon(Icons.auto_awesome, size: 12, color: Colors.tealAccent.shade200),
+              const SizedBox(width: 5),
+              Text(
+                'Translated${originalLang != null && targetLang != null ? ' · ${originalLang.toUpperCase()} → ${targetLang.toUpperCase()}' : ''}',
+                style: TextStyle(
+                  color: Colors.tealAccent.shade200,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.3,
+                ),
+              ),
+            ]),
+          ),
+        ],
         Text(displayContent,
             style: TextStyle(
               color: isMe ? Colors.white : const Color(0xFFE9F0F4),
@@ -2339,24 +2378,42 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
               height: 1.4,
             )),
         if (hasTranslation) ...[
-          const SizedBox(height: 4),
+          const SizedBox(height: 6),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.08),
-              borderRadius: BorderRadius.circular(6),
+              color: Colors.white.withOpacity(0.06),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.white.withOpacity(0.06)),
             ),
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              Icon(Icons.translate_rounded,
-                  size: 11, color: Colors.tealAccent.shade200),
-              const SizedBox(width: 4),
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Padding(
+                padding: const EdgeInsets.only(top: 1),
+                child: Icon(Icons.translate_rounded,
+                    size: 12, color: Colors.tealAccent.shade200.withOpacity(0.7)),
+              ),
+              const SizedBox(width: 6),
               Flexible(
-                child: Text(rm.message.content,
-                    style: TextStyle(
-                      color: Colors.grey.shade400.withOpacity(0.7),
-                      fontSize: 11.5,
-                      fontStyle: FontStyle.italic,
-                    )),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Original',
+                        style: TextStyle(
+                          color: Colors.grey.shade500,
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.4,
+                        )),
+                    const SizedBox(height: 1),
+                    Text(rm.message.content,
+                        style: TextStyle(
+                          color: Colors.grey.shade400.withOpacity(0.8),
+                          fontSize: 12,
+                          fontStyle: FontStyle.italic,
+                          height: 1.3,
+                        )),
+                  ],
+                ),
               ),
             ]),
           ),
@@ -2408,16 +2465,46 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         path != null && _isAudioPlaying && _activeAudioPath == path;
     final meta = rm.message.metadata ?? const <String, dynamic>{};
     final translatedText = meta['translatedContent']?.toString();
+    final originalLang = meta['originalLanguage']?.toString();
+    final targetLang = meta['targetLanguage']?.toString();
     final transcript =
         (meta['voiceTranscript'] ?? rm.message.content).toString();
-    final displayText =
-        !isMe && translatedText != null && translatedText.isNotEmpty
-            ? translatedText
-            : transcript;
+    final hasTranslation =
+        translatedText != null && translatedText.isNotEmpty;
+    final displayText = hasTranslation ? translatedText : transcript;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        // Translation banner for voice notes
+        if (hasTranslation)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            margin: const EdgeInsets.only(bottom: 8),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  Colors.tealAccent.shade700.withOpacity(0.15),
+                  Colors.tealAccent.shade700.withOpacity(0.05),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.tealAccent.shade700.withOpacity(0.2)),
+            ),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Icon(Icons.auto_awesome, size: 12, color: Colors.tealAccent.shade200),
+              const SizedBox(width: 5),
+              Text(
+                'Voice translated${originalLang != null && targetLang != null ? ' · ${originalLang.toUpperCase()} → ${targetLang.toUpperCase()}' : ''}',
+                style: TextStyle(
+                  color: Colors.tealAccent.shade200,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.3,
+                ),
+              ),
+            ]),
+          ),
         GestureDetector(
           onTap: path == null ? null : () => _toggleAudioPlayback(path),
           child: Row(children: [
@@ -2451,14 +2538,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                       ),
                     ),
                     if (displayText.isNotEmpty) ...[
-                      const SizedBox(height: 2),
+                      const SizedBox(height: 3),
                       Text(
                         displayText,
-                        maxLines: 2,
+                        maxLines: 3,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: isMe ? Colors.white70 : Colors.white70,
-                          fontSize: 11.5,
+                          fontSize: 12,
+                          height: 1.3,
                         ),
                       ),
                     ],
@@ -2474,8 +2562,53 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
             ),
           ]),
         ),
+        // Show original transcript for translated voice messages
+        if (hasTranslation && transcript.isNotEmpty) ...[
+          const SizedBox(height: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.06),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Padding(
+                padding: const EdgeInsets.only(top: 1),
+                child: Icon(Icons.record_voice_over_rounded,
+                    size: 11, color: Colors.grey.shade500),
+              ),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Original voice',
+                        style: TextStyle(
+                          color: Colors.grey.shade500,
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.4,
+                        )),
+                    const SizedBox(height: 1),
+                    Text(transcript,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.grey.shade400.withOpacity(0.8),
+                          fontSize: 11,
+                          fontStyle: FontStyle.italic,
+                        )),
+                  ],
+                ),
+              ),
+            ]),
+          ),
+        ],
         const SizedBox(height: 6),
-        _timeRow(isMe, time, rm.message.status),
+        Align(
+          alignment: Alignment.centerRight,
+          child: _timeRow(isMe, time, rm.message.status),
+        ),
       ]),
     );
   }

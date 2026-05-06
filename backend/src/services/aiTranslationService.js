@@ -19,24 +19,35 @@ class AITranslationService {
    * @returns {Promise<string>} Translated text
    */
   async translateText(text, from, to) {
-    if (!text || text.trim() === '') return text;
-    if (from === to) return text;
-    const normalizedText = text.trim();
-    const cacheKey = `${from}:${to}:${normalizedText}`;
-    const cached = this._getFromCache(this.translationCache, cacheKey);
-    if (cached) {
-      return cached;
+    if (!text || text.trim() === '') return { text: null, detected: null };
+    const targetLang = to || 'en';
+    const sourceLang = from || 'auto';
+    
+    if (sourceLang !== 'auto' && sourceLang === targetLang) {
+      return { text: null, detected: sourceLang };
     }
 
+    const normalizedText = text.trim();
+    const cacheKey = `${sourceLang}:${targetLang}:${normalizedText}`;
+    const cached = this._getFromCache(this.translationCache, cacheKey);
+    if (cached) return cached;
+
     try {
-      const result = await translate(normalizedText, { from, to });
-      this._setCache(this.translationCache, cacheKey, result.text);
-      console.log(`🌐 Translated: "${normalizedText}" → "${result.text}" (${from}→${to})`);
-      return result.text;
+      const result = await translate(normalizedText, { 
+        from: sourceLang === 'auto' ? undefined : sourceLang, 
+        to: targetLang 
+      });
+
+      if (result.text.toLowerCase() === normalizedText.toLowerCase()) {
+        return { text: null, detected: result.from.language.iso };
+      }
+
+      const response = { text: result.text, detected: result.from.language.iso };
+      this._setCache(this.translationCache, cacheKey, response);
+      return response;
     } catch (error) {
       console.error('Translation error:', error.message);
-      // Fallback: return original text if translation fails
-      return normalizedText;
+      return { text: null, detected: null };
     }
   }
 
@@ -120,19 +131,22 @@ class AITranslationService {
   }
 
   /**
-   * Placeholder for future streaming speech translation.
-   * Keeps the socket pipeline safe even if audio chunks are sent.
+   * Placeholder for future streaming speech-to-text.
+   * Currently logs incoming chunks for debugging; ready for STT integration.
    */
   processAudioChunk(userId, audioData) {
     const stream = this.activeStreams.get(userId);
     if (!stream || !audioData) {
       return;
     }
-    // Speech-to-text streaming is not wired yet. Intentionally no-op.
+    // Future: pipe audioData to a streaming STT service (e.g., Google Cloud Speech)
+    // and call processCallText() with the transcription result.
+    // For now, on-device STT handles this via the send_call_text event.
   }
 
   /**
    * Process a text message during a call and send translated text + audio to the peer.
+   * Includes latency measurement for monitoring sub-2-second target.
    */
   async processCallText(userId, text) {
     if (!text || text.trim() === '') return;
@@ -140,33 +154,53 @@ class AITranslationService {
     const stream = this.activeStreams.get(userId);
     if (!stream) return;
 
+    const startMs = Date.now();
+
     try {
-      const { translatedText, audioBuffer } = await this.translateAndSpeak(
-        text,
+      // 1. FAST TEXT TRANSLATION ONLY
+      const result = await this.translateText(
+        text.trim(),
         stream.sourceLanguage,
         stream.targetLanguage
       );
+      const translatedText = result.text;
+      const detectedSource = result.detected || stream.sourceLanguage;
 
+      const latencyMs = Date.now() - startMs;
       const targetSocketId = stream.activeUsers.get(stream.targetUserId);
+
       if (targetSocketId) {
-        // Send translated subtitle text instantly
+        // 2. EMIT SUBTITLE IMMEDIATELY
         stream.io.to(targetSocketId).emit('receive_subtitle', {
           from: userId,
-          text: translatedText,
+          text: translatedText || text.trim(),
           originalText: text,
-          originalLanguage: stream.sourceLanguage,
-          targetLanguage: stream.targetLanguage
+          originalLanguage: detectedSource,
+          targetLanguage: stream.targetLanguage,
+          latencyMs
         });
 
-        // Send TTS audio if available
-        if (audioBuffer) {
-          stream.io.to(targetSocketId).emit('receive_translated_audio', {
-            from: userId,
-            audioData: Array.from(audioBuffer), // Convert Buffer to array for Socket.io
-            language: stream.targetLanguage
-          });
-        }
+        // 3. SYNTHESIZE SPEECH ASYNCHRONOUSLY
+        if (translatedText) {
+          this.textToSpeech(translatedText, stream.targetLanguage)
+          .then(audioBuffer => {
+            if (audioBuffer && targetSocketId) {
+              stream.io.to(targetSocketId).emit('receive_translated_audio', {
+                from: userId,
+                audioData: Array.from(audioBuffer),
+                language: stream.targetLanguage,
+                latencyMs: Date.now() - startMs
+              });
+            }
+          })
+          .catch(err => console.error('TTS Background error:', err.message));
       }
+
+      // Log latency for monitoring
+      const emoji = latencyMs < 1500 ? '⚡' : latencyMs < 2500 ? '🟡' : '🔴';
+      console.log(`${emoji} Stream pipeline: ${latencyMs}ms (${stream.sourceLanguage}→${stream.targetLanguage})`);
+
+      return { latencyMs };
     } catch (error) {
       console.error('processCallText error:', error);
     }

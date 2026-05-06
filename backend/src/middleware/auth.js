@@ -1,19 +1,13 @@
 const jwt = require('jsonwebtoken');
-const User = require('../models/User');
+const supabase = require('../config/supabase');
 
 // Middleware to verify JWT token
 const authenticate = async (req, res, next) => {
   try {
     let token;
 
-    // Check for token in Authorization header
     if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
       token = req.headers.authorization.split(' ')[1];
-    }
-
-    // Check for token in cookies (if using cookie-based auth)
-    if (!token && req.cookies && req.cookies.token) {
-      token = req.cookies.token;
     }
 
     if (!token) {
@@ -24,20 +18,22 @@ const authenticate = async (req, res, next) => {
     }
 
     try {
-      // Verify token
       const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+      
+      // Get user from Supabase profiles instead of MongoDB
+      const { data: user, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', decoded.id)
+        .single();
 
-      // Get user from token
-      const user = await User.findById(decoded.id).select('-password');
-
-      if (!user) {
-        return res.status(401).json({
-          success: false,
-          message: 'Token is valid but user not found.'
-        });
+      if (error || !user) {
+        // Fallback for dev: if decoding succeeded but user not in profiles, 
+        // we might be using raw IDs or the user hasn't created a profile yet
+        req.user = { id: decoded.id };
+        return next();
       }
 
-      // Add user to request object
       req.user = user;
       next();
 
@@ -57,58 +53,37 @@ const authenticate = async (req, res, next) => {
   }
 };
 
-// Middleware to check if user is authenticated (optional auth)
 const optionalAuth = async (req, res, next) => {
   try {
     let token;
-
     if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
       token = req.headers.authorization.split(' ')[1];
     }
-
     if (token) {
       try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
-        const user = await User.findById(decoded.id).select('-password');
-        if (user) {
-          req.user = user;
-        }
-      } catch (error) {
-        // Token is invalid but we don't throw error for optional auth
-        console.log('Optional auth token invalid:', error.message);
-      }
+        const { data: user } = await supabase.from('profiles').select('*').eq('id', decoded.id).single();
+        if (user) req.user = user;
+        else req.user = { id: decoded.id };
+      } catch (e) {}
     }
-
     next();
   } catch (error) {
-    console.error('Optional authentication error:', error);
-    next(); // Continue without authentication
+    next();
   }
 };
 
-// Middleware to generate JWT token
 const generateToken = (userId) => {
   return jwt.sign(
     { id: userId },
     process.env.JWT_SECRET || 'your-secret-key',
-    {
-      expiresIn: process.env.JWT_EXPIRE || '30d'
-    }
+    { expiresIn: process.env.JWT_EXPIRE || '30d' }
   );
 };
 
-// Middleware for role-based access control (for future use)
 const authorize = (...roles) => {
   return (req, res, next) => {
-    if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        message: 'Authentication required'
-      });
-    }
-
-    // For now, all authenticated users have access
-    // In future, we can add role-based permissions
+    if (!req.user) return res.status(401).json({ success: false, message: 'Auth required' });
     next();
   };
 };
@@ -119,4 +94,3 @@ module.exports = {
   generateToken,
   authorize
 };
-

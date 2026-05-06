@@ -1,9 +1,7 @@
-const User = require('../models/User');
-const Message = require('../models/Message');
+const supabase = require('../config/supabase');
 const aiTranslationService = require('./aiTranslationService');
-const mongoose = require('mongoose');
+const jwt = require('jsonwebtoken');
 
-const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id) && String(id).length === 24;
 const SUPPORTED_LANGUAGE_CODES = new Set([
   'en', 'es', 'fr', 'de', 'it', 'pt', 'ru', 'ja', 'ko', 'zh', 'hi', 'ar', 'ta', 'te', 'kn', 'ml'
 ]);
@@ -15,647 +13,215 @@ const normalizeLanguage = (language, fallback = 'en') => {
 };
 
 const resolveUserPreferredLanguage = async (userId, fallback = 'en') => {
-  if (!isValidObjectId(userId)) return fallback;
+  if (!userId) return fallback;
   try {
-    const user = await User.findById(userId).select('preferredLanguage').lean();
-    return normalizeLanguage(user?.preferredLanguage, fallback);
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('preferred_language')
+      .eq('id', userId)
+      .single();
+    
+    if (error || !data) return fallback;
+    return normalizeLanguage(data.preferred_language, fallback);
   } catch (error) {
     console.error(`Language lookup failed for user ${userId}:`, error.message);
     return fallback;
   }
 };
 
-// Store active users and their socket connections
+const verifySocketToken = (token) => {
+  if (!token) return null;
+  const jwtSecret = process.env.JWT_SECRET;
+  if (token.startsWith('ey') && jwtSecret) {
+    try {
+      const decoded = jwt.verify(token, jwtSecret);
+      return decoded.id || decoded.userId || decoded.sub || null;
+    } catch (err) {
+      console.warn('⚠️ JWT verification failed:', err.message);
+      return null;
+    }
+  }
+  return token; // Dev fallback
+};
+
 const activeUsers = new Map(); // userId -> socketId
 const socketToUser = new Map(); // socketId -> userId
 
 const initializeSocket = (io) => {
   io.on('connection', (socket) => {
-    console.log(`🔌 New socket connection: ${socket.id}`);
+    console.log(`🔌 New connection: ${socket.id}`);
 
-    // User authentication
     socket.on('authenticate', async (data) => {
       try {
         const { token } = data;
-
-        if (!token) {
-          socket.emit('unauthenticated', { message: 'Token required' });
+        const userId = verifySocketToken(token);
+        if (!userId) {
+          socket.emit('unauthenticated', { message: 'Invalid token' });
           return;
         }
 
-        // Here you would verify the JWT token
-        // For now, we'll assume the token contains the user ID
-        const userId = token; // In real implementation, decode JWT
-
-        let user = null;
-        if (isValidObjectId(userId)) {
-          user = await User.findById(userId);
-        }
-
-        if (!user) {
-          // Provide a mock user for local testing with frontend SharedPreferences
-          user = {
-            _id: userId,
-            id: userId,
-            name: "Mock User",
-            isOnline: true,
-            socketId: socket.id,
-            preferredLanguage: 'en', // fallback
-            lastSeen: new Date(),
-            toPublicProfile: function() { return { id: this.id, name: this.name, isOnline: this.isOnline }; },
-            save: async function() {}
-          };
-        }
-
-        // Store user connection
+        const { data: user } = await supabase.from('profiles').select('*').eq('id', userId).single();
+        
         activeUsers.set(userId, socket.id);
         socketToUser.set(socket.id, userId);
-
-        // Join user to their own room
         socket.join(userId);
 
-        // Update user online status
-        user.isOnline = true;
-        user.socketId = socket.id;
-        user.lastSeen = new Date();
-        if (user.save) await user.save();
-
         socket.emit('authenticated', {
-          user: user.toPublicProfile ? user.toPublicProfile() : user,
-          message: 'Authentication successful'
+          user: { id: userId, name: user?.name || "User", preferredLanguage: user?.preferred_language || 'en' }
         });
-
-        // Notify friends about online status
-        socket.broadcast.emit('user_online', {
-          userId,
-          user: user.toPublicProfile()
-        });
-
-        console.log(`✅ User ${user.name} authenticated: ${socket.id}`);
-
+        socket.broadcast.emit('user_online', { userId });
       } catch (error) {
-        console.error('Authentication error:', error);
-        socket.emit('unauthenticated', { message: 'Authentication failed' });
+        socket.emit('unauthenticated', { message: 'Auth failed' });
       }
     });
 
-    // Handle private messaging
     socket.on('send_message', async (data) => {
       try {
-        const { receiverId, content, type = 'text', mediaUrl, metadata, senderLanguage: senderLang, receiverLanguage: receiverLang } = data;
+        const { receiverId, content, type = 'text', metadata, senderLanguage, receiverLanguage } = data;
         const senderId = socketToUser.get(socket.id);
+        if (!senderId) return;
 
-        if (!senderId) {
-          socket.emit('error', { message: 'Not authenticated' });
-          return;
-        }
-
-        // Resolve languages server-side for reliable two-way translation.
-        const senderLanguage = normalizeLanguage(
-          senderLang,
-          await resolveUserPreferredLanguage(senderId, 'en')
-        );
-        const targetLanguage = normalizeLanguage(
-          receiverLang,
-          await resolveUserPreferredLanguage(receiverId, 'en')
-        );
+        const sLang = normalizeLanguage(senderLanguage, 'en');
+        const rLang = normalizeLanguage(receiverLanguage, 'en');
         
-        let translatedContent = null;
-        let translatedAudioData = null;
-        let voiceTranscript = typeof metadata?.voiceTranscript === 'string'
-          ? metadata.voiceTranscript.trim()
-          : '';
+        // Always attempt translation to the receiver's language
+        const result = await aiTranslationService.translateText(content, null, rLang);
+        const translatedContent = result.text;
+        const detectedSource = result.detected || sLang;
 
-        // Translate text payloads and transcribed voice notes.
-        if ((type === 'text' || (type === 'audio' && voiceTranscript)) && senderLanguage !== targetLanguage) {
-          const sourceText = type === 'audio' ? voiceTranscript : content.trim();
-          try {
-            translatedContent = await aiTranslationService.translateText(
-              sourceText,
-              senderLanguage,
-              targetLanguage
-            );
-            if (type === 'audio' && translatedContent && translatedContent.trim()) {
-              const ttsAudioBuffer = await aiTranslationService.textToSpeech(
-                translatedContent,
-                targetLanguage
-              );
-              if (ttsAudioBuffer) {
-                translatedAudioData = Array.from(ttsAudioBuffer);
+        const messagePayload = {
+          id: Date.now().toString(),
+          senderId, receiverId, content, type,
+          metadata: { 
+            ...metadata, 
+            translatedContent, 
+            originalLanguage: detectedSource, 
+            targetLanguage: rLang 
+          },
+          createdAt: new Date()
+        };
+
+        const rSocketId = activeUsers.get(receiverId);
+        if (rSocketId) io.to(rSocketId).emit('new_message', messagePayload);
+        socket.emit('message_sent', messagePayload);
+
+        // Async save/update to Supabase
+        const clientMessageId = metadata?.clientMessageId;
+        
+        const saveToDb = async (attempt = 1) => {
+          if (clientMessageId) {
+            const { data, error } = await supabase.from('messages')
+              .update({ metadata: messagePayload.metadata })
+              .eq('metadata->>clientMessageId', clientMessageId)
+              .select();
+              
+            if (error) {
+              console.error('DB update error:', error);
+            } else if (!data || data.length === 0) {
+              // Message might not be inserted yet by the frontend, retry after 500ms
+              if (attempt < 3) {
+                setTimeout(() => saveToDb(attempt + 1), 500);
+              } else {
+                // Fallback to insert if update fails after retries
+                supabase.from('messages').insert({
+                  sender_id: senderId,
+                  receiver_id: receiverId,
+                  content,
+                  type,
+                  metadata: messagePayload.metadata
+                }).then(({error}) => { if(error) console.error('DB save error:', error); });
               }
             }
-          } catch (err) {
-            console.error('Translation failed, using original:', err.message);
-            translatedContent = sourceText;
+          } else {
+            supabase.from('messages').insert({
+              sender_id: senderId,
+              receiver_id: receiverId,
+              content,
+              type,
+              metadata: messagePayload.metadata
+            }).then(({error}) => { if(error) console.error('DB save error:', error); });
           }
-        }
+        };
 
-        let messageData;
-
-        if (isValidObjectId(senderId) && isValidObjectId(receiverId)) {
-          // Create and save message in MongoDB
-          const message = await Message.create({
-            sender: senderId,
-            receiver: receiverId,
-            content: content.trim(),
-            type,
-            mediaUrl,
-            metadata: {
-              ...(metadata || {}),
-              voiceTranscript: voiceTranscript || undefined,
-              translatedContent,
-              translatedAudioData,
-              originalLanguage: senderLanguage,
-              targetLanguage
-            }
-          });
-
-          // Populate message data
-          await message.populate('sender', 'name email profileImageUrl isOnline');
-          await message.populate('receiver', 'name email profileImageUrl isOnline');
-
-          messageData = {
-            id: message._id,
-            sender: message.sender,
-            receiver: message.receiver,
-            content: message.content,
-            type: message.type,
-            status: message.status,
-            mediaUrl: message.mediaUrl,
-            metadata: message.metadata,
-            createdAt: message.createdAt
-          };
-        } else {
-          // Mock message data for local testing
-          messageData = {
-            id: Date.now().toString(),
-            sender: { id: senderId, _id: senderId, name: "Sender" },
-            receiver: { id: receiverId, _id: receiverId, name: "Receiver" },
-            content: content.trim(),
-            type,
-            status: 'sent',
-            mediaUrl,
-            metadata: {
-              ...(metadata || {}),
-              voiceTranscript: voiceTranscript || undefined,
-              translatedContent,
-              translatedAudioData,
-              originalLanguage: senderLanguage,
-              targetLanguage
-            },
-            createdAt: new Date()
-          };
-        }
-
-        // Send to receiver if online
-        const receiverSocketId = activeUsers.get(receiverId);
-        if (receiverSocketId) {
-          io.to(receiverSocketId).emit('new_message', messageData);
-        }
-
-        // Send confirmation to sender
-        socket.emit('message_sent', messageData);
-
-        console.log(`📨 Message sent from ${senderId} to ${receiverId}`);
+        saveToDb();
 
       } catch (error) {
         console.error('Send message error:', error);
-        socket.emit('error', { message: 'Failed to send message' });
       }
     });
 
-    socket.on('delete_message', async (data) => {
-      try {
-        const { messageId, receiverId, deleteForEveryone = false } = data || {};
-        const senderId = socketToUser.get(socket.id);
-
-        if (!senderId || !messageId) {
-          socket.emit('error', { message: 'Not authenticated or missing messageId' });
-          return;
-        }
-
-        // Only the sender can delete for everyone.
-        if (deleteForEveryone) {
-          let message = null;
-          if (isValidObjectId(messageId)) {
-            message = await Message.findById(messageId);
-          }
-
-          if (!message) {
-            message = await Message.findOne({
-              'metadata.clientMessageId': messageId,
-              sender: senderId,
-            });
-          }
-
-          if (!message) {
-            socket.emit('message_delete_failed', { messageId, reason: 'not_found' });
-            return;
-          }
-
-          if (message.sender.toString() !== senderId.toString()) {
-            socket.emit('message_delete_failed', { messageId, reason: 'not_authorized' });
-            return;
-          }
-
-          await Message.findByIdAndDelete(message._id);
-
-          const targetRoom = receiverId || message.receiver.toString();
-          if (targetRoom) {
-            io.to(targetRoom).emit('message_deleted', {
-              messageId: message._id.toString(),
-              clientMessageId: message.metadata?.clientMessageId || messageId,
-              deleteForEveryone: true,
-            });
-          }
-
-          socket.emit('message_deleted', {
-            messageId: message._id.toString(),
-            clientMessageId: message.metadata?.clientMessageId || messageId,
-            deleteForEveryone: true,
-          });
-          return;
-        }
-
-        // Delete-for-me is handled locally by the client, but we still confirm it.
-        socket.emit('message_deleted', {
-          messageId,
-          deleteForEveryone: false,
-        });
-      } catch (error) {
-        console.error('Delete message error:', error);
-        socket.emit('message_delete_failed', {
-          messageId: data?.messageId,
-          reason: 'server_error',
-        });
-      }
-    });
-
-    // Mark messages as read
-    socket.on('mark_read', async (data) => {
-      try {
-        const { senderId } = data;
-        const userId = socketToUser.get(socket.id);
-
-        if (!userId) {
-          socket.emit('error', { message: 'Not authenticated' });
-          return;
-        }
-
-        await Message.markAsRead(senderId, userId);
-
-        // Notify sender that messages were read
-        const senderSocketId = activeUsers.get(senderId);
-        if (senderSocketId) {
-          io.to(senderSocketId).emit('messages_read', {
-            readerId: userId,
-            timestamp: new Date()
-          });
-        }
-
-      } catch (error) {
-        console.error('Mark read error:', error);
-        socket.emit('error', { message: 'Failed to mark messages as read' });
-      }
-    });
-
-    // WebRTC Signaling for video calls
-    socket.on('call_user', (data) => {
-      const { userToCall, signalData, from, name } = data;
-      const receiverSocketId = activeUsers.get(userToCall);
-
-      if (receiverSocketId) {
-        io.to(receiverSocketId).emit('call_user', {
-          signal: signalData,
-          from,
-          name
-        });
-      }
-    });
-
-    socket.on('answer_call', (data) => {
-      const { to, signal } = data;
-      const receiverSocketId = activeUsers.get(to);
-
-      if (receiverSocketId) {
-        io.to(receiverSocketId).emit('call_accepted', signal);
-      }
-    });
-
-    socket.on('end_call', (data) => {
-      const { to } = data;
-      const receiverSocketId = activeUsers.get(to);
-      const userId = socketToUser.get(socket.id);
-
-      // Clean up any active translation streams
-      if (userId) {
-        aiTranslationService.stopStream(userId);
-      }
-      if (to) {
-        aiTranslationService.stopStream(to);
-      }
-
-      if (receiverSocketId) {
-        io.to(receiverSocketId).emit('call_ended');
-      }
-    });
-
-    socket.on('webrtc_offer', (data) => {
-      const { to, offer, callType } = data;
-      const from = socketToUser.get(socket.id);
-      const receiverSocketId = activeUsers.get(to);
-
-      if (receiverSocketId) {
-        io.to(receiverSocketId).emit('webrtc_offer', {
-          from,
-          offer,
-          callType
-        });
-      }
-    });
-
-    socket.on('webrtc_answer', (data) => {
-      const { to, answer, callType } = data;
-      const from = socketToUser.get(socket.id);
-      const receiverSocketId = activeUsers.get(to);
-
-      if (receiverSocketId) {
-        io.to(receiverSocketId).emit('webrtc_answer', {
-          from,
-          answer,
-          callType
-        });
-      }
-    });
-
-    socket.on('webrtc_ice_candidate', (data) => {
-      const { to, candidate } = data;
-      const from = socketToUser.get(socket.id);
-      const receiverSocketId = activeUsers.get(to);
-
-      if (receiverSocketId) {
-        io.to(receiverSocketId).emit('webrtc_ice_candidate', {
-          from,
-          candidate
-        });
-      }
-    });
-
-    // AI Translation signaling & Audio Streaming Hook
-    socket.on('start_translation', async (data) => {
-      const { targetUserId, sourceLanguage, targetLanguage } = data;
-      const userId = socketToUser.get(socket.id);
-
-      if (!userId) return;
-
-      const resolvedSourceLanguage = normalizeLanguage(
-        sourceLanguage,
-        await resolveUserPreferredLanguage(userId, 'en')
-      );
-      const resolvedTargetLanguage = normalizeLanguage(
-        targetLanguage,
-        await resolveUserPreferredLanguage(targetUserId, 'en')
-      );
-
-      // Start the translation pipeline in the backend
-      aiTranslationService.startStream(
-        userId, 
-        targetUserId, 
-        resolvedSourceLanguage, 
-        resolvedTargetLanguage, 
-        io, 
-        socketToUser, 
-        activeUsers
-      );
-
-      const targetSocketId = activeUsers.get(targetUserId);
-      if (targetSocketId) {
-        io.to(targetSocketId).emit('translation_started', {
-          from: userId,
-          sourceLanguage: resolvedSourceLanguage,
-          targetLanguage: resolvedTargetLanguage
-        });
-      }
-    });
-
-    socket.on('translation_audio', (data) => {
-      const { targetUserId, audioData } = data;
-      const userId = socketToUser.get(socket.id);
-
-      if (!userId) return;
-
-      // Pipe the audio chunk into the translation service instead of relaying it directly
-      aiTranslationService.processAudioChunk(userId, audioData);
-    });
-
-    socket.on('translated_text', (data) => {
-      const { targetUserId, text, originalLanguage, targetLanguage } = data;
-      const userId = socketToUser.get(socket.id);
-
-      if (!userId) return;
-
-      const targetSocketId = activeUsers.get(targetUserId);
-      if (targetSocketId) {
-        io.to(targetSocketId).emit('receive_subtitle', {
-          from: userId,
-          text,
-          originalLanguage,
-          targetLanguage
-        });
-      }
-    });
-
-    socket.on('translated_audio', (data) => {
-      const { targetUserId, audioData, language } = data;
-      const userId = socketToUser.get(socket.id);
-
-      if (!userId) return;
-
-      const targetSocketId = activeUsers.get(targetUserId);
-      if (targetSocketId) {
-        io.to(targetSocketId).emit('receive_translated_audio', {
-          from: userId,
-          audioData,
-          language
-        });
-      }
-    });
-
-    // In-call text message translation
     socket.on('send_call_text', async (data) => {
-      const {
-        targetUserId,
-        text,
-        sourceLanguage,
-        targetLanguage,
-        shouldSpeak = true,
-        isFinal = true
-      } = data;
+      const { targetUserId, text, sourceLanguage, targetLanguage, shouldSpeak = true, isFinal = true } = data;
       const userId = socketToUser.get(socket.id);
+      if (!userId || !text) return;
 
-      if (!userId || !text || text.trim() === '') return;
-
+      const startedAt = Date.now();
       try {
-        const startedAt = Date.now();
-        const resolvedSourceLanguage = normalizeLanguage(
-          sourceLanguage,
-          await resolveUserPreferredLanguage(userId, 'en')
-        );
-        const resolvedTargetLanguage = normalizeLanguage(
-          targetLanguage,
-          await resolveUserPreferredLanguage(targetUserId, 'en')
-        );
+        const sLang = normalizeLanguage(sourceLanguage, 'en');
+        const rLang = normalizeLanguage(targetLanguage, 'en');
 
-        // Keep subtitle fast; synthesize speech only for final chunks/messages.
-        const translatedText = await aiTranslationService.translateText(
-          text.trim(),
-          resolvedSourceLanguage,
-          resolvedTargetLanguage
-        );
-        let audioBuffer = null;
-        if (shouldSpeak && isFinal) {
-          try {
-            audioBuffer = await aiTranslationService.textToSpeech(
-              translatedText,
-              resolvedTargetLanguage
-            );
-          } catch (err) {
-            console.error('TTS failed for call text:', err.message);
-          }
-        }
+        // 1. FAST TEXT TRANSLATION
+        const result = await aiTranslationService.translateText(text.trim(), sLang, rLang);
+        const translated = result.text;
+        const detectedSource = result.detected || sLang;
+        
         const latencyMs = Date.now() - startedAt;
+        const rSocketId = activeUsers.get(targetUserId);
 
-        const targetSocketId = activeUsers.get(targetUserId);
-        if (targetSocketId) {
-          // Send translated subtitle
-          io.to(targetSocketId).emit('receive_subtitle', {
+        if (rSocketId) {
+          // 2. EMIT SUBTITLE IMMEDIATELY
+          io.to(rSocketId).emit('receive_subtitle', {
             from: userId,
-            text: translatedText,
+            text: translated || text.trim(),
             originalText: text.trim(),
-            originalLanguage: resolvedSourceLanguage,
-            targetLanguage: resolvedTargetLanguage,
+            originalLanguage: detectedSource,
+            targetLanguage: rLang,
             latencyMs
           });
 
-          // Send TTS audio
-          if (audioBuffer) {
-            io.to(targetSocketId).emit('receive_translated_audio', {
-              from: userId,
-              audioData: Array.from(audioBuffer),
-              language: resolvedTargetLanguage
-            });
+          // 3. SYNTHESIZE SPEECH IN BACKGROUND
+          if (shouldSpeak && isFinal && translated) {
+            aiTranslationService.textToSpeech(translated, rLang)
+              .then(audio => {
+                if (audio) {
+                  io.to(rSocketId).emit('receive_translated_audio', {
+                    from: userId,
+                    audioData: Array.from(audio),
+                    language: rLang
+                  });
+                }
+              });
           }
         }
-
-        // Confirm to sender
-        socket.emit('call_text_sent', {
-          originalText: text.trim(),
-          translatedText,
-          targetLanguage: resolvedTargetLanguage,
-          latencyMs,
-          isFinal
-        });
-
-        console.log(`💬 Call text translated in ${latencyMs}ms: "${text}" → "${translatedText}"`);
-      } catch (error) {
-        console.error('send_call_text error:', error);
-        socket.emit('error', { message: 'Translation failed' });
-      }
+        socket.emit('call_text_sent', { originalText: text.trim(), translatedText: translated, latencyMs, isFinal });
+      } catch (e) { console.error('Call text error:', e); }
     });
 
-    // Handle typing indicators
-    socket.on('typing_start', (data) => {
-      const { receiverId } = data;
-      const userId = socketToUser.get(socket.id);
-
-      if (!userId) return;
-
-      const receiverSocketId = activeUsers.get(receiverId);
-      if (receiverSocketId) {
-        io.to(receiverSocketId).emit('user_typing', {
-          userId,
-          isTyping: true
-        });
-      }
+    socket.on('webrtc_offer', (data) => {
+      const target = activeUsers.get(data.to);
+      if (target) io.to(target).emit('webrtc_offer', { from: socketToUser.get(socket.id), offer: data.offer, callType: data.callType });
     });
 
-    socket.on('typing_stop', (data) => {
-      const { receiverId } = data;
-      const userId = socketToUser.get(socket.id);
-
-      if (!userId) return;
-
-      const receiverSocketId = activeUsers.get(receiverId);
-      if (receiverSocketId) {
-        io.to(receiverSocketId).emit('user_typing', {
-          userId,
-          isTyping: false
-        });
-      }
+    socket.on('webrtc_answer', (data) => {
+      const target = activeUsers.get(data.to);
+      if (target) io.to(target).emit('webrtc_answer', { from: socketToUser.get(socket.id), answer: data.answer });
     });
 
-    // Handle disconnection
-    socket.on('disconnect', async () => {
-      console.log(`🔌 Socket disconnected: ${socket.id}`);
+    socket.on('webrtc_ice_candidate', (data) => {
+      const target = activeUsers.get(data.to);
+      if (target) io.to(target).emit('webrtc_ice_candidate', { from: socketToUser.get(socket.id), candidate: data.candidate });
+    });
 
+    socket.on('disconnect', () => {
       const userId = socketToUser.get(socket.id);
       if (userId) {
-        // Clean up translation streams
+        activeUsers.delete(userId);
+        socketToUser.delete(socket.id);
         aiTranslationService.stopStream(userId);
-
-        // Remove from active users
-        activeUsers.delete(userId);
-        socketToUser.delete(socket.id);
-
-        // Update user offline status
-        try {
-          const user = await User.findById(userId);
-          if (user) {
-            user.isOnline = false;
-            user.lastSeen = new Date();
-            user.socketId = null;
-            await user.save();
-
-            // Notify other users
-            socket.broadcast.emit('user_offline', {
-              userId,
-              lastSeen: user.lastSeen
-            });
-          }
-        } catch (error) {
-          console.error('Error updating user offline status:', error);
-        }
+        socket.broadcast.emit('user_offline', { userId });
       }
-    });
-
-    // Handle manual logout
-    socket.on('logout', async () => {
-      const userId = socketToUser.get(socket.id);
-      if (userId) {
-        activeUsers.delete(userId);
-        socketToUser.delete(socket.id);
-
-        try {
-          const user = await User.findById(userId);
-          if (user) {
-            user.isOnline = false;
-            user.lastSeen = new Date();
-            user.socketId = null;
-            await user.save();
-          }
-        } catch (error) {
-          console.error('Error during logout:', error);
-        }
-      }
-
-      socket.disconnect();
     });
   });
 };
 
-module.exports = {
-  initializeSocket,
-  activeUsers,
-  socketToUser
-};
-
+module.exports = { initializeSocket };

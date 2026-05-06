@@ -1,53 +1,49 @@
-const User = require('../models/User');
+const supabase = require('../config/supabase');
 const { generateToken } = require('../middleware/auth');
-
-const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const bcrypt = require('bcryptjs');
 
 // @desc    Register user
 // @route   POST /api/auth/register
-// @access  Public
 const register = async (req, res, next) => {
   try {
     const { name, email, password, preferredLanguage } = req.body;
 
-    // Validation
     if (!name || !email || !password) {
-      return res.status(400).json({
-        success: false,
-        message: 'Please provide name, email, and password'
-      });
+      return res.status(400).json({ success: false, message: 'Missing fields' });
     }
 
-    // Check if user already exists
-    const existingUser = await User.findOne({ email: email.toLowerCase() });
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Check if user exists in profiles
+    const { data: existingUser } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('email', email.toLowerCase())
+      .single();
+
     if (existingUser) {
-      return res.status(400).json({
-        success: false,
-        message: 'User with this email already exists'
-      });
+      return res.status(400).json({ success: false, message: 'User already exists' });
     }
 
-    // Create user
-    const user = await User.create({
-      name: name.trim(),
-      email: email.toLowerCase().trim(),
-      password,
-      preferredLanguage: preferredLanguage || 'en'
-    });
+    // Insert into Supabase profiles
+    const { data: user, error } = await supabase
+      .from('profiles')
+      .insert({
+        name: name.trim(),
+        email: email.toLowerCase().trim(),
+        password: hashedPassword,
+        preferred_language: preferredLanguage || 'en'
+      })
+      .select()
+      .single();
 
-    // Generate token
-    const token = generateToken(user._id);
+    if (error) throw error;
 
-    // Return user data without password
-    const userData = user.toPublicProfile();
+    const token = generateToken(user.id);
 
     res.status(201).json({
       success: true,
-      message: 'User registered successfully',
-      data: {
-        user: userData,
-        token
-      }
+      data: { user: { id: user.id, name: user.name, email: user.email, preferredLanguage: user.preferred_language }, token }
     });
 
   } catch (error) {
@@ -57,63 +53,30 @@ const register = async (req, res, next) => {
 
 // @desc    Login user
 // @route   POST /api/auth/login
-// @access  Public
 const login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
+    if (!email || !password) return res.status(400).json({ success: false, message: 'Missing fields' });
 
-    // Validation
-    if (!email || !password) {
-      return res.status(400).json({
-        success: false,
-        message: 'Please provide email and password'
-      });
-    }
+    const { data: user, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('email', email.toLowerCase())
+      .single();
 
-    const identifier = email.toLowerCase().trim();
-    const safeIdentifier = escapeRegex(identifier);
+    if (error || !user) return res.status(401).json({ success: false, message: 'Invalid credentials' });
 
-    // Check if user exists by email or name and get password
-    const user = await User.findOne({
-      $or: [
-        { email: identifier },
-        { name: { $regex: `^${safeIdentifier}$`, $options: 'i' } }
-      ]
-    }).select('+password');
-    if (!user) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid credentials'
-      });
-    }
-
-    // Check password
-    const isPasswordValid = await user.comparePassword(password);
-    if (!isPasswordValid) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid credentials'
-      });
-    }
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) return res.status(401).json({ success: false, message: 'Invalid credentials' });
 
     // Update online status
-    user.isOnline = true;
-    user.lastSeen = new Date();
-    await user.save();
+    await supabase.from('profiles').update({ is_online: true, last_seen: new Date() }).eq('id', user.id);
 
-    // Generate token
-    const token = generateToken(user._id);
-
-    // Return user data without password
-    const userData = user.toPublicProfile();
+    const token = generateToken(user.id);
 
     res.status(200).json({
       success: true,
-      message: 'Login successful',
-      data: {
-        user: userData,
-        token
-      }
+      data: { user: { id: user.id, name: user.name, email: user.email, preferredLanguage: user.preferred_language }, token }
     });
 
   } catch (error) {
@@ -121,101 +84,41 @@ const login = async (req, res, next) => {
   }
 };
 
-// @desc    Get current user profile
-// @route   GET /api/auth/me
-// @access  Private
 const getMe = async (req, res, next) => {
   try {
-    const user = await User.findById(req.user._id);
+    const { data: user, error } = await supabase.from('profiles').select('*').eq('id', req.user.id).single();
+    if (error || !user) return res.status(404).json({ success: false, message: 'User not found' });
 
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found'
-      });
-    }
-
-    res.status(200).json({
-      success: true,
-      data: {
-        user: user.toPublicProfile()
-      }
-    });
-
+    res.status(200).json({ success: true, data: { user: { id: user.id, name: user.name, email: user.email, preferredLanguage: user.preferred_language } } });
   } catch (error) {
     next(error);
   }
 };
 
-// @desc    Update user profile
-// @route   PUT /api/auth/profile
-// @access  Private
 const updateProfile = async (req, res, next) => {
   try {
     const { name, preferredLanguage, profileImageUrl } = req.body;
+    const { data: user, error } = await supabase
+      .from('profiles')
+      .update({ name, preferred_language: preferredLanguage, profile_image_url: profileImageUrl })
+      .eq('id', req.user.id)
+      .select()
+      .single();
 
-    const updateData = {};
-    if (name !== undefined) updateData.name = name.trim();
-    if (preferredLanguage !== undefined) updateData.preferredLanguage = preferredLanguage;
-    if (profileImageUrl !== undefined) updateData.profileImageUrl = profileImageUrl;
-
-    const user = await User.findByIdAndUpdate(
-      req.user._id,
-      updateData,
-      {
-        new: true,
-        runValidators: true
-      }
-    );
-
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found'
-      });
-    }
-
-    res.status(200).json({
-      success: true,
-      message: 'Profile updated successfully',
-      data: {
-        user: user.toPublicProfile()
-      }
-    });
-
+    if (error) throw error;
+    res.status(200).json({ success: true, data: { user } });
   } catch (error) {
     next(error);
   }
 };
 
-// @desc    Logout user
-// @route   POST /api/auth/logout
-// @access  Private
 const logout = async (req, res, next) => {
   try {
-    // Update user's online status
-    const user = await User.findById(req.user._id);
-    if (user) {
-      user.isOnline = false;
-      user.lastSeen = new Date();
-      await user.save();
-    }
-
-    res.status(200).json({
-      success: true,
-      message: 'Logout successful'
-    });
-
+    await supabase.from('profiles').update({ is_online: false, last_seen: new Date() }).eq('id', req.user.id);
+    res.status(200).json({ success: true, message: 'Logged out' });
   } catch (error) {
     next(error);
   }
 };
 
-module.exports = {
-  register,
-  login,
-  getMe,
-  updateProfile,
-  logout
-};
-
+module.exports = { register, login, getMe, updateProfile, logout };

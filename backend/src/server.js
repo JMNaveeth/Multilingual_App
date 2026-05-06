@@ -11,8 +11,6 @@ require('dotenv').config();
 const connectDB = require('./config/database');
 const authRoutes = require('./routes/auth');
 const chatRoutes = require('./routes/chat');
-const userRoutes = require('./routes/user');
-const statsRoutes = require('./routes/stats');
 const { initializeSocket } = require('./services/socketService');
 const { errorHandler } = require('./middleware/errorHandler');
 
@@ -79,8 +77,6 @@ app.get('/health', (req, res) => {
 // API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/chat', chatRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api', statsRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {
@@ -96,18 +92,11 @@ initializeSocket(io);
 // Connect to database and start server
 const PORT = process.env.PORT || 3000;
 
-connectDB().then((dbConnection) => {
-  server.listen(PORT, () => {
-    console.log(`🚀 Server running on port ${PORT}`);
-    console.log(`📱 Client URL: ${process.env.CLIENT_URL || 'http://localhost:3000'}`);
-    console.log(`🔧 Environment: ${process.env.NODE_ENV || 'development'}`);
-    if (!dbConnection) {
-      console.log('🧪 Running in fallback mode: DB-backed API features may be limited.');
-    }
-  });
-}).catch((error) => {
-  console.error('Failed to connect to database:', error);
-  process.exit(1);
+server.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`📱 Client URL: ${process.env.CLIENT_URL || 'http://localhost:3000'}`);
+  console.log(`🔧 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`⚡ Database: Supabase Integrated`);
 });
 
 // Graceful shutdown

@@ -1,50 +1,34 @@
-const Message = require('../models/Message');
-const User = require('../models/User');
+const supabase = require('../config/supabase');
 
 // @desc    Send a message
 // @route   POST /api/chat/messages
 // @access  Private
 const sendMessage = async (req, res, next) => {
   try {
-    const { receiverId, content, type = 'text', mediaUrl, metadata } = req.body;
+    const { receiverId, content, type = 'text', metadata } = req.body;
 
-    // Validation
     if (!receiverId || !content) {
-      return res.status(400).json({
-        success: false,
-        message: 'Receiver ID and content are required'
-      });
+      return res.status(400).json({ success: false, message: 'Receiver ID and content are required' });
     }
 
-    // Check if receiver exists
-    const receiver = await User.findById(receiverId);
-    if (!receiver) {
-      return res.status(404).json({
-        success: false,
-        message: 'Receiver not found'
-      });
-    }
+    const { data: message, error } = await supabase
+      .from('messages')
+      .insert({
+        sender_id: req.user.id,
+        receiver_id: receiverId,
+        content: content.trim(),
+        type,
+        metadata: metadata || {}
+      })
+      .select()
+      .single();
 
-    // Create message
-    const message = await Message.create({
-      sender: req.user._id,
-      receiver: receiverId,
-      content: content.trim(),
-      type,
-      mediaUrl,
-      metadata: metadata || {}
-    });
-
-    // Populate sender and receiver data
-    await message.populate('sender', 'name email profileImageUrl isOnline');
-    await message.populate('receiver', 'name email profileImageUrl isOnline');
+    if (error) throw error;
 
     res.status(201).json({
       success: true,
       message: 'Message sent successfully',
-      data: {
-        message
-      }
+      data: { message }
     });
 
   } catch (error) {
@@ -58,53 +42,20 @@ const sendMessage = async (req, res, next) => {
 const getConversation = async (req, res, next) => {
   try {
     const { userId } = req.params;
-    const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 50;
-    const skip = (page - 1) * limit;
 
-    // Check if user exists
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found'
-      });
-    }
+    const { data: messages, error } = await supabase
+      .from('messages')
+      .select('*')
+      .or(`and(sender_id.eq.${req.user.id},receiver_id.eq.${userId}),and(sender_id.eq.${userId},receiver_id.eq.${req.user.id})`)
+      .order('created_at', { ascending: false })
+      .limit(limit);
 
-    // Get messages
-    const messages = await Message.getConversation(req.user._id, userId, limit, skip);
-
-    // Mark messages as delivered (from the other user to current user)
-    await Message.markAsDelivered(userId, req.user._id);
-
-    // Get total count for pagination
-    const totalMessages = await Message.countDocuments({
-      $or: [
-        { sender: req.user._id, receiver: userId },
-        { sender: userId, receiver: req.user._id }
-      ]
-    });
+    if (error) throw error;
 
     res.status(200).json({
       success: true,
-      data: {
-        messages,
-        pagination: {
-          page,
-          limit,
-          total: totalMessages,
-          pages: Math.ceil(totalMessages / limit)
-        },
-        user: {
-          id: user._id,
-          name: user.name,
-          email: user.email,
-          profileImageUrl: user.profileImageUrl,
-          isOnline: user.isOnline,
-          preferredLanguage: user.preferredLanguage,
-          lastSeen: user.lastSeen
-        }
-      }
+      data: { messages: messages.reverse() }
     });
 
   } catch (error) {
@@ -119,26 +70,16 @@ const markAsRead = async (req, res, next) => {
   try {
     const { userId } = req.params;
 
-    // Check if user exists
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found'
-      });
-    }
+    const { error } = await supabase
+      .from('messages')
+      .update({ status: 'read' })
+      .eq('sender_id', userId)
+      .eq('receiver_id', req.user.id)
+      .neq('status', 'read');
 
-    // Mark messages as read
-    const result = await Message.markAsRead(userId, req.user._id);
+    if (error) throw error;
 
-    res.status(200).json({
-      success: true,
-      message: 'Messages marked as read',
-      data: {
-        modifiedCount: result.modifiedCount
-      }
-    });
-
+    res.status(200).json({ success: true, message: 'Messages marked as read' });
   } catch (error) {
     next(error);
   }
@@ -149,85 +90,34 @@ const markAsRead = async (req, res, next) => {
 // @access  Private
 const getConversationsList = async (req, res, next) => {
   try {
-    // Get all users the current user has chatted with
-    const conversations = await Message.aggregate([
-      {
-        $match: {
-          $or: [
-            { sender: req.user._id },
-            { receiver: req.user._id }
-          ]
-        }
-      },
-      {
-        $sort: { createdAt: -1 }
-      },
-      {
-        $group: {
-          _id: {
-            $cond: {
-              if: { $eq: ['$sender', req.user._id] },
-              then: '$receiver',
-              else: '$sender'
-            }
-          },
-          lastMessage: { $first: '$$ROOT' },
-          unreadCount: {
-            $sum: {
-              $cond: [
-                {
-                  $and: [
-                    { $eq: ['$receiver', req.user._id] },
-                    { $ne: ['$status', 'read'] }
-                  ]
-                },
-                1,
-                0
-              ]
-            }
-          }
-        }
-      },
-      {
-        $lookup: {
-          from: 'users',
-          localField: '_id',
-          foreignField: '_id',
-          as: 'user'
-        }
-      },
-      {
-        $unwind: '$user'
-      },
-      {
-        $project: {
-          _id: 0,
-          user: {
-            id: '$user._id',
-            name: '$user.name',
-            email: '$user.email',
-            profileImageUrl: '$user.profileImageUrl',
-            isOnline: '$user.isOnline',
-            preferredLanguage: '$user.preferredLanguage',
-            lastSeen: '$user.lastSeen'
-          },
-          lastMessage: {
-            id: '$lastMessage._id',
-            content: '$lastMessage.content',
-            type: '$lastMessage.type',
-            status: '$lastMessage.status',
-            createdAt: '$lastMessage.createdAt'
-          },
-          unreadCount: 1
-        }
+    // Note: Supabase/Postgres logic for grouping conversations is different from MongoDB
+    // This is a simplified version; in production, you might use a dedicated RPC or view
+    const { data: messages, error } = await supabase
+      .from('messages')
+      .select('*, sender_id, receiver_id')
+      .or(`sender_id.eq.${req.user.id},receiver_id.eq.${req.user.id}`)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    // Logic to group by conversation partner
+    const conversationsMap = new Map();
+    messages.forEach(msg => {
+      const partnerId = msg.sender_id === req.user.id ? msg.receiver_id : msg.sender_id;
+      if (!conversationsMap.has(partnerId)) {
+        conversationsMap.set(partnerId, {
+          partnerId,
+          lastMessage: msg,
+          unreadCount: (msg.receiver_id === req.user.id && msg.status !== 'read') ? 1 : 0
+        });
+      } else if (msg.receiver_id === req.user.id && msg.status !== 'read') {
+        conversationsMap.get(partnerId).unreadCount++;
       }
-    ]);
+    });
 
     res.status(200).json({
       success: true,
-      data: {
-        conversations
-      }
+      data: { conversations: Array.from(conversationsMap.values()) }
     });
 
   } catch (error) {
@@ -242,30 +132,15 @@ const deleteMessage = async (req, res, next) => {
   try {
     const { messageId } = req.params;
 
-    const message = await Message.findById(messageId);
+    const { error } = await supabase
+      .from('messages')
+      .delete()
+      .eq('id', messageId)
+      .eq('sender_id', req.user.id);
 
-    if (!message) {
-      return res.status(404).json({
-        success: false,
-        message: 'Message not found'
-      });
-    }
+    if (error) throw error;
 
-    // Check if user owns the message
-    if (message.sender.toString() !== req.user._id.toString()) {
-      return res.status(403).json({
-        success: false,
-        message: 'Not authorized to delete this message'
-      });
-    }
-
-    await Message.findByIdAndDelete(messageId);
-
-    res.status(200).json({
-      success: true,
-      message: 'Message deleted successfully'
-    });
-
+    res.status(200).json({ success: true, message: 'Message deleted successfully' });
   } catch (error) {
     next(error);
   }
@@ -278,4 +153,3 @@ module.exports = {
   getConversationsList,
   deleteMessage
 };
-

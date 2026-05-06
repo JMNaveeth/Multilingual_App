@@ -582,7 +582,7 @@ class _CallScreenState extends ConsumerState<CallScreen> {
     final now = DateTime.now();
     final msSinceLast = now.difference(_lastSpeechSentAt).inMilliseconds;
     final shouldSend =
-        result.finalResult || deltaText.length >= 12 || msSinceLast >= 900;
+        result.finalResult || deltaText.length >= 6 || msSinceLast >= 400;
 
     if (shouldSend && deltaText.isNotEmpty) {
       _sendLiveSpeechText(deltaText);
