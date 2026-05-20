@@ -3,9 +3,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:multilingual_chat_app/providers/auth_provider.dart';
-import 'package:multilingual_chat_app/screens/auth/login_screen.dart';
-import 'package:multilingual_chat_app/screens/auth/register_screen.dart';
-import 'package:multilingual_chat_app/screens/home/home_screen.dart';
+import 'package:multilingual_chat_app/Auth/login_screen.dart';
+import 'package:multilingual_chat_app/Auth/register_screen.dart';
+import 'package:multilingual_chat_app/screens/home_screen.dart';
 import 'package:multilingual_chat_app/services/supabase_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 

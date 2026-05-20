@@ -17,7 +17,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:multilingual_chat_app/screens/discover/discover_games.dart';
+import 'package:multilingual_chat_app/screens/discover_games.dart';
 
 // ---------------------------------------------------------------------------
 // Design tokens

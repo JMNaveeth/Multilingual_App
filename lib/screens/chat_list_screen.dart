@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:multilingual_chat_app/models/user.dart';
 import 'package:multilingual_chat_app/providers/auth_provider.dart';
-import 'package:multilingual_chat_app/screens/chat/chat_screen.dart';
+import 'package:multilingual_chat_app/screens/chat_screen.dart';
 import 'package:multilingual_chat_app/widgets/user_list_item.dart';
 
 import 'package:multilingual_chat_app/services/auth_service.dart';

@@ -3,7 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:multilingual_chat_app/providers/auth_provider.dart';
-import 'package:multilingual_chat_app/screens/auth/register_screen.dart';
+import 'package:multilingual_chat_app/Auth/register_screen.dart';
 
 // ── Nexus tokens ─────────────────────────────────────────────────────────────
 class _N {

@@ -21,7 +21,7 @@ import 'package:multilingual_chat_app/models/message.dart';
 import 'package:multilingual_chat_app/models/user.dart';
 import 'package:multilingual_chat_app/providers/auth_provider.dart';
 import 'package:multilingual_chat_app/providers/call_history_provider.dart';
-import 'package:multilingual_chat_app/screens/chat/call_screen.dart';
+import 'package:multilingual_chat_app/screens/call_screen.dart';
 import 'package:multilingual_chat_app/services/call_socket_service.dart';
 import 'package:multilingual_chat_app/services/chat_service.dart';
 

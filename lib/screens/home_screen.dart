@@ -1,6 +1,6 @@
 import 'dart:io';
 import 'dart:ui';
-import 'package:multilingual_chat_app/screens/contacts/contacts_screen.dart';
+import 'package:multilingual_chat_app/screens/contacts_screen.dart';
 import 'package:flutter_contacts/flutter_contacts.dart' as fc;
 
 import 'package:flutter/material.dart';
@@ -10,9 +10,9 @@ import 'package:intl/intl.dart';
 import 'package:multilingual_chat_app/models/call_history_entry.dart';
 import 'package:multilingual_chat_app/providers/auth_provider.dart';
 import 'package:multilingual_chat_app/providers/call_history_provider.dart';
-import 'package:multilingual_chat_app/screens/chat/chat_list_screen.dart';
-import 'package:multilingual_chat_app/screens/discover/discover_screen.dart';
-import 'package:multilingual_chat_app/screens/profile/profile_screen.dart';
+import 'package:multilingual_chat_app/screens/chat_list_screen.dart';
+import 'package:multilingual_chat_app/screens/discover_screen.dart';
+import 'package:multilingual_chat_app/screens/profile_screen.dart';
 
 // ── Nexus Design Tokens ─────────────────────────────────────────────────────
 class _N {
