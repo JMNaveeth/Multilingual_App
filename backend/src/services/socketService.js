@@ -197,6 +197,31 @@ const initializeSocket = (io) => {
       } catch (e) { console.error('Call text error:', e); }
     });
 
+    socket.on('call_user', (data) => {
+      const target = activeUsers.get(data.userToCall);
+      if (target) {
+        io.to(target).emit('call_user', { 
+          from: socketToUser.get(socket.id), 
+          name: data.name, 
+          signal: data.signalData 
+        });
+      }
+    });
+
+    socket.on('answer_call', (data) => {
+      const target = activeUsers.get(data.to);
+      if (target) {
+        io.to(target).emit('call_accepted', data.signal);
+      }
+    });
+
+    socket.on('end_call', (data) => {
+      const target = activeUsers.get(data.to);
+      if (target) {
+        io.to(target).emit('call_ended', { from: socketToUser.get(socket.id) });
+      }
+    });
+
     socket.on('webrtc_offer', (data) => {
       const target = activeUsers.get(data.to);
       if (target) io.to(target).emit('webrtc_offer', { from: socketToUser.get(socket.id), offer: data.offer, callType: data.callType });

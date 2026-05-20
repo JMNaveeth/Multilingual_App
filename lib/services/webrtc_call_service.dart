@@ -3,6 +3,7 @@ import 'package:flutter_webrtc/flutter_webrtc.dart';
 class WebRtcCallService {
   final bool isVideoCall;
   final Future<void> Function(Map<String, dynamic> candidate) onLocalCandidate;
+  final void Function(RTCPeerConnectionState state)? onConnectionState;
 
   final RTCVideoRenderer localRenderer = RTCVideoRenderer();
   final RTCVideoRenderer remoteRenderer = RTCVideoRenderer();
@@ -19,6 +20,7 @@ class WebRtcCallService {
   WebRtcCallService({
     required this.isVideoCall,
     required this.onLocalCandidate,
+    this.onConnectionState,
   });
 
   Future<void> initialize() async {
@@ -35,9 +37,9 @@ class WebRtcCallService {
 
     final configuration = <String, dynamic>{
       'iceServers': [
-        {'urls': 'stun:stun.l.google.com:19302'},
-        {'urls': 'stun:stun1.l.google.com:19302'},
-        {'urls': 'stun:stun2.l.google.com:19302'},
+        {'urls': ['stun:stun.l.google.com:19302']},
+        {'urls': ['stun:stun1.l.google.com:19302']},
+        {'urls': ['stun:stun2.l.google.com:19302']},
         // TURN servers for reliable connectivity behind NATs/firewalls
         {
           'urls': [
@@ -61,6 +63,16 @@ class WebRtcCallService {
       }
     };
 
+    _peerConnection!.onAddStream = (MediaStream stream) {
+      remoteRenderer.srcObject = stream;
+    };
+
+    _peerConnection!.onConnectionState = (RTCPeerConnectionState state) {
+      if (onConnectionState != null) {
+        onConnectionState!(state);
+      }
+    };
+
     _peerConnection!.onIceCandidate = (RTCIceCandidate candidate) {
       final rawCandidate = candidate.candidate;
       if (rawCandidate == null || rawCandidate.isEmpty) {
@@ -80,13 +92,27 @@ class WebRtcCallService {
   }
 
   Future<RTCSessionDescription> createOffer() async {
-    final offer = await _peerConnection!.createOffer(<String, dynamic>{});
+    final constraints = <String, dynamic>{
+      'mandatory': {
+        'OfferToReceiveAudio': true,
+        'OfferToReceiveVideo': isVideoCall,
+      },
+      'optional': [],
+    };
+    final offer = await _peerConnection!.createOffer(constraints);
     await _peerConnection!.setLocalDescription(offer);
     return offer;
   }
 
   Future<RTCSessionDescription> createAnswer() async {
-    final answer = await _peerConnection!.createAnswer(<String, dynamic>{});
+    final constraints = <String, dynamic>{
+      'mandatory': {
+        'OfferToReceiveAudio': true,
+        'OfferToReceiveVideo': isVideoCall,
+      },
+      'optional': [],
+    };
+    final answer = await _peerConnection!.createAnswer(constraints);
     await _peerConnection!.setLocalDescription(answer);
     return answer;
   }
