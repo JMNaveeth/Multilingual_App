@@ -241,10 +241,6 @@ class ChatService {
     }
 
     final row = rows.first;
-    if (row is! Map) {
-      return null;
-    }
-
     return _fromRow(row.map((k, v) => MapEntry(k.toString(), v)));
   }
 

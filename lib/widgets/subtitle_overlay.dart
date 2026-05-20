@@ -103,6 +103,8 @@ class _SubtitleOverlayState extends ConsumerState<SubtitleOverlay>
           historyCount: history.length,
           onOpenHistory:
               history.isNotEmpty ? () => _openHistory(context, history) : null,
+          bannerText: widget.bannerText,
+          isListening: widget.isListening,
         ),
         const SizedBox(height: 8),
 

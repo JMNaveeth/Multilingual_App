@@ -14,8 +14,7 @@ class _G {
   static const violet = Color(0xFF8B5CF6);
   static const cyan = Color(0xFF22D3EE);
   static const emerald = Color(0xFF10B981);
-  
-  static var amber;
+  static const amber = Color(0xFFFBBF24);
 }
 
 class WordSprintGameScreen extends StatefulWidget {

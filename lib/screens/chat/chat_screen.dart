@@ -117,7 +117,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   bool _speechReady = false;
   String _currentVoiceTranscript = '';
   String _lastNonEmptyVoiceTranscript = '';
-  bool _speechDetected = false;
   RichMessage? _replyingTo;
   final Set<String> _selectedMessageIds = <String>{};
 
@@ -374,33 +373,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       contactName: meta['contactName']?.toString(),
       contactPhone: meta['contactPhone']?.toString(),
     );
-  }
-
-  Future<RichMessage> _fromIncomingMessage(Message message) async {
-    final meta = message.metadata ?? const <String, dynamic>{};
-    final translatedAudio = meta['translatedAudioData'];
-    if (message.type == MessageType.audio &&
-        translatedAudio is List &&
-        translatedAudio.isNotEmpty) {
-      try {
-        final bytes = List<int>.from(translatedAudio);
-        final path =
-            '${Directory.systemTemp.path}/translated_voice_${DateTime.now().microsecondsSinceEpoch}.mp3';
-        await File(path).writeAsBytes(bytes, flush: true);
-        return RichMessage(
-          message: message.copyWith(
-            metadata: {
-              ...meta,
-              'audioPath': path,
-            },
-          ),
-          audioPath: path,
-        );
-      } catch (e) {
-        debugPrint('Failed to save translated voice audio: $e');
-      }
-    }
-    return _fromMessage(message);
   }
 
   Future<void> _showMessageActions(RichMessage rm, bool isMe) async {
@@ -676,7 +648,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                 separatorBuilder: (_, __) => Divider(color: _N.cardBorder),
                 itemBuilder: (_, index) {
                   final contact = contacts[index];
-                  final name = contact.displayName ?? contact.name.first ?? 'Unknown';
+                  final name = contact.displayName.isNotEmpty
+                      ? contact.displayName
+                      : (contact.name.first.isNotEmpty ? contact.name.first : 'Unknown');
                   final phone = contact.phones.firstOrNull?.number ?? '';
 
                   return ListTile(
@@ -1331,7 +1305,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   void _onSpeechResult(SpeechRecognitionResult result) {
     final recognized = result.recognizedWords.trim();
     if (recognized.isNotEmpty) {
-      _speechDetected = true;
       _lastNonEmptyVoiceTranscript = recognized;
       debugPrint(
           'Speech detected: $recognized (isFinal: ${result.finalResult})');
@@ -1505,7 +1478,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     try {
       _currentVoiceTranscript = '';
       _lastNonEmptyVoiceTranscript = '';
-      _speechDetected = false;
 
       final audioStarted = await _startAudioCapture();
       if (!audioStarted) {
@@ -1594,10 +1566,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         audioPath: audioPath,
       );
 
-      // Clear state after sending
       _currentVoiceTranscript = '';
       _lastNonEmptyVoiceTranscript = '';
-      _speechDetected = false;
     } catch (e) {
       debugPrint('Error stopping/sending voice message: $e');
       if (!mounted) return;
