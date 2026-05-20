@@ -155,14 +155,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
             ),
 
             // Title
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 20, vertical: 14),
               child: Row(
                 children: [
-                  const Icon(Icons.image_rounded,
+                  Icon(Icons.image_rounded,
                       color: _N.indigoLight, size: 18),
-                  const SizedBox(width: 10),
-                  const Text(
+                  SizedBox(width: 10),
+                  Text(
                     'Update Profile Photo',
                     style: TextStyle(
                       color: _N.textPrimary,
@@ -252,7 +252,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
             Expanded(
               child: Text(
                 label,
-                style: TextStyle(
+                style: const TextStyle(
                   color: _N.textPrimary,
                   fontSize: 15,
                   fontWeight: FontWeight.w500,
