@@ -111,6 +111,45 @@ class AuthService {
     return RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email);
   }
 
+  bool _isProfileIdFormat(String value) {
+    return RegExp(r'^EC-\d{8}$').hasMatch(value);
+  }
+
+  String _normalizeProfileId(String value) {
+    final trimmed = value.trim();
+    if (_isProfileIdFormat(trimmed)) {
+      return trimmed;
+    }
+
+    if (RegExp(r'^\d{8}$').hasMatch(trimmed)) {
+      return 'EC-$trimmed';
+    }
+
+    return trimmed.startsWith('EC-') ? trimmed : 'EC-$trimmed';
+  }
+
+  Future<String> _generateUniqueProfileId() async {
+    final random = math.Random();
+
+    while (true) {
+      final buffer = StringBuffer();
+      for (var index = 0; index < 8; index++) {
+        buffer.write(random.nextInt(10));
+      }
+
+        final candidate = 'EC-${buffer.toString()}';
+      final existing = await _client
+          .from('profiles')
+          .select('id')
+          .eq('profile_id', candidate)
+          .limit(1);
+
+      if (existing.isEmpty) {
+        return candidate;
+      }
+    }
+  }
+
   Map<String, dynamic> _userToProfileMap(app_model.User user) {
     return {
       'id': user.id,
@@ -149,30 +188,53 @@ class AuthService {
         await _client.from('profiles').select().eq('id', authUser.id).limit(1);
 
     if (rows.isNotEmpty) {
+      final existing = Map<String, dynamic>.from(rows.first);
+      final existingProfileId =
+          (existing['profileId'] ?? existing['profile_id'] ?? '').toString();
+
+      if (existingProfileId.trim().isEmpty) {
+        final generatedProfileId = await _generateUniqueProfileId();
+        final updated = await _client
+            .from('profiles')
+            .update({
+              'profile_id': generatedProfileId,
+              'updated_at': DateTime.now().toIso8601String(),
+            })
+            .eq('id', authUser.id)
+            .select()
+            .single();
+
+        return _profileToUser(
+          Map<String, dynamic>.from(updated),
+          fallbackEmail: authUser.email,
+        );
+      }
+
+      if (!_isProfileIdFormat(existingProfileId)) {
+        final normalizedProfileId = _normalizeProfileId(existingProfileId);
+        final updated = await _client
+            .from('profiles')
+            .update({
+              'profile_id': normalizedProfileId,
+              'updated_at': DateTime.now().toIso8601String(),
+            })
+            .eq('id', authUser.id)
+            .select()
+            .single();
+
+        return _profileToUser(
+          Map<String, dynamic>.from(updated),
+          fallbackEmail: authUser.email,
+        );
+      }
+
       return _profileToUser(
-        Map<String, dynamic>.from(rows.first),
+        existing,
         fallbackEmail: authUser.email,
       );
     }
 
-    String generatedProfileId = '';
-    final random = math.Random();
-    while (true) {
-      final idBuffer = StringBuffer();
-      for (int i = 0; i < 8; i++) {
-        idBuffer.write(random.nextInt(10).toString());
-      }
-      generatedProfileId = idBuffer.toString();
-
-      final existing = await _client
-          .from('profiles')
-          .select('id')
-          .eq('profile_id', generatedProfileId)
-          .limit(1);
-      if (existing.isEmpty) {
-        break;
-      }
-    }
+    final generatedProfileId = await _generateUniqueProfileId();
 
     final payload = {
       'id': authUser.id,

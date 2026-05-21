@@ -15,6 +15,13 @@ create table if not exists public.profiles (
   updated_at timestamptz not null default now()
 );
 
+-- Backfill for existing databases that were created before profile_id existed.
+alter table public.profiles
+  add column if not exists profile_id text;
+
+create unique index if not exists idx_profiles_profile_id_unique
+  on public.profiles(profile_id);
+
 create table if not exists public.messages (
   id uuid primary key default gen_random_uuid(),
   sender_id uuid not null references public.profiles(id) on delete cascade,
