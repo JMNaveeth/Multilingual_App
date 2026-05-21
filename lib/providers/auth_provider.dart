@@ -104,6 +104,11 @@ class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
     }
   }
 
+  Future<User> addFriendByProfileId(String profileId) async {
+    final addedFriend = await _authService.addFriendByProfileId(profileId);
+    return addedFriend;
+  }
+
   Future<String> uploadProfileImage(File imageFile) async {
     return await _authService.uploadProfileImage(imageFile);
   }

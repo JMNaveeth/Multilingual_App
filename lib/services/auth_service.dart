@@ -254,6 +254,64 @@ class AuthService {
         fallbackEmail: authUser.email);
   }
 
+  Future<app_model.User?> getUserByProfileId(String profileId) async {
+    if (!SupabaseService.isConfigured) {
+      return null;
+    }
+
+    final normalizedProfileId = _normalizeProfileId(profileId);
+    if (!_isProfileIdFormat(normalizedProfileId)) {
+      return null;
+    }
+
+    final rows = await _client
+        .from('profiles')
+        .select()
+        .eq('profile_id', normalizedProfileId)
+        .limit(1);
+
+    if (rows.isEmpty) {
+      return null;
+    }
+
+    return _profileToUser(
+      Map<String, dynamic>.from(rows.first),
+      fallbackEmail: rows.first['email']?.toString(),
+    );
+  }
+
+  Future<app_model.User> addFriendByProfileId(String profileId) async {
+    final current = await getCurrentUser();
+    if (current == null) {
+      throw Exception('Not authenticated');
+    }
+
+    final target = await getUserByProfileId(profileId);
+    if (target == null) {
+      throw Exception('No user found with that Profile ID.');
+    }
+
+    if (target.id == current.id) {
+      throw Exception('You cannot add yourself as a friend.');
+    }
+
+    final existing = await _client
+        .from('friends')
+        .select('id')
+        .eq('user_id', current.id)
+        .eq('friend_id', target.id)
+        .limit(1);
+
+    if (existing.isEmpty) {
+      await _client.from('friends').insert({
+        'user_id': current.id,
+        'friend_id': target.id,
+      });
+    }
+
+    return target;
+  }
+
   Future<Map<String, dynamic>> login(String email, String password) async {
     if (!SupabaseService.isConfigured) {
       throw Exception(

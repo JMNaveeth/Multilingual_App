@@ -1,8 +1,3 @@
-import 'dart:io';
-import 'dart:ui';
-import 'package:multilingual_chat_app/screens/contacts_screen.dart';
-import 'package:flutter_contacts/flutter_contacts.dart' as fc;
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -786,22 +781,144 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   Future<void> _openNewChat() async {
+    await _showAddFriendDialog();
+  }
+
+  Future<void> _showAddFriendDialog() async {
+    final profileIdController = TextEditingController();
+
     try {
-      if (Platform.isAndroid || Platform.isIOS) {
-        final granted = await _requestContactsPermission();
-        if (granted) {
-          if (mounted) {
-            Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const ContactsScreen()));
-          }
-        } else {
-          _snack('Contacts permission denied');
-        }
-      } else {
-        _snack('Not available on this platform');
-      }
-    } catch (e) {
-      _snack('Error: $e');
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) {
+          bool isAdding = false;
+
+          return StatefulBuilder(
+            builder: (context, setDialogState) {
+              return AlertDialog(
+                backgroundColor: _N.surface,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(24),
+                  side: const BorderSide(color: _N.cardBorder),
+                ),
+                title: const Text(
+                  'Add Friend',
+                  style: TextStyle(
+                    color: _N.textPrimary,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Enter the other user\'s Profile ID like EC-12345678.',
+                      style: TextStyle(color: _N.textSecondary, fontSize: 13),
+                    ),
+                    const SizedBox(height: 14),
+                    TextField(
+                      controller: profileIdController,
+                      autofocus: true,
+                      textCapitalization: TextCapitalization.characters,
+                      style: const TextStyle(color: _N.textPrimary),
+                      decoration: InputDecoration(
+                        hintText: 'EC-12345678',
+                        hintStyle:
+                            const TextStyle(color: _N.textMuted, fontSize: 13),
+                        filled: true,
+                        fillColor: _N.card,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: const BorderSide(color: _N.cardBorder),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: const BorderSide(color: _N.cardBorder),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide:
+                              const BorderSide(color: _N.indigoLight, width: 1.6),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    const Text(
+                      'After confirming, the user will appear in your chat list.',
+                      style: TextStyle(color: _N.textMuted, fontSize: 12),
+                    ),
+                  ],
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: isAdding
+                        ? null
+                        : () => Navigator.of(dialogContext).pop(),
+                    child: const Text('Cancel'),
+                  ),
+                  ElevatedButton(
+                    onPressed: isAdding
+                        ? null
+                        : () async {
+                            final entered = profileIdController.text.trim();
+                            if (entered.isEmpty) {
+                              _snack('Enter a Profile ID first');
+                              return;
+                            }
+
+                            setDialogState(() => isAdding = true);
+                            try {
+                              final friend = await ref
+                                  .read(authProvider.notifier)
+                                  .addFriendByProfileId(entered);
+
+                              ref.invalidate(chatListProvider);
+
+                              if (dialogContext.mounted) {
+                                Navigator.of(dialogContext).pop();
+                                _snack('Added ${friend.name} to your friends');
+                              }
+                            } catch (e) {
+                              if (mounted) {
+                                final raw = e.toString();
+                                final cleanMsg = raw.startsWith('Exception: ')
+                                    ? raw.substring(11)
+                                    : raw;
+                                _snack(cleanMsg);
+                              }
+                            } finally {
+                              if (dialogContext.mounted) {
+                                setDialogState(() => isAdding = false);
+                              }
+                            }
+                          },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _N.indigo,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: isAdding
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Text('Confirm'),
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      );
+    } finally {
+      profileIdController.dispose();
     }
   }
 
@@ -815,15 +932,4 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     ));
   }
 
-  Future<bool> _requestContactsPermission() async {
-    try {
-      if (Platform.isAndroid || Platform.isIOS) {
-        return await fc.FlutterContacts.requestPermission();
-      }
-      return false;
-    } catch (e) {
-      debugPrint('Contacts permission error: $e');
-      return false;
-    }
-  }
 }
