@@ -838,8 +838,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(14),
-                          borderSide:
-                              const BorderSide(color: _N.indigoLight, width: 1.6),
+                          borderSide: const BorderSide(
+                              color: _N.indigoLight, width: 1.6),
                         ),
                       ),
                     ),
@@ -931,5 +931,4 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
     ));
   }
-
 }
