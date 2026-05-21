@@ -93,15 +93,6 @@ class ChatListScreen extends ConsumerWidget {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (err, stack) => Center(child: Text('Error: $err')),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          // TODO: Implement search/add new contact functionality
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Add contact feature coming soon!')),
-          );
-        },
-        child: const Icon(Icons.add),
-      ),
     );
   }
 }
