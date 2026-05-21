@@ -28,10 +28,19 @@ class User {
       email: json['email'],
       name: json['name'],
       profileImageUrl: json['profileImageUrl'] ?? json['profile_image_url'],
-      preferredLanguage: json['preferredLanguage'] ?? json['preferred_language'] ?? 'en',
+      preferredLanguage:
+          json['preferredLanguage'] ?? json['preferred_language'] ?? 'en',
       isOnline: json['isOnline'] ?? json['is_online'] ?? false,
-      lastSeen: json['lastSeen'] != null ? DateTime.parse(json['lastSeen']) : (json['last_seen'] != null ? DateTime.parse(json['last_seen']) : null),
-      createdAt: json['createdAt'] != null ? DateTime.parse(json['createdAt']) : (json['created_at'] != null ? DateTime.parse(json['created_at']) : DateTime.now()),
+      lastSeen: json['lastSeen'] != null
+          ? DateTime.parse(json['lastSeen'])
+          : (json['last_seen'] != null
+              ? DateTime.parse(json['last_seen'])
+              : null),
+      createdAt: json['createdAt'] != null
+          ? DateTime.parse(json['createdAt'])
+          : (json['created_at'] != null
+              ? DateTime.parse(json['created_at'])
+              : DateTime.now()),
     );
   }
 
@@ -73,4 +82,3 @@ class User {
     );
   }
 }
-

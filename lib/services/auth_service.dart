@@ -28,10 +28,12 @@ class AuthService {
     if (error is AuthException) {
       final code = error.code ?? '';
       final msg = error.message;
-      if (code == 'email_not_confirmed' || msg.toLowerCase().contains('email not confirmed')) {
+      if (code == 'email_not_confirmed' ||
+          msg.toLowerCase().contains('email not confirmed')) {
         return 'Email not confirmed. Please check your inbox for the verification link.';
       }
-      if (code == 'invalid_credentials' || msg.toLowerCase().contains('invalid login credentials')) {
+      if (code == 'invalid_credentials' ||
+          msg.toLowerCase().contains('invalid login credentials')) {
         return 'Invalid email or password.';
       }
       return msg;
@@ -162,7 +164,11 @@ class AuthService {
       }
       generatedProfileId = idBuffer.toString();
 
-      final existing = await _client.from('profiles').select('id').eq('profile_id', generatedProfileId).limit(1);
+      final existing = await _client
+          .from('profiles')
+          .select('id')
+          .eq('profile_id', generatedProfileId)
+          .limit(1);
       if (existing.isEmpty) {
         break;
       }

@@ -133,7 +133,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       }
       if (mounted) {
         final raw = e.toString();
-        final cleanMsg = raw.startsWith('Exception: ') ? raw.substring(11) : raw;
+        final cleanMsg =
+            raw.startsWith('Exception: ') ? raw.substring(11) : raw;
         _snack('Login failed: $cleanMsg', _N.rose);
       }
     } finally {
@@ -509,25 +510,25 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         const SizedBox(width: 10),
         Expanded(
           child: TextFormField(
-              controller: controller,
-              focusNode: focusNode,
-              obscureText: obscure,
-              keyboardType: keyboardType,
-              readOnly: false,
-              autofocus: false,
-              onTap: () => FocusScope.of(context).requestFocus(focusNode),
-              style: const TextStyle(color: _N.textPrimary, fontSize: 14.5),
-              cursorColor: _N.indigoLight,
-              validator: validator,
-              decoration: InputDecoration(
-                hintText: hint,
-                hintStyle: const TextStyle(color: _N.textMuted, fontSize: 14.5),
-                border: InputBorder.none,
-                isDense: true,
-                contentPadding: const EdgeInsets.symmetric(vertical: 15),
-                errorStyle: const TextStyle(color: _N.rose, fontSize: 11),
-              ),
+            controller: controller,
+            focusNode: focusNode,
+            obscureText: obscure,
+            keyboardType: keyboardType,
+            readOnly: false,
+            autofocus: false,
+            onTap: () => FocusScope.of(context).requestFocus(focusNode),
+            style: const TextStyle(color: _N.textPrimary, fontSize: 14.5),
+            cursorColor: _N.indigoLight,
+            validator: validator,
+            decoration: InputDecoration(
+              hintText: hint,
+              hintStyle: const TextStyle(color: _N.textMuted, fontSize: 14.5),
+              border: InputBorder.none,
+              isDense: true,
+              contentPadding: const EdgeInsets.symmetric(vertical: 15),
+              errorStyle: const TextStyle(color: _N.rose, fontSize: 11),
             ),
+          ),
         ),
         if (suffix != null)
           Padding(padding: const EdgeInsets.only(right: 12), child: suffix),

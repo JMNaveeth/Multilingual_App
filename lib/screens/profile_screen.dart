@@ -159,8 +159,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
               padding: EdgeInsets.symmetric(horizontal: 20, vertical: 14),
               child: Row(
                 children: [
-                  Icon(Icons.image_rounded,
-                      color: _N.indigoLight, size: 18),
+                  Icon(Icons.image_rounded, color: _N.indigoLight, size: 18),
                   SizedBox(width: 10),
                   Text(
                     'Update Profile Photo',
@@ -487,13 +486,17 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                         _sectionLabel('Profile ID', Icons.badge_outlined),
                         const SizedBox(height: 8),
                         _readonlyField(
-                          value: 'Your ID: ${user.profileId ?? 'Not Generated'}',
+                          value:
+                              'Your ID: ${user.profileId ?? 'Not Generated'}',
                           trailing: IconButton(
-                            icon: const Icon(Icons.copy_rounded, color: _N.textSecondary, size: 20),
+                            icon: const Icon(Icons.copy_rounded,
+                                color: _N.textSecondary, size: 20),
                             onPressed: () {
                               if (user.profileId != null) {
-                                Clipboard.setData(ClipboardData(text: user.profileId!));
-                                _snack('Profile ID copied to clipboard', _N.emerald);
+                                Clipboard.setData(
+                                    ClipboardData(text: user.profileId!));
+                                _snack('Profile ID copied to clipboard',
+                                    _N.emerald);
                               }
                             },
                           ),

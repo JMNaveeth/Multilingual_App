@@ -808,7 +808,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
           child: Icon(icon, size: 18),
         ),
         const SizedBox(width: 10),
-          Expanded(
+        Expanded(
           child: TextFormField(
             controller: ctrl,
             focusNode: focus,

@@ -66,7 +66,8 @@ class ChatListScreen extends ConsumerWidget {
         data: (chatList) {
           if (chatList.isEmpty) {
             return const Center(
-                child: Text('No users found. Please add friends to start chatting.'));
+                child: Text(
+                    'No users found. Please add friends to start chatting.'));
           }
 
           return ListView.builder(
