@@ -19,11 +19,13 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:multilingual_chat_app/models/call_history_entry.dart';
 import 'package:multilingual_chat_app/models/message.dart';
 import 'package:multilingual_chat_app/models/user.dart';
+import 'package:multilingual_chat_app/models/rich_message.dart';
 import 'package:multilingual_chat_app/providers/auth_provider.dart';
 import 'package:multilingual_chat_app/providers/call_history_provider.dart';
 import 'package:multilingual_chat_app/screens/call_screen.dart';
 import 'package:multilingual_chat_app/services/call_socket_service.dart';
 import 'package:multilingual_chat_app/services/chat_service.dart';
+import 'package:multilingual_chat_app/services/mymemory_translation_service.dart';
 
 // ── Nexus Design Tokens ──────────────────────────────────────────────────────
 class _N {
@@ -40,44 +42,6 @@ class _N {
   static const textMuted = Color(0xFF475569);
   static const inputBg = Color(0xFF13141F);
   static const inputBorder = Color(0xFF1E2035);
-}
-
-// ── Extended Message model for rich content ──────────────────────────────────
-/// Wraps [Message] with optional extra payload for image/file/location/contact.
-class RichMessage {
-  final Message message;
-
-  /// For image messages: local file path
-  final String? imagePath;
-
-  /// For file messages
-  final String? fileName;
-  final String? filePath;
-  final int? fileSizeBytes;
-  final String? audioPath;
-
-  /// For location messages
-  final double? latitude;
-  final double? longitude;
-  final String? locationLabel;
-
-  /// For contact messages
-  final String? contactName;
-  final String? contactPhone;
-
-  const RichMessage({
-    required this.message,
-    this.imagePath,
-    this.fileName,
-    this.filePath,
-    this.fileSizeBytes,
-    this.audioPath,
-    this.latitude,
-    this.longitude,
-    this.locationLabel,
-    this.contactName,
-    this.contactPhone,
-  });
 }
 
 // ── ChatScreen ────────────────────────────────────────────────────────────────
@@ -119,6 +83,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   String _lastNonEmptyVoiceTranscript = '';
   RichMessage? _replyingTo;
   final Set<String> _selectedMessageIds = <String>{};
+  final Set<String> _pendingTranslations = <String>{};
 
   late final AnimationController _onlineGlowCtrl;
   late final AnimationController _attachMenuCtrl;
@@ -354,6 +319,20 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
 
   RichMessage _fromMessage(Message message) {
     final meta = message.metadata ?? const <String, dynamic>{};
+
+    // Auto-translation fallback: if the message is from another user, type is text,
+    // and translatedContent is missing or empty, trigger client-side translation.
+    final currentUser = ref.read(authProvider).value;
+    if (currentUser != null &&
+        message.senderId != currentUser.id &&
+        message.type == MessageType.text &&
+        (meta['translatedContent'] == null ||
+            meta['translatedContent'].toString().trim().isEmpty)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _translateIncomingMessage(message);
+      });
+    }
+
     return RichMessage(
       message: message,
       imagePath: (meta['imagePath'] ?? message.mediaUrl)?.toString(),
@@ -373,6 +352,59 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       contactName: meta['contactName']?.toString(),
       contactPhone: meta['contactPhone']?.toString(),
     );
+  }
+
+  Future<void> _translateIncomingMessage(Message message) async {
+    if (_pendingTranslations.contains(message.id)) return;
+    
+    final currentUser = ref.read(authProvider).value;
+    if (currentUser == null) return;
+    
+    final targetLang = currentUser.preferredLanguage;
+    // Get the sender's language from the peer user object
+    final sourceLang = widget.user.preferredLanguage;
+    
+    setState(() {
+      _pendingTranslations.add(message.id);
+    });
+
+    try {
+      final translatedText = await MyMemoryTranslationService.translateText(
+        message.content,
+        from: sourceLang,
+        to: targetLang,
+      );
+
+      if (translatedText.isNotEmpty && translatedText != message.content) {
+        final index = _richMessages.indexWhere((m) => m.message.id == message.id);
+        if (index != -1) {
+          final originalRm = _richMessages[index];
+          final originalMeta = originalRm.message.metadata ?? <String, dynamic>{};
+          
+          final updatedMeta = Map<String, dynamic>.from(originalMeta)
+            ..['translatedContent'] = translatedText
+            ..['translationProvider'] = 'MyMemory';
+
+          final updatedMessage = originalRm.message.copyWith(metadata: updatedMeta);
+          
+          if (mounted) {
+            setState(() {
+              _richMessages[index] = _fromMessage(updatedMessage);
+            });
+            // Update in local database
+            await _chatService.saveLocalMessage(updatedMessage);
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Auto-translation failed for message ${message.id}: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _pendingTranslations.remove(message.id);
+        });
+      }
+    }
   }
 
   Future<void> _showMessageActions(RichMessage rm, bool isMe) async {
@@ -1168,7 +1200,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
 
   // ── Text message ──────────────────────────────────────────────────────────
 
-  void _sendMessage() {
+  Future<void> _sendMessage() async {
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
 

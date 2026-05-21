@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:multilingual_chat_app/models/message.dart';
+import 'package:multilingual_chat_app/models/rich_message.dart';
 import 'package:multilingual_chat_app/services/auth_service.dart';
 import 'package:multilingual_chat_app/services/supabase_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -202,6 +203,32 @@ class ChatService {
       'mediaUrl': row['media_url'],
       'metadata': row['metadata'],
     });
+  }
+
+  RichMessage _fromMessage(Message message) {
+    final meta = message.metadata ?? const <String, dynamic>{};
+    // Prefer translated content if the backend provided it
+    final displayedContent = meta['translatedContent']?.toString() ?? message.content;
+    final updatedMessage = message.copyWith(content: displayedContent);
+    return RichMessage(
+      message: updatedMessage,
+      imagePath: (meta['imagePath'] ?? updatedMessage.mediaUrl)?.toString(),
+      fileName: meta['fileName']?.toString(),
+      filePath: meta['filePath']?.toString(),
+      audioPath: (meta['audioPath'] ?? updatedMessage.mediaUrl)?.toString(),
+      fileSizeBytes: meta['fileSizeBytes'] is int
+          ? meta['fileSizeBytes'] as int
+          : int.tryParse('${meta['fileSizeBytes'] ?? ''}'),
+      latitude: meta['latitude'] is num
+          ? (meta['latitude'] as num).toDouble()
+          : double.tryParse('${meta['latitude'] ?? ''}'),
+      longitude: meta['longitude'] is num
+          ? (meta['longitude'] as num).toDouble()
+          : double.tryParse('${meta['longitude'] ?? ''}'),
+      locationLabel: meta['locationLabel']?.toString(),
+      contactName: meta['contactName']?.toString(),
+      contactPhone: meta['contactPhone']?.toString(),
+    );
   }
 
   Map<String, dynamic> _toInsertRow(Message message) {

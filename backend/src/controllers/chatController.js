@@ -1,4 +1,5 @@
 const supabase = require('../config/supabase');
+const { appendMessageToHistory, loadHistory } = require('../services/chatPersistence');
 
 // @desc    Send a message
 // @route   POST /api/chat/messages
@@ -23,7 +24,8 @@ const sendMessage = async (req, res, next) => {
       .select()
       .single();
 
-    if (error) throw error;
+    await appendMessageToHistory(message);
+
 
     res.status(201).json({
       success: true,
