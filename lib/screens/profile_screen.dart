@@ -483,6 +483,23 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // Profile ID
+                        _sectionLabel('Profile ID', Icons.badge_outlined),
+                        const SizedBox(height: 8),
+                        _readonlyField(
+                          value: 'Your ID: ${user.profileId ?? 'Not Generated'}',
+                          trailing: IconButton(
+                            icon: const Icon(Icons.copy_rounded, color: _N.textSecondary, size: 20),
+                            onPressed: () {
+                              if (user.profileId != null) {
+                                Clipboard.setData(ClipboardData(text: user.profileId!));
+                                _snack('Profile ID copied to clipboard', _N.emerald);
+                              }
+                            },
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+
                         // Name field
                         _sectionLabel(
                             'Display Name', Icons.person_outline_rounded),

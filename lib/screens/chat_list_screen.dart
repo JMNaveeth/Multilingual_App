@@ -17,7 +17,7 @@ final chatListProvider =
   final authService = AuthService();
   final chatService = ChatService();
 
-  final users = await authService.getAllUsers();
+  final users = await authService.getFriends();
   final messages = await chatService.getAllLocalMessages();
 
   final otherUsers = users.where((u) => u.id != currentUser.id).toList();
@@ -66,7 +66,7 @@ class ChatListScreen extends ConsumerWidget {
         data: (chatList) {
           if (chatList.isEmpty) {
             return const Center(
-                child: Text('No users found. Please register other accounts.'));
+                child: Text('No users found. Please add friends to start chatting.'));
           }
 
           return ListView.builder(

@@ -1,5 +1,6 @@
 class User {
   final String id;
+  final String? profileId;
   final String email;
   final String name;
   final String? profileImageUrl;
@@ -10,6 +11,7 @@ class User {
 
   User({
     required this.id,
+    this.profileId,
     required this.email,
     required this.name,
     this.profileImageUrl,
@@ -22,19 +24,21 @@ class User {
   factory User.fromJson(Map<String, dynamic> json) {
     return User(
       id: json['_id'] ?? json['id'],
+      profileId: json['profileId'] ?? json['profile_id'],
       email: json['email'],
       name: json['name'],
-      profileImageUrl: json['profileImageUrl'],
-      preferredLanguage: json['preferredLanguage'] ?? 'en',
-      isOnline: json['isOnline'] ?? false,
-      lastSeen: json['lastSeen'] != null ? DateTime.parse(json['lastSeen']) : null,
-      createdAt: DateTime.parse(json['createdAt']),
+      profileImageUrl: json['profileImageUrl'] ?? json['profile_image_url'],
+      preferredLanguage: json['preferredLanguage'] ?? json['preferred_language'] ?? 'en',
+      isOnline: json['isOnline'] ?? json['is_online'] ?? false,
+      lastSeen: json['lastSeen'] != null ? DateTime.parse(json['lastSeen']) : (json['last_seen'] != null ? DateTime.parse(json['last_seen']) : null),
+      createdAt: json['createdAt'] != null ? DateTime.parse(json['createdAt']) : (json['created_at'] != null ? DateTime.parse(json['created_at']) : DateTime.now()),
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
       'id': id,
+      'profileId': profileId,
       'email': email,
       'name': name,
       'profileImageUrl': profileImageUrl,
@@ -47,6 +51,7 @@ class User {
 
   User copyWith({
     String? id,
+    String? profileId,
     String? email,
     String? name,
     String? profileImageUrl,
@@ -57,6 +62,7 @@ class User {
   }) {
     return User(
       id: id ?? this.id,
+      profileId: profileId ?? this.profileId,
       email: email ?? this.email,
       name: name ?? this.name,
       profileImageUrl: profileImageUrl ?? this.profileImageUrl,

@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:multilingual_chat_app/providers/auth_provider.dart';
 import 'package:multilingual_chat_app/Auth/register_screen.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' show AuthException;
 
 // ── Nexus tokens ─────────────────────────────────────────────────────────────
 class _N {
@@ -114,12 +115,27 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         debugPrint(
             '[LoginScreen] Sign in completed in ${stopwatch.elapsedMilliseconds}ms, provider hasUser=${authState.value != null}');
       }
+    } on AuthException catch (e) {
+      if (kDebugMode) {
+        debugPrint(
+            '[LoginScreen] Sign in failed after ${stopwatch.elapsedMilliseconds}ms: $e');
+      }
+      if (mounted) {
+        final message = e.message.toLowerCase().contains('email not confirmed')
+            ? 'Email not confirmed. Please use the account that is already confirmed in Supabase.'
+            : e.message;
+        _snack(message, _N.rose);
+      }
     } catch (e) {
       if (kDebugMode) {
         debugPrint(
             '[LoginScreen] Sign in failed after ${stopwatch.elapsedMilliseconds}ms: $e');
       }
-      if (mounted) _snack('Login failed: $e', _N.rose);
+      if (mounted) {
+        final raw = e.toString();
+        final cleanMsg = raw.startsWith('Exception: ') ? raw.substring(11) : raw;
+        _snack('Login failed: $cleanMsg', _N.rose);
+      }
     } finally {
       stopwatch.stop();
       if (mounted) setState(() => _isLoading = false);
@@ -493,22 +509,25 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         const SizedBox(width: 10),
         Expanded(
           child: TextFormField(
-            controller: controller,
-            focusNode: focusNode,
-            obscureText: obscure,
-            keyboardType: keyboardType,
-            style: const TextStyle(color: _N.textPrimary, fontSize: 14.5),
-            cursorColor: _N.indigoLight,
-            validator: validator,
-            decoration: InputDecoration(
-              hintText: hint,
-              hintStyle: const TextStyle(color: _N.textMuted, fontSize: 14.5),
-              border: InputBorder.none,
-              isDense: true,
-              contentPadding: const EdgeInsets.symmetric(vertical: 15),
-              errorStyle: const TextStyle(color: _N.rose, fontSize: 11),
+              controller: controller,
+              focusNode: focusNode,
+              obscureText: obscure,
+              keyboardType: keyboardType,
+              readOnly: false,
+              autofocus: false,
+              onTap: () => FocusScope.of(context).requestFocus(focusNode),
+              style: const TextStyle(color: _N.textPrimary, fontSize: 14.5),
+              cursorColor: _N.indigoLight,
+              validator: validator,
+              decoration: InputDecoration(
+                hintText: hint,
+                hintStyle: const TextStyle(color: _N.textMuted, fontSize: 14.5),
+                border: InputBorder.none,
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(vertical: 15),
+                errorStyle: const TextStyle(color: _N.rose, fontSize: 11),
+              ),
             ),
-          ),
         ),
         if (suffix != null)
           Padding(padding: const EdgeInsets.only(right: 12), child: suffix),

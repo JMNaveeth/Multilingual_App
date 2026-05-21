@@ -808,12 +808,15 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
           child: Icon(icon, size: 18),
         ),
         const SizedBox(width: 10),
-        Expanded(
+          Expanded(
           child: TextFormField(
             controller: ctrl,
             focusNode: focus,
             obscureText: obscure,
             keyboardType: keyboard,
+            readOnly: false,
+            autofocus: false,
+            onTap: () => FocusScope.of(context).requestFocus(focus),
             autocorrect: autocorrect,
             enableSuggestions: enableSuggestions,
             style: const TextStyle(color: _N.textPrimary, fontSize: 14.5),

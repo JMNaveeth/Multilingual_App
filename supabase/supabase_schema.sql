@@ -4,6 +4,7 @@ create extension if not exists "pgcrypto";
 
 create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
+  profile_id text unique,
   email text not null unique,
   name text not null,
   preferred_language text not null default 'en',
@@ -41,6 +42,14 @@ create table if not exists public.call_history (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.friends (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  friend_id uuid not null references public.profiles(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  unique(user_id, friend_id)
+);
+
 create index if not exists idx_messages_sender_created
   on public.messages(sender_id, created_at desc);
 
@@ -53,6 +62,28 @@ create index if not exists idx_call_history_user_started
 alter table public.profiles enable row level security;
 alter table public.messages enable row level security;
 alter table public.call_history enable row level security;
+alter table public.friends enable row level security;
+
+drop policy if exists "friends_select_own" on public.friends;
+create policy "friends_select_own"
+  on public.friends
+  for select
+  to authenticated
+  using (auth.uid() = user_id or auth.uid() = friend_id);
+
+drop policy if exists "friends_insert_own" on public.friends;
+create policy "friends_insert_own"
+  on public.friends
+  for insert
+  to authenticated
+  with check (auth.uid() = user_id);
+
+drop policy if exists "friends_delete_own" on public.friends;
+create policy "friends_delete_own"
+  on public.friends
+  for delete
+  to authenticated
+  using (auth.uid() = user_id);
 
 drop policy if exists "profiles_select_authenticated" on public.profiles;
 create policy "profiles_select_authenticated"
@@ -162,6 +193,7 @@ create trigger on_auth_user_created
 
 -- Storage RLS Policies for avatars bucket
 -- Allow authenticated users to upload their own profile images
+drop policy if exists "Allow authenticated users to upload profile images" on storage.objects;
 create policy "Allow authenticated users to upload profile images"
 on storage.objects
 for insert
@@ -172,6 +204,7 @@ with check (
 );
 
 -- Allow public read access to profile images
+drop policy if exists "Allow public to read profile images" on storage.objects;
 create policy "Allow public to read profile images"
 on storage.objects
 for select
@@ -182,6 +215,7 @@ using (
 );
 
 -- Allow authenticated users to read profile images
+drop policy if exists "Allow authenticated users to read profile images" on storage.objects;
 create policy "Allow authenticated users to read profile images"
 on storage.objects
 for select

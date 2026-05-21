@@ -55,6 +55,17 @@ class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
     }
   }
 
+  Future<void> resendVerificationEmail(String email) async {
+    try {
+      await _authService.resendVerificationEmail(email);
+    } catch (error, stackTrace) {
+      if (kDebugMode) {
+        debugPrint('[AuthNotifier] resendVerificationEmail error: $error');
+      }
+      Error.throwWithStackTrace(error, stackTrace);
+    }
+  }
+
   Future<Map<String, dynamic>> register(String name, String email,
       String password, String preferredLanguage) async {
     final previousState = state;

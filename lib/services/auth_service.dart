@@ -4,6 +4,7 @@ import 'package:multilingual_chat_app/models/user.dart' as app_model;
 import 'package:multilingual_chat_app/services/supabase_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide User;
 import 'dart:io';
+import 'dart:math' as math;
 
 class AuthService {
   // Kept for compatibility with existing call/socket code paths.
@@ -24,6 +25,18 @@ class AuthService {
   }
 
   String _toUserFriendlyAuthError(Object error) {
+    if (error is AuthException) {
+      final code = error.code ?? '';
+      final msg = error.message;
+      if (code == 'email_not_confirmed' || msg.toLowerCase().contains('email not confirmed')) {
+        return 'Email not confirmed. Please check your inbox for the verification link.';
+      }
+      if (code == 'invalid_credentials' || msg.toLowerCase().contains('invalid login credentials')) {
+        return 'Invalid email or password.';
+      }
+      return msg;
+    }
+
     final text = error.toString();
     final lower = text.toLowerCase();
 
@@ -99,6 +112,7 @@ class AuthService {
   Map<String, dynamic> _userToProfileMap(app_model.User user) {
     return {
       'id': user.id,
+      'profileId': user.profileId,
       'email': user.email,
       'name': user.name,
       'profileImageUrl': user.profileImageUrl,
@@ -113,6 +127,7 @@ class AuthService {
       {String? fallbackEmail}) {
     final mapped = <String, dynamic>{
       '_id': (row['id'] ?? '').toString(),
+      'profileId': row['profileId'] ?? row['profile_id'],
       'email': (row['email'] ?? fallbackEmail ?? '').toString(),
       'name': (row['name'] ?? 'User').toString(),
       'profileImageUrl': row['profileImageUrl'] ?? row['profile_image_url'],
@@ -138,8 +153,24 @@ class AuthService {
       );
     }
 
+    String generatedProfileId = '';
+    final random = math.Random();
+    while (true) {
+      final idBuffer = StringBuffer();
+      for (int i = 0; i < 8; i++) {
+        idBuffer.write(random.nextInt(10).toString());
+      }
+      generatedProfileId = idBuffer.toString();
+
+      final existing = await _client.from('profiles').select('id').eq('profile_id', generatedProfileId).limit(1);
+      if (existing.isEmpty) {
+        break;
+      }
+    }
+
     final payload = {
       'id': authUser.id,
+      'profile_id': generatedProfileId,
       'email': authUser.email,
       'name': authUser.name,
       'preferred_language': authUser.preferredLanguage,
@@ -169,6 +200,8 @@ class AuthService {
           password: password,
         );
       });
+    } on AuthException {
+      rethrow;
     } catch (error) {
       throw Exception(_toUserFriendlyAuthError(error));
     }
@@ -201,6 +234,22 @@ class AuthService {
       'token': session.accessToken,
       'user': _userToProfileMap(appUser),
     };
+  }
+
+  Future<void> resendVerificationEmail(String email) async {
+    if (!SupabaseService.isConfigured) {
+      throw Exception('Supabase is not configured.');
+    }
+    try {
+      await _withNetworkRetry(() {
+        return _client.auth.resend(
+          type: OtpType.signup,
+          email: email.trim(),
+        );
+      });
+    } catch (error) {
+      throw Exception(_toUserFriendlyAuthError(error));
+    }
   }
 
   Future<Map<String, dynamic>> register(
@@ -450,6 +499,38 @@ class AuthService {
 
     return _profileToUser(Map<String, dynamic>.from(updated),
         fallbackEmail: current.email);
+  }
+
+  Future<List<app_model.User>> getFriends() async {
+    final current = await getCurrentUser();
+    if (current == null) {
+      return <app_model.User>[];
+    }
+
+    final friendRows = await _client
+        .from('friends')
+        .select('user_id, friend_id')
+        .or('user_id.eq.${current.id},friend_id.eq.${current.id}');
+
+    final Set<String> friendIds = {};
+    for (final row in friendRows) {
+      if (row['user_id'] != current.id) friendIds.add(row['user_id']);
+      if (row['friend_id'] != current.id) friendIds.add(row['friend_id']);
+    }
+
+    if (friendIds.isEmpty) return <app_model.User>[];
+
+    final profileRows = await _client
+        .from('profiles')
+        .select()
+        .inFilter('id', friendIds.toList())
+        .order('is_online', ascending: false)
+        .order('last_seen', ascending: false);
+
+    return profileRows
+        .whereType<Map>()
+        .map((e) => _profileToUser(e.map((k, v) => MapEntry(k.toString(), v))))
+        .toList();
   }
 
   Future<List<app_model.User>> getAllUsers() async {
