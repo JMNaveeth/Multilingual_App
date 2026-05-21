@@ -232,7 +232,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     );
 
     // Real-time listener for message deletions
-    _messageDeletedSub ??= CallSocketService.instance.messageDeleted.listen((event) {
+    _messageDeletedSub ??=
+        CallSocketService.instance.messageDeleted.listen((event) {
       if (!mounted) return;
       final deletedMessageId = event['messageId']?.toString() ?? '';
       final clientMessageId = event['clientMessageId']?.toString() ?? '';
@@ -240,8 +241,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
 
       setState(() {
         _richMessages.removeWhere((m) =>
-            m.message.id == deletedMessageId || m.message.id == clientMessageId ||
-            m.message.metadata?['clientMessageId']?.toString() == clientMessageId);
+            m.message.id == deletedMessageId ||
+            m.message.id == clientMessageId ||
+            m.message.metadata?['clientMessageId']?.toString() ==
+                clientMessageId);
       });
     });
   }
@@ -356,14 +359,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
 
   Future<void> _translateIncomingMessage(Message message) async {
     if (_pendingTranslations.contains(message.id)) return;
-    
+
     final currentUser = ref.read(authProvider).value;
     if (currentUser == null) return;
-    
+
     final targetLang = currentUser.preferredLanguage;
     // Get the sender's language from the peer user object
     final sourceLang = widget.user.preferredLanguage;
-    
+
     setState(() {
       _pendingTranslations.add(message.id);
     });
@@ -376,17 +379,20 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       );
 
       if (translatedText.isNotEmpty && translatedText != message.content) {
-        final index = _richMessages.indexWhere((m) => m.message.id == message.id);
+        final index =
+            _richMessages.indexWhere((m) => m.message.id == message.id);
         if (index != -1) {
           final originalRm = _richMessages[index];
-          final originalMeta = originalRm.message.metadata ?? <String, dynamic>{};
-          
+          final originalMeta =
+              originalRm.message.metadata ?? <String, dynamic>{};
+
           final updatedMeta = Map<String, dynamic>.from(originalMeta)
             ..['translatedContent'] = translatedText
             ..['translationProvider'] = 'MyMemory';
 
-          final updatedMessage = originalRm.message.copyWith(metadata: updatedMeta);
-          
+          final updatedMessage =
+              originalRm.message.copyWith(metadata: updatedMeta);
+
           if (mounted) {
             setState(() {
               _richMessages[index] = _fromMessage(updatedMessage);
@@ -436,104 +442,105 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                Center(
-                  child: Container(
-                    width: 44,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: _N.cardBorder,
-                      borderRadius: BorderRadius.circular(999),
+                    Center(
+                      child: Container(
+                        width: 44,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: _N.cardBorder,
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                      ),
                     ),
-                  ),
-                ),
-                const SizedBox(height: 14),
-                const Text(
-                  'Message options',
-                  style: TextStyle(
-                    color: _N.textPrimary,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  isTextMessage ? rm.message.content : 'Choose an action',
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: _N.textSecondary,
-                    fontSize: 12.5,
-                  ),
-                ),
-                const SizedBox(height: 14),
-                _actionTile(
-                  icon: Icons.reply_rounded,
-                  label: 'Reply',
-                  onTap: () {
-                    Navigator.of(sheetContext).pop();
-                    _startReply(rm);
-                  },
-                ),
-                const SizedBox(height: 8),
-                _actionTile(
-                  icon: Icons.forward_rounded,
-                  label: 'Forward',
-                  onTap: () async {
-                    Navigator.of(sheetContext).pop();
-                    await _forwardMessage(rm);
-                  },
-                ),
-                const SizedBox(height: 8),
-                _actionTile(
-                  icon: Icons.checklist_rounded,
-                  label: 'Select messages',
-                  onTap: () {
-                    Navigator.of(sheetContext).pop();
-                    _toggleMessageSelection(rm);
-                  },
-                ),
-                const SizedBox(height: 8),
-                if (isTextMessage)
-                  _actionTile(
-                    icon: Icons.copy_rounded,
-                    label: 'Copy text',
-                    onTap: () {
-                      Clipboard.setData(ClipboardData(text: rm.message.content));
-                      Navigator.of(sheetContext).pop();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Message copied')),
-                      );
-                    },
-                  ),
-                if (isTextMessage) const SizedBox(height: 8),
-                _actionTile(
-                  icon: Icons.delete_outline_rounded,
-                  label: 'Delete for me',
-                  iconColor: Colors.redAccent,
-                  onTap: () async {
-                    Navigator.of(sheetContext).pop();
-                    await _deleteMessage(rm, deleteForEveryone: false);
-                  },
-                ),
-                if (isMe) ...[
-                  const SizedBox(height: 8),
-                  _actionTile(
-                    icon: Icons.delete_forever_rounded,
-                    label: 'Delete for everyone',
-                    iconColor: Colors.redAccent,
-                    onTap: () async {
-                      Navigator.of(sheetContext).pop();
-                      await _deleteMessage(rm, deleteForEveryone: true);
-                    },
-                  ),
-                ],
-                const SizedBox(height: 8),
-                _actionTile(
-                  icon: Icons.arrow_forward_ios_rounded,
-                  label: 'Cancel',
-                  iconColor: _N.textSecondary,
-                  onTap: () => Navigator.of(sheetContext).pop(),
-                ),
+                    const SizedBox(height: 14),
+                    const Text(
+                      'Message options',
+                      style: TextStyle(
+                        color: _N.textPrimary,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      isTextMessage ? rm.message.content : 'Choose an action',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: _N.textSecondary,
+                        fontSize: 12.5,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    _actionTile(
+                      icon: Icons.reply_rounded,
+                      label: 'Reply',
+                      onTap: () {
+                        Navigator.of(sheetContext).pop();
+                        _startReply(rm);
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    _actionTile(
+                      icon: Icons.forward_rounded,
+                      label: 'Forward',
+                      onTap: () async {
+                        Navigator.of(sheetContext).pop();
+                        await _forwardMessage(rm);
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    _actionTile(
+                      icon: Icons.checklist_rounded,
+                      label: 'Select messages',
+                      onTap: () {
+                        Navigator.of(sheetContext).pop();
+                        _toggleMessageSelection(rm);
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    if (isTextMessage)
+                      _actionTile(
+                        icon: Icons.copy_rounded,
+                        label: 'Copy text',
+                        onTap: () {
+                          Clipboard.setData(
+                              ClipboardData(text: rm.message.content));
+                          Navigator.of(sheetContext).pop();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Message copied')),
+                          );
+                        },
+                      ),
+                    if (isTextMessage) const SizedBox(height: 8),
+                    _actionTile(
+                      icon: Icons.delete_outline_rounded,
+                      label: 'Delete for me',
+                      iconColor: Colors.redAccent,
+                      onTap: () async {
+                        Navigator.of(sheetContext).pop();
+                        await _deleteMessage(rm, deleteForEveryone: false);
+                      },
+                    ),
+                    if (isMe) ...[
+                      const SizedBox(height: 8),
+                      _actionTile(
+                        icon: Icons.delete_forever_rounded,
+                        label: 'Delete for everyone',
+                        iconColor: Colors.redAccent,
+                        onTap: () async {
+                          Navigator.of(sheetContext).pop();
+                          await _deleteMessage(rm, deleteForEveryone: true);
+                        },
+                      ),
+                    ],
+                    const SizedBox(height: 8),
+                    _actionTile(
+                      icon: Icons.arrow_forward_ios_rounded,
+                      label: 'Cancel',
+                      iconColor: _N.textSecondary,
+                      onTap: () => Navigator.of(sheetContext).pop(),
+                    ),
                   ],
                 ),
               ),
@@ -551,7 +558,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     // Update UI immediately
     if (!mounted) return;
     setState(() {
-      _richMessages.removeWhere((message) => message.message.id == rm.message.id);
+      _richMessages
+          .removeWhere((message) => message.message.id == rm.message.id);
     });
 
     // Delete from backend and notify other users in real-time
@@ -609,7 +617,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     }
 
     final originalMeta = replying.message.metadata ?? const <String, dynamic>{};
-    final originalText = (originalMeta['voiceTranscript'] ?? replying.message.content).toString();
+    final originalText =
+        (originalMeta['voiceTranscript'] ?? replying.message.content)
+            .toString();
 
     return {
       'replyToMessageId': replying.message.id,
@@ -626,7 +636,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     }
 
     final sourceMeta = rm.message.metadata ?? const <String, dynamic>{};
-    final forwardText = (sourceMeta['voiceTranscript'] ?? rm.message.content).toString().trim();
+    final forwardText =
+        (sourceMeta['voiceTranscript'] ?? rm.message.content).toString().trim();
     if (forwardText.isEmpty) {
       _showError('Cannot forward an empty message.');
       return;
@@ -664,7 +675,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                 );
               }
 
-              if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
+              if (snapshot.hasError ||
+                  !snapshot.hasData ||
+                  snapshot.data!.isEmpty) {
                 return Center(
                   child: Text(
                     'No contacts found',
@@ -682,11 +695,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                   final contact = contacts[index];
                   final name = contact.displayName.isNotEmpty
                       ? contact.displayName
-                      : (contact.name.first.isNotEmpty ? contact.name.first : 'Unknown');
+                      : (contact.name.first.isNotEmpty
+                          ? contact.name.first
+                          : 'Unknown');
                   final phone = contact.phones.firstOrNull?.number ?? '';
 
                   return ListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     title: Text(
                       name,
                       style: const TextStyle(color: _N.textPrimary),
@@ -813,9 +829,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     final selectedIds = _selectedMessageIds.toList();
     if (selectedIds.isEmpty) return;
 
-    final selectedMessages = _richMessages
-        .where((m) => selectedIds.contains(m.message.id))
-        .toList();
+    final selectedMessages =
+        _richMessages.where((m) => selectedIds.contains(m.message.id)).toList();
 
     // Update UI immediately
     if (!mounted) return;
@@ -2196,12 +2211,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
           Flexible(
             child: GestureDetector(
               onLongPress: () => _showMessageActions(rm, isMe),
-              onTap: _isSelectionMode ? () => _toggleMessageSelection(rm) : null,
+              onTap:
+                  _isSelectionMode ? () => _toggleMessageSelection(rm) : null,
               child: Container(
                 constraints: BoxConstraints(
                     maxWidth: MediaQuery.of(context).size.width * 0.72),
                 decoration: BoxDecoration(
-                  color: isMe ? const Color(0xFF005C4B) : const Color(0xFF202C33),
+                  color:
+                      isMe ? const Color(0xFF005C4B) : const Color(0xFF202C33),
                   border: isSelected
                       ? Border.all(color: _N.indigoLight, width: 1.4)
                       : null,
@@ -2330,7 +2347,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     final hasTranslation = translated != null &&
         translated.isNotEmpty &&
         translated.toLowerCase() != rm.message.content.toLowerCase();
-    final isReply = meta['replyToMessageId'] != null && (meta['replyToMessageId'] as String).isNotEmpty;
+    final isReply = meta['replyToMessageId'] != null &&
+        (meta['replyToMessageId'] as String).isNotEmpty;
     final isForwarded = meta['forwarded'] == true;
 
     // Display translated text for receiver if available, otherwise original text
@@ -2340,7 +2358,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         // Show reply preview if this is a reply
-        if (isReply) ...[_buildReplyPreviewWidget(meta), const SizedBox(height: 8)],
+        if (isReply) ...[
+          _buildReplyPreviewWidget(meta),
+          const SizedBox(height: 8)
+        ],
         // Show forwarded badge if forwarded
         if (isForwarded) ...[_buildForwardedBadge(), const SizedBox(height: 6)],
         // Translation language banner
@@ -2356,10 +2377,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                 ],
               ),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.tealAccent.shade700.withOpacity(0.2)),
+              border: Border.all(
+                  color: Colors.tealAccent.shade700.withOpacity(0.2)),
             ),
             child: Row(mainAxisSize: MainAxisSize.min, children: [
-              Icon(Icons.auto_awesome, size: 12, color: Colors.tealAccent.shade200),
+              Icon(Icons.auto_awesome,
+                  size: 12, color: Colors.tealAccent.shade200),
               const SizedBox(width: 5),
               Text(
                 'Translated${originalLang != null && targetLang != null ? ' · ${originalLang.toUpperCase()} → ${targetLang.toUpperCase()}' : ''}',
@@ -2392,7 +2415,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
               Padding(
                 padding: const EdgeInsets.only(top: 1),
                 child: Icon(Icons.translate_rounded,
-                    size: 12, color: Colors.tealAccent.shade200.withOpacity(0.7)),
+                    size: 12,
+                    color: Colors.tealAccent.shade200.withOpacity(0.7)),
               ),
               const SizedBox(width: 6),
               Flexible(
@@ -2471,8 +2495,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     final targetLang = meta['targetLanguage']?.toString();
     final transcript =
         (meta['voiceTranscript'] ?? rm.message.content).toString();
-    final hasTranslation =
-        translatedText != null && translatedText.isNotEmpty;
+    final hasTranslation = translatedText != null && translatedText.isNotEmpty;
     final displayText = hasTranslation ? translatedText : transcript;
 
     return Padding(
@@ -2491,10 +2514,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                 ],
               ),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.tealAccent.shade700.withOpacity(0.2)),
+              border: Border.all(
+                  color: Colors.tealAccent.shade700.withOpacity(0.2)),
             ),
             child: Row(mainAxisSize: MainAxisSize.min, children: [
-              Icon(Icons.auto_awesome, size: 12, color: Colors.tealAccent.shade200),
+              Icon(Icons.auto_awesome,
+                  size: 12, color: Colors.tealAccent.shade200),
               const SizedBox(width: 5),
               Text(
                 'Voice translated${originalLang != null && targetLang != null ? ' · ${originalLang.toUpperCase()} → ${targetLang.toUpperCase()}' : ''}',
@@ -3108,24 +3133,28 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
             const SizedBox(width: 8),
             Expanded(
               child: Container(
-                constraints: const BoxConstraints(minHeight: 42, maxHeight: 120),
+                constraints:
+                    const BoxConstraints(minHeight: 42, maxHeight: 120),
                 decoration: BoxDecoration(
                   color: _N.card,
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(color: _N.cardBorder),
                 ),
-                child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                child:
+                    Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
                   Expanded(
                     child: TextField(
                       controller: _messageController,
-                      style: const TextStyle(color: _N.textPrimary, fontSize: 14.5),
+                      style: const TextStyle(
+                          color: _N.textPrimary, fontSize: 14.5),
                       cursorColor: _N.indigoLight,
                       maxLines: null,
                       textInputAction: TextInputAction.newline,
                       onSubmitted: (_) => _sendMessage(),
                       decoration: const InputDecoration(
                         hintText: 'Write a message…',
-                        hintStyle: TextStyle(color: _N.textMuted, fontSize: 14.5),
+                        hintStyle:
+                            TextStyle(color: _N.textMuted, fontSize: 14.5),
                         border: InputBorder.none,
                         contentPadding: EdgeInsets.fromLTRB(14, 11, 4, 11),
                         isDense: true,
