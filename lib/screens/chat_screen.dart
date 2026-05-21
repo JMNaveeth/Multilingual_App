@@ -166,20 +166,28 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       currentUserId: currentUser.id,
       otherUserId: widget.user.id,
     )
-        .listen((messages) async {
+          .listen((messages) async {
       if (!mounted) return;
       final hiddenIds = await _chatService.getHiddenMessageIds(currentUser.id);
+
+      final seen = <String>{};
+      final deduped = messages.where((m) {
+        final key = m.metadata?['clientMessageId']?.toString();
+        final dedupeKey = (key != null && key.isNotEmpty) ? key : m.id;
+        return seen.add(dedupeKey);
+      }).toList();
+
       setState(() {
         _richMessages
           ..clear()
-          ..addAll(messages
+          ..addAll(deduped
               .where((message) => !hiddenIds.contains(message.id))
               .map(_fromMessage));
         _isLoadingHistory = false;
       });
       _scrollToBottom();
     });
-
+    
     _incomingCallSub ??= CallSocketService.instance.incomingCalls.listen(
       (incomingCall) {
         if (!mounted) return;
@@ -918,11 +926,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       _chatService.saveLocalMessage(rm.message).catchError((e) {
         debugPrint('[ChatScreen] saveLocalMessage error: $e');
       });
-
-      final currentUserId = ref.read(authProvider).value?.id;
-      if (currentUserId == null || rm.message.senderId != currentUserId) {
-        return;
-      }
+      return;
     }
 
     _chatService.sendMessage(rm.message).then((persisted) {
