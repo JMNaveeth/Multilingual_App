@@ -137,7 +137,7 @@ class AuthService {
         buffer.write(random.nextInt(10));
       }
 
-        final candidate = 'EC-${buffer.toString()}';
+      final candidate = 'EC-${buffer.toString()}';
       final existing = await _client
           .from('profiles')
           .select('id')
