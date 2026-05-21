@@ -867,6 +867,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                               return;
                             }
 
+                            var closedDialog = false;
                             setDialogState(() => isAdding = true);
                             try {
                               final friend = await ref
@@ -877,6 +878,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
                               if (dialogContext.mounted) {
                                 Navigator.of(dialogContext).pop();
+                                closedDialog = true;
                                 _snack('Added ${friend.name} to your friends');
                               }
                             } catch (e) {
@@ -888,7 +890,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                                 _snack(cleanMsg);
                               }
                             } finally {
-                              if (dialogContext.mounted) {
+                              if (!closedDialog && dialogContext.mounted) {
                                 setDialogState(() => isAdding = false);
                               }
                             }
