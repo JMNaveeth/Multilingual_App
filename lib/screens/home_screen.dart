@@ -85,7 +85,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         child: _buildBody(),
       ),
       bottomNavigationBar: _buildBottomNav(),
-      floatingActionButton: _bottomIndex == 0 ? _buildComposeFAB() : null,
+      floatingActionButton: _bottomIndex == 0 ? _buildAddFAB() : null,
     );
   }
 
@@ -350,10 +350,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     }
   }
 
-  // ── Compose FAB ───────────────────────────────────────────────────────────
-  Widget _buildComposeFAB() => Container(
+  // ── Add FAB ───────────────────────────────────────────────────────────────
+  Widget _buildAddFAB() => Container(
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(18),
+          shape: BoxShape.circle,
           gradient: const LinearGradient(
             colors: [_N.indigo, _N.violet],
             begin: Alignment.topLeft,
@@ -370,24 +370,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         child: Material(
           color: Colors.transparent,
           child: InkWell(
-            borderRadius: BorderRadius.circular(18),
+            customBorder: const CircleBorder(),
             onTap: _openNewChat,
             child: const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.edit_outlined, color: Colors.white, size: 20),
-                  SizedBox(width: 8),
-                  Text('Compose',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14,
-                        letterSpacing: 0.3,
-                      )),
-                ],
-              ),
+              padding: EdgeInsets.all(16),
+              child: Icon(Icons.add_rounded, color: Colors.white, size: 28),
             ),
           ),
         ),
