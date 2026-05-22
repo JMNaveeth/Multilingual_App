@@ -2328,6 +2328,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     switch (rm.message.type) {
       case MessageType.image:
         return _buildImageBubble(rm, isMe, time);
+      case MessageType.video:
+        return _buildVideoBubble(rm, isMe, time);
       case MessageType.audio:
         return _buildAudioBubble(rm, isMe, time);
       case MessageType.file:
@@ -2460,24 +2462,31 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   // ── Image bubble ──────────────────────────────────────────────────────────
 
   Widget _buildImageBubble(RichMessage rm, bool isMe, String time) {
+    final path = rm.imagePath;
+    final maxW = MediaQuery.of(context).size.width * 0.72;
+    final maxH = MediaQuery.of(context).size.height * 0.5;
+
     return Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-      if (rm.imagePath != null)
+      if (path != null)
         ClipRRect(
           borderRadius: const BorderRadius.only(
             topLeft: Radius.circular(18),
             topRight: Radius.circular(18),
           ),
           child: GestureDetector(
-            onTap: () => _openImageFullscreen(rm.imagePath!),
-            child: Image.file(
-              File(rm.imagePath!),
-              width: double.infinity,
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => Container(
-                height: 120,
-                color: _N.card,
-                child: const Icon(Icons.broken_image_outlined,
-                    color: _N.textMuted, size: 36),
+            onTap: () => _openImageFullscreen(path),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: maxW, maxHeight: maxH),
+              child: Image.file(
+                File(path),
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => Container(
+                  height: 120,
+                  width: maxW,
+                  color: _N.card,
+                  child: const Icon(Icons.broken_image_outlined,
+                      color: _N.textMuted, size: 36),
+                ),
               ),
             ),
           ),
@@ -2487,6 +2496,84 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         child: _timeRow(isMe, time, rm.message.status),
       ),
     ]);
+  }
+
+  // ── Video bubble (thumbnail + play overlay) ───────────────────────────────
+
+  Widget _buildVideoBubble(RichMessage rm, bool isMe, String time) {
+    // For now we display the video file as an image preview (if available) and
+    // show a play icon overlay. You can replace this with a proper thumbnail
+    // extraction later.
+    final path = rm.imagePath ?? rm.filePath;
+    final maxW = MediaQuery.of(context).size.width * 0.72;
+    final maxH = MediaQuery.of(context).size.height * 0.5;
+
+    return Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+      ClipRRect(
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(18),
+          topRight: Radius.circular(18),
+        ),
+        child: GestureDetector(
+          onTap: path == null ? null : () => _openVideoPlayer(path),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: maxW, maxHeight: maxH),
+            child: Stack(children: [
+              Container(
+                color: _N.card,
+                width: double.infinity,
+                height: maxH,
+                child: path != null
+                    ? Image.file(
+                        File(path),
+                        fit: BoxFit.contain,
+                        width: double.infinity,
+                        height: maxH,
+                        errorBuilder: (_, __, ___) => Center(
+                          child: Icon(Icons.videocam_outlined,
+                              color: _N.textMuted, size: 48),
+                        ),
+                      )
+                    : Center(
+                        child: Icon(Icons.videocam_outlined,
+                            color: _N.textMuted, size: 48),
+                      ),
+              ),
+              Positioned.fill(
+                child: Align(
+                  alignment: Alignment.center,
+                  child: Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.35),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.play_arrow_rounded,
+                        color: Colors.white, size: 34),
+                  ),
+                ),
+              ),
+            ]),
+          ),
+        ),
+      ),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(10, 4, 10, 6),
+        child: _timeRow(isMe, time, rm.message.status),
+      ),
+    ]);
+  }
+
+  void _openVideoPlayer(String path) {
+    // Simple player placeholder: open fullscreen and show video using default viewer.
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => Scaffold(
+        backgroundColor: Colors.black,
+        appBar: AppBar(backgroundColor: Colors.black, iconTheme: const IconThemeData(color: Colors.white)),
+        body: Center(child: Text('Play video at: $path', style: const TextStyle(color: Colors.white))),
+      ),
+    ));
   }
 
   Widget _buildAudioBubble(RichMessage rm, bool isMe, String time) {
