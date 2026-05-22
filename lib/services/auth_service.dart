@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart' show kDebugMode, debugPrint;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:multilingual_chat_app/models/friend_request.dart';
 import 'package:multilingual_chat_app/models/user.dart' as app_model;
 import 'package:multilingual_chat_app/services/supabase_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide User;
@@ -280,36 +281,155 @@ class AuthService {
     );
   }
 
+  /// Sends a friend REQUEST (does NOT add directly).
+  /// The receiver must accept before chatting is allowed.
   Future<app_model.User> addFriendByProfileId(String profileId) async {
     final current = await getCurrentUser();
-    if (current == null) {
-      throw Exception('Not authenticated');
-    }
+    if (current == null) throw Exception('Not authenticated');
 
     final target = await getUserByProfileId(profileId);
-    if (target == null) {
-      throw Exception('No user found with that Profile ID.');
-    }
+    if (target == null) throw Exception('No user found with that Profile ID.');
+    if (target.id == current.id) throw Exception('You cannot add yourself.');
 
-    if (target.id == current.id) {
-      throw Exception('You cannot add yourself as a friend.');
-    }
-
-    final existing = await _client
+    // Check if already friends
+    final alreadyFriend = await _client
         .from('friends')
         .select('id')
-        .eq('user_id', current.id)
-        .eq('friend_id', target.id)
+        .or('and(user_id.eq.${current.id},friend_id.eq.${target.id}),and(user_id.eq.${target.id},friend_id.eq.${current.id})')
         .limit(1);
-
-    if (existing.isEmpty) {
-      await _client.from('friends').insert({
-        'user_id': current.id,
-        'friend_id': target.id,
-      });
+    if (alreadyFriend.isNotEmpty) {
+      throw Exception('You are already friends with ${target.name}.');
     }
 
+    // Check for a pending request in either direction
+    final existing = await _client
+        .from('friend_requests')
+        .select('id, status')
+        .or('and(sender_id.eq.${current.id},receiver_id.eq.${target.id}),and(sender_id.eq.${target.id},receiver_id.eq.${current.id})')
+        .eq('status', 'pending')
+        .limit(1);
+    if (existing.isNotEmpty) {
+      throw Exception('A pending request already exists with ${target.name}.');
+    }
+
+    await _client.from('friend_requests').insert({
+      'sender_id': current.id,
+      'receiver_id': target.id,
+      'status': 'pending',
+    });
+
     return target;
+  }
+
+  // ── Friend request helpers ────────────────────────────────────────────────
+
+  Future<List<FriendRequest>> getIncomingRequests() async {
+    final current = await getCurrentUser();
+    if (current == null) return [];
+
+    final rows = await _client
+        .from('friend_requests')
+        .select()
+        .eq('receiver_id', current.id)
+        .eq('status', 'pending')
+        .order('created_at', ascending: false);
+
+    final result = <FriendRequest>[];
+    for (final row in rows) {
+      final req = _requestFromRow(row);
+      final senderRows = await _client
+          .from('profiles')
+          .select()
+          .eq('id', req.senderId)
+          .limit(1);
+      if (senderRows.isNotEmpty) {
+        req.senderUser = _profileToUser(
+            Map<String, dynamic>.from(senderRows.first));
+      }
+      result.add(req);
+    }
+    return result;
+  }
+
+  Future<List<FriendRequest>> getOutgoingRequests() async {
+    final current = await getCurrentUser();
+    if (current == null) return [];
+
+    final rows = await _client
+        .from('friend_requests')
+        .select()
+        .eq('sender_id', current.id)
+        .inFilter('status', ['pending', 'accepted', 'cancelled'])
+        .order('created_at', ascending: false);
+
+    final result = <FriendRequest>[];
+    for (final row in rows) {
+      final req = _requestFromRow(row);
+      final receiverRows = await _client
+          .from('profiles')
+          .select()
+          .eq('id', req.receiverId)
+          .limit(1);
+      if (receiverRows.isNotEmpty) {
+        req.receiverUser = _profileToUser(
+            Map<String, dynamic>.from(receiverRows.first));
+      }
+      result.add(req);
+    }
+    return result;
+  }
+
+  Future<void> acceptRequest(String requestId) async {
+    final current = await getCurrentUser();
+    if (current == null) throw Exception('Not authenticated');
+
+    // Fetch the request
+    final rows = await _client
+        .from('friend_requests')
+        .select()
+        .eq('id', requestId)
+        .limit(1);
+    if (rows.isEmpty) throw Exception('Request not found.');
+
+    final row = rows.first;
+    final senderId = row['sender_id']?.toString() ?? '';
+    final receiverId = row['receiver_id']?.toString() ?? '';
+
+    if (receiverId != current.id) {
+      throw Exception('You are not the receiver of this request.');
+    }
+
+    // Mark accepted
+    await _client
+        .from('friend_requests')
+        .update({'status': 'accepted'})
+        .eq('id', requestId);
+
+    // Create the friendship (both directions)
+    final existingFriend = await _client
+        .from('friends')
+        .select('id')
+        .eq('user_id', senderId)
+        .eq('friend_id', receiverId)
+        .limit(1);
+    if (existingFriend.isEmpty) {
+      await _client.from('friends').insert({
+        'user_id': senderId,
+        'friend_id': receiverId,
+      });
+    }
+  }
+
+  Future<void> cancelRequest(String requestId) async {
+    await _client
+        .from('friend_requests')
+        .update({'status': 'cancelled'})
+        .eq('id', requestId);
+  }
+
+  // ── Internal helper ───────────────────────────────────────────────────────
+  FriendRequest _requestFromRow(Map<String, dynamic> row) {
+    return FriendRequest.fromJson(row);
   }
 
   Future<Map<String, dynamic>> login(String email, String password) async {

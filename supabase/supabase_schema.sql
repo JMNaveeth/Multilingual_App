@@ -57,6 +57,15 @@ create table if not exists public.friends (
   unique(user_id, friend_id)
 );
 
+create table if not exists public.friend_requests (
+  id uuid primary key default gen_random_uuid(),
+  sender_id uuid not null references public.profiles(id) on delete cascade,
+  receiver_id uuid not null references public.profiles(id) on delete cascade,
+  status text not null default 'pending' check (status in ('pending', 'accepted', 'cancelled')),
+  created_at timestamptz not null default now(),
+  unique(sender_id, receiver_id)
+);
+
 create index if not exists idx_messages_sender_created
   on public.messages(sender_id, created_at desc);
 
@@ -70,6 +79,7 @@ alter table public.profiles enable row level security;
 alter table public.messages enable row level security;
 alter table public.call_history enable row level security;
 alter table public.friends enable row level security;
+alter table public.friend_requests enable row level security;
 
 drop policy if exists "friends_select_own" on public.friends;
 create policy "friends_select_own"
@@ -91,6 +101,35 @@ create policy "friends_delete_own"
   for delete
   to authenticated
   using (auth.uid() = user_id);
+
+drop policy if exists "friend_requests_select_own" on public.friend_requests;
+create policy "friend_requests_select_own"
+  on public.friend_requests
+  for select
+  to authenticated
+  using (auth.uid() = sender_id or auth.uid() = receiver_id);
+
+drop policy if exists "friend_requests_insert_own" on public.friend_requests;
+create policy "friend_requests_insert_own"
+  on public.friend_requests
+  for insert
+  to authenticated
+  with check (auth.uid() = sender_id);
+
+drop policy if exists "friend_requests_update_own" on public.friend_requests;
+create policy "friend_requests_update_own"
+  on public.friend_requests
+  for update
+  to authenticated
+  using (auth.uid() = sender_id or auth.uid() = receiver_id)
+  with check (auth.uid() = sender_id or auth.uid() = receiver_id);
+
+drop policy if exists "friend_requests_delete_own" on public.friend_requests;
+create policy "friend_requests_delete_own"
+  on public.friend_requests
+  for delete
+  to authenticated
+  using (auth.uid() = sender_id or auth.uid() = receiver_id);
 
 drop policy if exists "profiles_select_authenticated" on public.profiles;
 create policy "profiles_select_authenticated"

@@ -8,6 +8,7 @@ import 'package:multilingual_chat_app/providers/call_history_provider.dart';
 import 'package:multilingual_chat_app/screens/chat_list_screen.dart';
 import 'package:multilingual_chat_app/screens/discover_screen.dart';
 import 'package:multilingual_chat_app/screens/profile_screen.dart';
+import 'package:multilingual_chat_app/screens/requests_screen.dart';
 
 // ── Nexus Design Tokens ─────────────────────────────────────────────────────
 class _N {
@@ -265,10 +266,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       );
 
   // ── Segment control ───────────────────────────────────────────────────────
-  static const _segLabels = ['Messages', 'Moments', 'Calls'];
+  static const _segLabels = ['Messages', 'Requests', 'Calls'];
   static const _segIcons = [
     Icons.forum_outlined,
-    Icons.auto_awesome_outlined,
+    Icons.person_add_alt_1_outlined,
     Icons.mic_none_rounded,
   ];
 
@@ -337,7 +338,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           ),
         );
       case 1:
-        return _buildComingSoon(Icons.auto_awesome_outlined, 'Moments');
+        return const RequestsScreen();
       case 2:
         return _buildCallHistoryContent();
       default:
@@ -802,7 +803,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   side: const BorderSide(color: _N.cardBorder),
                 ),
                 title: const Text(
-                  'Add Friend',
+                  'Send Friend Request',
                   style: TextStyle(
                     color: _N.textPrimary,
                     fontWeight: FontWeight.w800,
@@ -813,7 +814,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'Enter the other user\'s Profile ID like EC-12345678.',
+                      'Enter the other user\'s Profile ID to send them a friend request. They must accept before you can chat.',
                       style: TextStyle(color: _N.textSecondary, fontSize: 13),
                     ),
                     const SizedBox(height: 14),
@@ -845,7 +846,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     ),
                     const SizedBox(height: 10),
                     const Text(
-                      'After confirming, the user will appear in your chat list.',
+                      'The user will receive your request and must accept it before you can start chatting.',
                       style: TextStyle(color: _N.textMuted, fontSize: 12),
                     ),
                   ],
@@ -876,10 +877,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
                               ref.invalidate(chatListProvider);
 
-                              if (dialogContext.mounted) {
-                                Navigator.of(dialogContext).pop();
+                              if (mounted) {
+                                if (dialogContext.mounted) {
+                                  Navigator.of(dialogContext).pop();
+                                }
                                 closedDialog = true;
-                                _snack('Added ${friend.name} to your friends');
+                                _snack('Request sent to ${friend.name}! They must accept before you can chat.');
                               }
                             } catch (e) {
                               if (mounted) {
@@ -911,7 +914,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                               color: Colors.white,
                             ),
                           )
-                        : const Text('Confirm'),
+                        : const Text('Send Request'),
                   ),
                 ],
               );
