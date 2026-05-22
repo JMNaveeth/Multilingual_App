@@ -166,7 +166,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       currentUserId: currentUser.id,
       otherUserId: widget.user.id,
     )
-          .listen((messages) async {
+        .listen((messages) async {
       if (!mounted) return;
       final hiddenIds = await _chatService.getHiddenMessageIds(currentUser.id);
 
@@ -187,7 +187,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       });
       _scrollToBottom();
     });
-    
+
     _incomingCallSub ??= CallSocketService.instance.incomingCalls.listen(
       (incomingCall) {
         if (!mounted) return;
@@ -2570,8 +2570,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => Scaffold(
         backgroundColor: Colors.black,
-        appBar: AppBar(backgroundColor: Colors.black, iconTheme: const IconThemeData(color: Colors.white)),
-        body: Center(child: Text('Play video at: $path', style: const TextStyle(color: Colors.white))),
+        appBar: AppBar(
+            backgroundColor: Colors.black,
+            iconTheme: const IconThemeData(color: Colors.white)),
+        body: Center(
+            child: Text('Play video at: $path',
+                style: const TextStyle(color: Colors.white))),
       ),
     ));
   }
