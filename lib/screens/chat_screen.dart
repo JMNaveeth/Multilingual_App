@@ -2306,11 +2306,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   }
 
   Widget _buildForwardedBadge() {
-    return Row(
+    return const Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         Icon(Icons.forward_rounded, size: 12, color: _N.indigoLight),
-        const SizedBox(width: 4),
+        SizedBox(width: 4),
         Text(
           'Forwarded',
           style: TextStyle(
