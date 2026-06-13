@@ -93,7 +93,7 @@ create policy "friends_insert_own"
   on public.friends
   for insert
   to authenticated
-  with check (auth.uid() = user_id);
+  with check (auth.uid() = user_id or auth.uid() = friend_id);
 
 drop policy if exists "friends_delete_own" on public.friends;
 create policy "friends_delete_own"

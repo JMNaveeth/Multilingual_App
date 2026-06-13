@@ -409,13 +409,21 @@ class AuthService {
     final existingFriend = await _client
         .from('friends')
         .select('id')
-        .eq('user_id', senderId)
-        .eq('friend_id', receiverId)
+        .or('and(user_id.eq.$senderId,friend_id.eq.$receiverId),and(user_id.eq.$receiverId,friend_id.eq.$senderId)')
         .limit(1);
     if (existingFriend.isEmpty) {
       await _client.from('friends').insert({
-        'user_id': senderId,
-        'friend_id': receiverId,
+        'user_id': receiverId, // current.id (auth.uid()) to satisfy the RLS policy
+        'friend_id': senderId,
+      });
+
+      // Auto-send a welcome message to break the ice
+      await _client.from('messages').insert({
+        'sender_id': receiverId, // current.id (auth.uid()) to satisfy the messages RLS insert policy
+        'receiver_id': senderId,
+        'content': '💬 You are now connected on ec communication! Start typing to say hello!',
+        'type': 'text',
+        'status': 'sent',
       });
     }
   }
