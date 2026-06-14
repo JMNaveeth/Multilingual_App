@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:multilingual_chat_app/models/friend_request.dart';
 import 'package:multilingual_chat_app/services/auth_service.dart';
+import 'package:multilingual_chat_app/screens/chat_list_screen.dart';
 
 // ── Design tokens (mirrors _N in home_screen) ─────────────────────────────
 class _N {
@@ -59,6 +60,7 @@ class _RequestsScreenState extends ConsumerState<RequestsScreen>
   void _refresh() {
     ref.invalidate(incomingRequestsProvider);
     ref.invalidate(outgoingRequestsProvider);
+    ref.invalidate(chatListProvider);
   }
 
   @override

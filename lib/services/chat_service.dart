@@ -335,6 +335,15 @@ class ChatService {
     });
   }
 
+  Stream<List<Message>> getUserMessagesStream(String userId) {
+    return _client.from('messages').stream(primaryKey: ['id']).map((rows) {
+      return rows
+          .map((row) => _fromRow(row))
+          .where((m) => m.senderId == userId || m.receiverId == userId)
+          .toList();
+    });
+  }
+
   Future<Message> sendMessage(Message message) async {
     await _upsertSingleLocalMessage(message.senderId, message);
 

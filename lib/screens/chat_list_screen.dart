@@ -9,6 +9,10 @@ import 'package:multilingual_chat_app/services/auth_service.dart';
 import 'package:multilingual_chat_app/services/chat_service.dart';
 import 'package:multilingual_chat_app/models/message.dart';
 
+final userMessagesStreamProvider = StreamProvider.family<List<Message>, String>((ref, userId) {
+  return ChatService().getUserMessagesStream(userId);
+});
+
 final chatListProvider =
     FutureProvider<List<Map<String, dynamic>>>((ref) async {
   final currentUser = ref.watch(authProvider).value;
@@ -16,6 +20,9 @@ final chatListProvider =
 
   final authService = AuthService();
   final chatService = ChatService();
+
+  // Watch user messages stream to automatically rebuild when any welcome/new message occurs
+  ref.watch(userMessagesStreamProvider(currentUser.id));
 
   final users = await authService.getFriends();
   final messages = await chatService.getAllLocalMessages();
